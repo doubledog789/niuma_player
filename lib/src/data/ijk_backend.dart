@@ -32,7 +32,18 @@ class IjkBackend implements PlayerBackend {
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast();
 
+  /// Resolves when the native `initialized` event arrives (IJK's onPrepared).
+  /// Completed with an error if the first event we see is `error`. Ensures
+  /// [initialize] has parity with video_player's "ready-to-play" semantics —
+  /// play/seek commands fired right after initialize() succeed because the
+  /// underlying IjkMediaPlayer is guaranteed prepared by then.
+  final Completer<void> _preparedCompleter = Completer<void>();
+
   bool _disposed = false;
+
+  /// Max time we wait for IJK's onPrepared before giving up. Network streams
+  /// with huge manifests can take a while; 30s is generous.
+  static const Duration _prepareTimeout = Duration(seconds: 30);
 
   @override
   PlayerBackendKind get kind => PlayerBackendKind.ijk;
@@ -87,6 +98,18 @@ class IjkBackend implements PlayerBackend {
           _onEvent,
           onError: _onChannelError,
         );
+
+    // Wait for the native `initialized` event (IJK's onPrepared). Without
+    // this, callers that do `initialize(); play()` fire start() before the
+    // player is ready, which IjkMediaPlayer silently drops.
+    await _preparedCompleter.future.timeout(
+      _prepareTimeout,
+      onTimeout: () => throw PlatformException(
+        code: 'ijk_prepare_timeout',
+        message:
+            'IJK prepareAsync did not finish within ${_prepareTimeout.inSeconds}s',
+      ),
+    );
   }
 
   void _onEvent(dynamic raw) {
@@ -106,6 +129,7 @@ class IjkBackend implements PlayerBackend {
           duration: Duration(milliseconds: durationMs),
           size: Size(width, height),
         ));
+        if (!_preparedCompleter.isCompleted) _preparedCompleter.complete();
         break;
       case 'bufferingStart':
         _updateValue(_value.copyWith(isBuffering: true));
@@ -141,6 +165,16 @@ class IjkBackend implements PlayerBackend {
         if (!_eventController.isClosed) {
           _eventController.add(
             FallbackTriggered(FallbackReason.error, errorCode: code),
+          );
+        }
+        // If prepare never arrived, surface the error from initialize()
+        // instead of leaving the caller hanging on the prepare completer.
+        if (!_preparedCompleter.isCompleted) {
+          _preparedCompleter.completeError(
+            PlatformException(
+              code: code ?? 'ijk_error',
+              message: message ?? 'IjkMediaPlayer error',
+            ),
           );
         }
         break;
