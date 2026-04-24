@@ -275,8 +275,20 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     _eventController.add(event);
   }
 
-  Future<void> play() async => _backend?.play();
-  Future<void> pause() async => _backend?.pause();
+  Future<void> play() async {
+    debugPrint(
+      '[niuma_player] play() backend=${_backend?.kind.name ?? "<null>"}',
+    );
+    await _backend?.play();
+  }
+
+  Future<void> pause() async {
+    debugPrint(
+      '[niuma_player] pause() backend=${_backend?.kind.name ?? "<null>"}',
+    );
+    await _backend?.pause();
+  }
+
   Future<void> seekTo(Duration position) async => _backend?.seekTo(position);
   Future<void> setPlaybackSpeed(double speed) async =>
       _backend?.setSpeed(speed);
