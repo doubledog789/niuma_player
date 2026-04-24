@@ -46,7 +46,11 @@ const List<_Sample> _samples = <_Sample>[
   ),
   _Sample(
     label: '播放 HLS m3u8',
-    url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    url: 'http://api.rcmdiqxno.com/dyapi/m3u8/p/6a82e3ce1e9f46163419dc59a5fbce8b.m3u8',
+  ),
+  _Sample(
+    label: '播放 HLS m3u8',
+    url: 'http://api.rcmdiqxno.com/dyapi/m3u8/p/a5df5b6fdeac289ced48258c60afecf0.m3u8',
   ),
   _Sample(
     label: '强制 IJK 播放 m3u8',
@@ -218,9 +222,9 @@ class _DemoHomePageState extends State<DemoHomePage> {
 
           const SizedBox(height: 12),
 
-          // 3. Video + controls
+          // 3. Video — aspect ratio follows the stream when known, otherwise 16:9.
           AspectRatio(
-            aspectRatio: 16 / 9,
+            aspectRatio: _videoAspect(value) ?? 16 / 9,
             child: Container(
               color: Colors.black,
               alignment: Alignment.center,
@@ -228,31 +232,12 @@ class _DemoHomePageState extends State<DemoHomePage> {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: <Widget>[
-              ElevatedButton(
-                onPressed: (controller != null && value?.initialized == true)
-                    ? () => controller.play()
-                    : null,
-                child: const Text('Play'),
-              ),
-              ElevatedButton(
-                onPressed: (controller != null && value?.initialized == true)
-                    ? () => controller.pause()
-                    : null,
-                child: const Text('Pause'),
-              ),
-              ElevatedButton(
-                onPressed: (controller != null && value?.initialized == true)
-                    ? () => controller.seekTo(
-                          (value!.position) + const Duration(seconds: 10),
-                        )
-                    : null,
-                child: const Text('Seek +10s'),
-              ),
-            ],
-          ),
+
+          // 4. Player controls (time + scrubber + skip / play-pause / skip).
+          if (controller != null && value != null && value.initialized)
+            _PlayerControls(controller: controller, value: value)
+          else
+            const _PlayerControlsSkeleton(),
 
           const SizedBox(height: 12),
           OutlinedButton(
@@ -343,4 +328,217 @@ class _BackendStatus extends StatelessWidget {
       style: const TextStyle(fontWeight: FontWeight.w500),
     );
   }
+}
+
+/// Rich player chrome below the video: scrubber + time + skip / play-pause.
+class _PlayerControls extends StatefulWidget {
+  const _PlayerControls({required this.controller, required this.value});
+
+  final NiumaPlayerController controller;
+  final NiumaPlayerValue value;
+
+  @override
+  State<_PlayerControls> createState() => _PlayerControlsState();
+}
+
+class _PlayerControlsState extends State<_PlayerControls> {
+  // While the user is dragging the scrubber, show the drag position instead
+  // of the live one so the thumb doesn't jump back mid-gesture. Null = not
+  // scrubbing.
+  double? _scrubMs;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = widget.value;
+    final durMs = v.duration.inMilliseconds.toDouble();
+    final posMs = v.position.inMilliseconds.toDouble();
+    final hasDuration = durMs > 0;
+    final displayMs = _scrubMs ?? posMs;
+
+    final theme = Theme.of(context);
+    final timeStyle = theme.textTheme.bodySmall?.copyWith(
+      fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            SizedBox(
+              width: 56,
+              child: Text(
+                _fmtDuration(Duration(milliseconds: displayMs.toInt())),
+                textAlign: TextAlign.center,
+                style: timeStyle,
+              ),
+            ),
+            Expanded(
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                ),
+                child: Slider(
+                  value: hasDuration ? displayMs.clamp(0, durMs) : 0,
+                  min: 0,
+                  max: hasDuration ? durMs : 1,
+                  onChanged: hasDuration
+                      ? (x) => setState(() => _scrubMs = x)
+                      : null,
+                  onChangeEnd: hasDuration
+                      ? (x) async {
+                          await widget.controller
+                              .seekTo(Duration(milliseconds: x.toInt()));
+                          if (mounted) setState(() => _scrubMs = null);
+                        }
+                      : null,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 56,
+              child: Text(
+                hasDuration ? _fmtDuration(v.duration) : '--:--',
+                textAlign: TextAlign.center,
+                style: timeStyle,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: <Widget>[
+            IconButton(
+              tooltip: '后退 10 秒',
+              iconSize: 32,
+              onPressed: () {
+                final next = v.position - const Duration(seconds: 10);
+                widget.controller
+                    .seekTo(next.isNegative ? Duration.zero : next);
+              },
+              icon: const Icon(Icons.replay_10),
+            ),
+            IconButton(
+              tooltip: v.isPlaying ? '暂停' : '播放',
+              iconSize: 56,
+              color: theme.colorScheme.primary,
+              onPressed: () {
+                if (v.isPlaying) {
+                  widget.controller.pause();
+                } else {
+                  widget.controller.play();
+                }
+              },
+              icon: Icon(
+                v.isPlaying
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_filled,
+              ),
+            ),
+            IconButton(
+              tooltip: '前进 10 秒',
+              iconSize: 32,
+              onPressed: () {
+                final next = v.position + const Duration(seconds: 10);
+                widget.controller
+                    .seekTo(next > v.duration ? v.duration : next);
+              },
+              icon: const Icon(Icons.forward_10),
+            ),
+          ],
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 150),
+          child: v.isBuffering
+              ? Row(
+                  key: const ValueKey<String>('buffering'),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '缓冲中…',
+                      style: TextStyle(fontSize: 12, color: Colors.orange),
+                    ),
+                  ],
+                )
+              : const SizedBox(
+                  key: ValueKey<String>('idle'),
+                  height: 12,
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown before a controller exists / finishes initializing. Keeps vertical
+/// space stable so the layout doesn't jump when the real controls appear.
+class _PlayerControlsSkeleton extends StatelessWidget {
+  const _PlayerControlsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.4,
+      child: IgnorePointer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: const <Widget>[
+                SizedBox(
+                  width: 56,
+                  child: Text('--:--', textAlign: TextAlign.center),
+                ),
+                Expanded(child: Slider(value: 0, onChanged: null)),
+                SizedBox(
+                  width: 56,
+                  child: Text('--:--', textAlign: TextAlign.center),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: const <Widget>[
+                Icon(Icons.replay_10, size: 32),
+                Icon(Icons.play_circle_filled, size: 56),
+                Icon(Icons.forward_10, size: 32),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _fmtDuration(Duration d) {
+  final totalSeconds = d.inSeconds;
+  final hours = totalSeconds ~/ 3600;
+  final minutes = (totalSeconds % 3600) ~/ 60;
+  final seconds = totalSeconds % 60;
+  String two(int n) => n.toString().padLeft(2, '0');
+  if (hours > 0) {
+    return '${two(hours)}:${two(minutes)}:${two(seconds)}';
+  }
+  return '${two(minutes)}:${two(seconds)}';
+}
+
+double? _videoAspect(NiumaPlayerValue? v) {
+  if (v == null) return null;
+  final w = v.size.width;
+  final h = v.size.height;
+  if (w <= 0 || h <= 0) return null;
+  return w / h;
 }
