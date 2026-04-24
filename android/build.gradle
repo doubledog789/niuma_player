@@ -14,10 +14,21 @@ buildscript {
     }
 }
 
+// Propagate our vendored maven repo into the consumer's root project so
+// transitive ijkplayer resolution Just Works. Without this, `allprojects`
+// inside a Flutter plugin's build.gradle does NOT reach the consuming app.
+def niumaLocalMaven = file("${project.projectDir}/localmaven")
+rootProject.allprojects { proj ->
+    proj.repositories {
+        maven { url = uri(niumaLocalMaven) }
+    }
+}
+
 allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri(niumaLocalMaven) }
     }
 }
 
@@ -45,9 +56,20 @@ android {
 
     defaultConfig {
         minSdk = 21
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
+    }
+
+    packagingOptions {
+        pickFirst "lib/*/libc++_shared.so"
     }
 
     dependencies {
+        // Vendored via localmaven/ instead of fileTree to satisfy AGP 8's
+        // prohibition on direct local .aar deps for library modules.
+        implementation("tv.danmaku.ijk:ijkplayer:0.8.9-beta-260402150035@aar")
+
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
     }

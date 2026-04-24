@@ -1,0 +1,27 @@
+# niuma_player IJK / FFmpeg 版本锁定
+# 本文件为所有 android/libs/ijkplayer.aar 产物的唯一事实源。
+# 任何版本变更都必须先改本文件，再改脚本。
+# 参考: docs/plans/2026-04-24-niuma-player-design.md Section 7.1
+
+IJK_FORK=debugly/ijkplayer
+IJK_TAG=k0.8.9-beta-260402150035
+FFMPEG_FORK=bilibili/FFmpeg
+FFMPEG_TAG=ff4.0--ijk0.8.8--20210426--001
+OPENSSL_VERSION=1.1.1w
+NDK_VERSION=r26b
+NDK_REVISION=26.1.10909125
+COMPILE_SDK=35
+TARGET_SDK=35
+MIN_SDK=21
+ABI=arm64-v8a,armeabi-v7a
+FFMPEG_MODULE=module-lite-hevc.sh
+LICENSE=LGPL-2.1
+FFMPEG_GPL=disabled
+FFMPEG_NONFREE=disabled
+OPENSSL_LINK=static
+
+# 官方 prebuilt asset（debugly/ijkplayer releases）
+PREBUILT_ASSET=ijkplayer-cmake-release.aar
+PREBUILT_URL=https://github.com/debugly/ijkplayer/releases/download/k0.8.9-beta-260402150035/ijkplayer-cmake-release.aar
+PREBUILT_SHA256=f325911be7f6b9288a58bfe5872d7860b2066982b630f6462492f56efec5f163
+PREBUILT_SIZE=13771260

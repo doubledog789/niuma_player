@@ -31,3 +31,8 @@ migrate_working_dir/
 .flutter-plugins
 .flutter-plugins-dependencies
 build/
+
+# Vendored ijkplayer AAR — pulled by android/scripts/compile/download-prebuilt.sh.
+# Keep .pom (version record) in git, keep .aar out (13 MB binary).
+android/libs/
+android/localmaven/**/*.aar
