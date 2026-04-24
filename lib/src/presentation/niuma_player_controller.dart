@@ -281,6 +281,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Future<void> setPlaybackSpeed(double speed) async =>
       _backend?.setSpeed(speed);
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
+  Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
 
   /// Wipes the "this device needs IJK" memory for every device fingerprint.
   /// App-level "clear cache / reset" flows should call this so a future

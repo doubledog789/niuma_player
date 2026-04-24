@@ -109,6 +109,9 @@ class VideoPlayerBackend implements PlayerBackend {
   Future<void> setVolume(double volume) => _inner.setVolume(volume);
 
   @override
+  Future<void> setLooping(bool looping) => _inner.setLooping(looping);
+
+  @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;

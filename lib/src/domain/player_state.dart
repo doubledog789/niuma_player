@@ -44,6 +44,13 @@ class NiumaPlayerValue {
     return size.width / size.height;
   }
 
+  /// True when playback has reached (or nearly reached) the end of the media.
+  /// Derived rather than stored so both backends can share the same rule.
+  bool get isCompleted {
+    if (duration <= Duration.zero) return false;
+    return position >= duration - const Duration(milliseconds: 300);
+  }
+
   NiumaPlayerValue copyWith({
     bool? initialized,
     Duration? position,

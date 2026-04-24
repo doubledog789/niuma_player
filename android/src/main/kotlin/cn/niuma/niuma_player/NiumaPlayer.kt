@@ -220,6 +220,10 @@ internal class NiumaPlayer(
         }
     }
 
+    fun setLooping(looping: Boolean) {
+        if (!released) player.isLooping = looping
+    }
+
     fun release() {
         if (released) return
         released = true
@@ -267,6 +271,11 @@ internal class NiumaPlayer(
                 "setVolume" -> {
                     val volume = (call.argument<Number>("volume") ?: 1.0).toFloat()
                     setVolume(volume)
+                    result.success(null)
+                }
+                "setLooping" -> {
+                    val looping = call.argument<Boolean>("looping") ?: false
+                    setLooping(looping)
                     result.success(null)
                 }
                 "dispose" -> {

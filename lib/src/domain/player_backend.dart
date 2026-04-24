@@ -38,5 +38,7 @@ abstract class PlayerBackend {
 
   Future<void> setVolume(double volume);
 
+  Future<void> setLooping(bool looping);
+
   Future<void> dispose();
 }

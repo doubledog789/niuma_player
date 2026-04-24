@@ -203,6 +203,14 @@ class IjkBackend implements PlayerBackend {
   }
 
   @override
+  Future<void> setLooping(bool looping) async {
+    await _instanceChannel?.invokeMethod<void>(
+      'setLooping',
+      _argsWithId(<String, dynamic>{'looping': looping}),
+    );
+  }
+
+  @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;

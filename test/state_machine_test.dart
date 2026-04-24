@@ -83,6 +83,9 @@ class FakePlayerBackend implements PlayerBackend {
   Future<void> setVolume(double volume) async {}
 
   @override
+  Future<void> setLooping(bool looping) async {}
+
+  @override
   Future<void> dispose() async {
     disposed = true;
     await _valueController.close();
