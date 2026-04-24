@@ -88,17 +88,26 @@ internal class NiumaPlayer(
     // ---------------------------------------------------------------------
 
     private fun configureOptions() {
+        // Force software decoding. IJK's raison d'être in this plugin is to
+        // rescue playback on devices where the system's MediaCodec is flaky
+        // (Huawei, old Xiaomi / Redmi low-end SoCs like MTK Helio G25/G35
+        // where MediaCodec can segfault in native). Turning mediacodec back
+        // on here would re-introduce the exact hardware path video_player
+        // already tried and that we're falling back from. FFmpeg software
+        // decoding is slower but crash-free.
         player.setOption(
-            IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1
-        )
-        player.setOption(
-            IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1
-        )
-        player.setOption(
-            IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1
+            IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0
         )
         player.setOption(
             IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 0
+        )
+        // Reconnect on network drop — cheap insurance for mobile networks.
+        player.setOption(
+            IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1
+        )
+        // Lower frame drop threshold so old CPUs stay in sync on heavy streams.
+        player.setOption(
+            IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5
         )
         player.setOption(
             IjkMediaPlayer.OPT_CATEGORY_FORMAT,
