@@ -1,0 +1,56 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "example (debug) — 选设备",
+      "type": "dart",
+      "request": "launch",
+      "program": "example/lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "example (profile) — Android 实测",
+      "type": "dart",
+      "request": "launch",
+      "program": "example/lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "example (release) — Android 实测",
+      "type": "dart",
+      "request": "launch",
+      "program": "example/lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "flutterMode": "release"
+    },
+    {
+      "name": "example → PHK110 (Android) 调试",
+      "type": "dart",
+      "request": "launch",
+      "program": "example/lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "deviceId": "b8eea6f3",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "example → PHK110 (Android) profile",
+      "type": "dart",
+      "request": "launch",
+      "program": "example/lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "deviceId": "b8eea6f3",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "example → iPhone 羊驼🦙 (iOS) 调试",
+      "type": "dart",
+      "request": "launch",
+      "program": "example/lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "deviceId": "00008110-000A403E0E13801E",
+      "flutterMode": "debug"
+    }
+  ]
+}
