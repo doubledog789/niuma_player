@@ -122,6 +122,7 @@ internal class NiumaPlayer(
         }
 
         player.setOnCompletionListener {
+            emit(mapOf("event" to "playingChanged", "isPlaying" to false))
             emit(mapOf("event" to "completed"))
         }
 
@@ -142,6 +143,10 @@ internal class NiumaPlayer(
                     emit(mapOf("event" to "bufferingStart"))
                 IMediaPlayer.MEDIA_INFO_BUFFERING_END ->
                     emit(mapOf("event" to "bufferingEnd"))
+                IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START ->
+                    // Authoritative "now actually rendering" signal — confirms
+                    // the optimistic playingChanged emitted in play().
+                    emit(mapOf("event" to "playingChanged", "isPlaying" to true))
             }
             true
         }
@@ -198,11 +203,21 @@ internal class NiumaPlayer(
     // ---------------------------------------------------------------------
 
     fun play() {
-        if (!released) player.start()
+        if (!released) {
+            player.start()
+            // IJK's `setOnStartListener` doesn't exist. Emit optimistically so
+            // Dart-side state flips to playing immediately after the user
+            // presses play. Actual rendering start is confirmed asynchronously
+            // via MEDIA_INFO_VIDEO_RENDERING_START below.
+            emit(mapOf("event" to "playingChanged", "isPlaying" to true))
+        }
     }
 
     fun pause() {
-        if (!released) player.pause()
+        if (!released) {
+            player.pause()
+            emit(mapOf("event" to "playingChanged", "isPlaying" to false))
+        }
     }
 
     fun seekTo(positionMs: Long) {
