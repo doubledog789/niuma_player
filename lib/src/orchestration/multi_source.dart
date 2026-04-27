@@ -56,7 +56,8 @@ class MediaLine {
   /// Optional quality metadata describing this stream's technical properties.
   final MediaQuality? quality;
 
-  /// Selection weight; higher priority tried first by AutoFailoverOrchestrator.
+  /// Selection weight; lower value tried first by AutoFailoverOrchestrator
+  /// (priority 0 is the primary line, higher numbers are fallbacks).
   final int priority;
 }
 
