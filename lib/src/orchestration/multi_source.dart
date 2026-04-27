@@ -59,3 +59,77 @@ class MediaLine {
   /// Selection weight; higher priority tried first by AutoFailoverOrchestrator.
   final int priority;
 }
+
+/// A media source descriptor that may carry multiple switchable lines
+/// (CDN mirrors, quality variants, or failover backups).
+///
+/// Use [NiumaMediaSource.single] for simple single-URL playback, or
+/// [NiumaMediaSource.lines] when offering quality selection or CDN failover.
+/// The line identified by [defaultLineId] is used on first playback.
+@immutable
+class NiumaMediaSource {
+  const NiumaMediaSource._({
+    required this.lines,
+    required this.defaultLineId,
+  });
+
+  /// Creates a [NiumaMediaSource] backed by a single [NiumaDataSource].
+  ///
+  /// The resulting source has one [MediaLine] with id `'default'`.
+  /// Use this when there is only one URL and no quality/CDN switching needed.
+  factory NiumaMediaSource.single(NiumaDataSource source) {
+    return NiumaMediaSource._(
+      lines: [
+        MediaLine(id: 'default', label: 'default', source: source),
+      ],
+      defaultLineId: 'default',
+    );
+  }
+
+  /// Creates a [NiumaMediaSource] from an explicit list of [MediaLine]s.
+  ///
+  /// [lines] must be non-empty. [defaultLineId] must match the [MediaLine.id]
+  /// of exactly one entry in [lines]; an [ArgumentError] is thrown otherwise.
+  /// Use this for multi-quality playlists or CDN failover configurations.
+  factory NiumaMediaSource.lines({
+    required List<MediaLine> lines,
+    required String defaultLineId,
+  }) {
+    if (lines.isEmpty) {
+      throw ArgumentError.value(lines, 'lines', 'must not be empty');
+    }
+    if (!lines.any((l) => l.id == defaultLineId)) {
+      throw ArgumentError.value(
+        defaultLineId,
+        'defaultLineId',
+        'is not the id of any provided line',
+      );
+    }
+    return NiumaMediaSource._(lines: lines, defaultLineId: defaultLineId);
+  }
+
+  /// The ordered list of playback lines available for this source.
+  ///
+  /// Each entry is a [MediaLine] identified by its [MediaLine.id].
+  /// Do not confuse with the [NiumaMediaSource.lines] factory constructor.
+  final List<MediaLine> lines;
+
+  /// The [MediaLine.id] of the line that is active by default.
+  ///
+  /// Guaranteed to match one entry in [lines] by construction.
+  final String defaultLineId;
+
+  /// Returns the [MediaLine] whose [MediaLine.id] equals [defaultLineId].
+  ///
+  /// Safe to call without null-check: the factories enforce that
+  /// [defaultLineId] always refers to an existing line.
+  MediaLine get currentLine => lines.firstWhere((l) => l.id == defaultLineId);
+
+  /// Returns the [MediaLine] with the given [id], or `null` if not found.
+  MediaLine? lineById(String id) {
+    for (final line in lines) {
+      if (line.id == id) return line;
+    }
+    return null;
+  }
+}
