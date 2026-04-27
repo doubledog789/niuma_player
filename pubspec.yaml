@@ -34,6 +34,7 @@ dependencies:
   # hls.js (~250KB minified) for that one case isn't worth the bundle cost
   # given mobile is the primary target. Re-add the dep if HLS-in-browser
   # becomes a hard requirement.
+  shared_preferences: ^2.2.0
   video_player: ">=2.8.0 <3.0.0"
   plugin_platform_interface: ^2.0.2
 
