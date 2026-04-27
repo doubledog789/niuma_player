@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (M7 — orchestration layer)
+- `NiumaMediaSource` (`single` + `lines` factories) carrying `MediaLine` entries with `MediaQuality`.
+- `MultiSourcePolicy.autoFailover(maxAttempts: 1)` (default) / `MultiSourcePolicy.manual()`.
+- `NiumaPlayerController.switchLine(id)` with `LineSwitching` / `LineSwitched` /
+  `LineSwitchFailed` events; preserves position + play state across the switch.
+- `AutoFailoverOrchestrator` — picks the next priority line on `network` / `terminal`
+  errors only (codec-unsupported short-circuits); priority is ascending (lower number
+  = tried first).
+- `SourceMiddleware` abstract + `HeaderInjectionMiddleware` + `SignedUrlMiddleware`
+  + `runSourceMiddlewares` pipeline; runs before backend init, on switchLine, and on
+  retry — guarantees fresh headers / freshly signed URLs each time.
+- `NiumaPlayerController` constructor now accepts an optional `middlewares`
+  parameter; pipeline executes once before the backend is built.
+- `ResumeStorage` (abstract) + `SharedPreferencesResumeStorage` (default) +
+  `ResumePolicy` + `ResumeBehaviour` (`auto` / `askUser` / `disabled`) +
+  `ResumeOrchestrator` (read on init, periodic save, ended-clear, dispose final-save).
+- `RetryPolicy.smart()` / `.exponential()` / `.none()`. `NiumaPlayerController`
+  applies the policy around `backend.initialize()` (default `smart` retries
+  `network` + `transient` up to 3 attempts with exponential 1s → 10s backoff);
+  the existing forceIjk Try-Fail-Remember fallback continues underneath.
+- `AdCue` + `AdController` contract + `NiumaAdSchedule` + `MidRollAd` +
+  `MidRollSkipPolicy` + `PauseAdShowPolicy`.
+- `AdSchedulerOrchestrator` covering preRoll (idle→ready), midRoll (with
+  `skipIfSeekedPast` default), pauseAd (with `oncePerSession` default + `cooldown`
+  option), postRoll (phase=ended), plus `AdControllerImpl` enforcing
+  `minDisplayDuration` before allowing dismiss.
+- `AnalyticsEvent` sealed hierarchy (`AdScheduled` / `AdImpression` / `AdClick` /
+  `AdDismissed`) + `AnalyticsEmitter` typedef hook.
+- Public test doubles via `package:niuma_player/testing.dart`:
+  `FakeResumeStorage`, `FakeAnalyticsEmitter`.
+
+### Changed
+- `NiumaPlayerController` first-arg type: `NiumaDataSource` → `NiumaMediaSource`.
+  Use `NiumaPlayerController.dataSource(ds)` factory for the single-source case
+  (drop-in replacement for old call sites). The `dataSource` getter still returns
+  `source.currentLine.source`.
+- `shared_preferences` is now an explicit dependency (was previously a transitive).
+
 ## [0.1.0] - 2026-04-27
 
 First public release.
