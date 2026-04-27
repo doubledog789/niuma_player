@@ -105,12 +105,16 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Completer<void>? _initCompleter;
   bool _disposed = false;
 
+  /// Tracks the id of the currently active line so [switchLine] can emit the
+  /// correct [LineSwitching.fromId]. Updated by [switchLine] on success.
+  String? _activeLineId;
+
   /// The data source after running through the [middlewares] pipeline.
   /// Populated at the start of [_runInitialize] and reused by [_initNative].
   NiumaDataSource? _resolvedSource;
 
   final StreamController<NiumaPlayerEvent> _eventController =
-      StreamController<NiumaPlayerEvent>.broadcast();
+      StreamController<NiumaPlayerEvent>.broadcast(sync: true);
 
   /// Broadcast stream of [BackendSelected] / [FallbackTriggered] events. Safe
   /// to subscribe before [initialize].
@@ -281,6 +285,62 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       _backend?.setSpeed(speed);
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
   Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
+
+  /// Switches playback to the line identified by [lineId].
+  ///
+  /// Saves the current playback position and `isPlaying` state, tears down
+  /// the active backend, runs the middleware pipeline against the new line's
+  /// source, brings up a fresh backend for the target line, seeks back to the
+  /// saved position (if non-zero), and resumes playback if the player was
+  /// playing before the switch.
+  ///
+  /// Events emitted (in order on success):
+  ///   1. [LineSwitching] — backend tear-down is about to begin.
+  ///   2. [LineSwitched]  — new backend is ready.
+  ///
+  /// On failure, [LineSwitchFailed] is emitted and the error is rethrown.
+  ///
+  /// Throws [ArgumentError] if [lineId] is not present in [source.lines].
+  /// No-ops silently if [lineId] equals the currently active line.
+  Future<void> switchLine(String lineId) async {
+    if (_disposed) return;
+    final target = source.lineById(lineId);
+    if (target == null) {
+      throw ArgumentError.value(lineId, 'lineId', 'unknown line id');
+    }
+    final fromId = _activeLineId ?? source.defaultLineId;
+    if (fromId == lineId) return;
+
+    _emit(LineSwitching(fromId: fromId, toId: lineId));
+
+    final savedPos = value.position;
+    final wasPlaying = value.isPlaying;
+
+    try {
+      await _disposeCurrentBackend();
+      _activeLineId = lineId;
+      final resolved = await runSourceMiddlewares(target.source, middlewares);
+      _resolvedSource = resolved;
+
+      if (_platform.isIOS || _platform.isWeb) {
+        await _attachBackend(_backendFactory.createVideoPlayer(resolved));
+        await _backend!.initialize().timeout(options.initTimeout);
+      } else {
+        await _initNative(forceIjk: options.forceIjkOnAndroid);
+      }
+
+      if (savedPos > Duration.zero) {
+        await _backend!.seekTo(savedPos);
+      }
+      if (wasPlaying) {
+        await _backend!.play();
+      }
+      _emit(LineSwitched(lineId));
+    } catch (e) {
+      _emit(LineSwitchFailed(toId: lineId, error: e));
+      rethrow;
+    }
+  }
 
   /// Wipes the "this device needs IJK" memory for every device fingerprint.
   /// App-level "clear cache / reset" flows should call this so a future

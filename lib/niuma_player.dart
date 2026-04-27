@@ -15,6 +15,9 @@ export 'src/domain/player_state.dart'
         NiumaPlayerEvent,
         BackendSelected,
         FallbackTriggered,
-        FallbackReason;
+        FallbackReason,
+        LineSwitching,
+        LineSwitched,
+        LineSwitchFailed;
 export 'src/presentation/niuma_player_controller.dart';
 export 'src/presentation/niuma_player_view.dart';

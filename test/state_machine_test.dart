@@ -26,14 +26,20 @@ class FakePlayerBackend implements PlayerBackend {
   final Future<void> Function()? initBlock;
 
   final StreamController<NiumaPlayerValue> _valueController =
-      StreamController<NiumaPlayerValue>.broadcast();
+      StreamController<NiumaPlayerValue>.broadcast(sync: true);
   final StreamController<NiumaPlayerEvent> _eventController =
-      StreamController<NiumaPlayerEvent>.broadcast();
+      StreamController<NiumaPlayerEvent>.broadcast(sync: true);
 
   NiumaPlayerValue _value = NiumaPlayerValue.uninitialized();
 
   bool initializeCalled = false;
   bool disposed = false;
+
+  /// Last argument passed to [seekTo]; null if seekTo was never called.
+  Duration? lastSeekTarget;
+
+  /// Simulated playback position returned by [value].
+  Duration _simulatedPosition = Duration.zero;
 
   @override
   int? get textureId => kind == PlayerBackendKind.native ? 42 : null;
@@ -53,12 +59,28 @@ class FakePlayerBackend implements PlayerBackend {
     if (initBlock != null) {
       await initBlock!();
     }
-    _value = const NiumaPlayerValue(
+    _value = NiumaPlayerValue(
       phase: PlayerPhase.ready,
-      position: Duration.zero,
-      duration: Duration(seconds: 10),
-      size: Size(1280, 720),
+      position: _simulatedPosition,
+      duration: const Duration(seconds: 10),
+      size: const Size(1280, 720),
       bufferedPosition: Duration.zero,
+    );
+    if (!_valueController.isClosed) {
+      _valueController.add(_value);
+    }
+  }
+
+  /// Sets the simulated position reflected by [value.position]. Call before
+  /// [initialize] to pre-seed the position, or after to update it live.
+  void simulatePosition(Duration pos) {
+    _simulatedPosition = pos;
+    _value = NiumaPlayerValue(
+      phase: _value.phase,
+      position: pos,
+      duration: _value.duration,
+      size: _value.size,
+      bufferedPosition: _value.bufferedPosition,
     );
     if (!_valueController.isClosed) {
       _valueController.add(_value);
@@ -72,7 +94,9 @@ class FakePlayerBackend implements PlayerBackend {
   Future<void> pause() async {}
 
   @override
-  Future<void> seekTo(Duration position) async {}
+  Future<void> seekTo(Duration position) async {
+    lastSeekTarget = position;
+  }
 
   @override
   Future<void> setSpeed(double speed) async {}
@@ -95,11 +119,18 @@ class FakePlayerBackend implements PlayerBackend {
 /// a sequence of fake backends (e.g. first one errors, second one succeeds)
 /// by giving a `makeNative` that picks a different fake based on its
 /// `forceIjk` argument or call index.
+///
+/// The no-arg [FakeBackendFactory()] constructor creates simple, always-
+/// succeeding video-player backends and is convenient for tests that only
+/// need to inspect [simulatePosition] / [lastSeekTarget].
 class FakeBackendFactory implements BackendFactory {
   FakeBackendFactory({
-    required this.makeVideoPlayer,
-    required this.makeNative,
-  });
+    FakePlayerBackend Function(NiumaDataSource ds)? makeVideoPlayer,
+    FakePlayerBackend Function(NiumaDataSource ds, bool forceIjk)? makeNative,
+  })  : makeVideoPlayer = makeVideoPlayer ??
+            ((_) => FakePlayerBackend(kind: PlayerBackendKind.videoPlayer)),
+        makeNative = makeNative ??
+            ((_, __) => FakePlayerBackend(kind: PlayerBackendKind.native));
 
   final FakePlayerBackend Function(NiumaDataSource ds) makeVideoPlayer;
   final FakePlayerBackend Function(NiumaDataSource ds, bool forceIjk)
@@ -114,6 +145,20 @@ class FakeBackendFactory implements BackendFactory {
   /// on this to verify middleware mutations were applied before the backend
   /// factory was invoked.
   NiumaDataSource? lastSourceFromMiddleware;
+
+  /// The most recently constructed [FakePlayerBackend] (video-player or
+  /// native). Convenience accessor for [simulatePosition] / [lastSeekTarget]
+  /// without having to index into [videoPlayers] / [nativePlayers].
+  FakePlayerBackend? get _latestBackend =>
+      (videoPlayers + nativePlayers).isNotEmpty
+          ? (videoPlayers + nativePlayers).last
+          : null;
+
+  /// Delegates to the latest backend's [FakePlayerBackend.simulatePosition].
+  void simulatePosition(Duration pos) => _latestBackend?.simulatePosition(pos);
+
+  /// Returns the last seek target recorded by the latest backend.
+  Duration? get lastSeekTarget => _latestBackend?.lastSeekTarget;
 
   @override
   PlayerBackend createVideoPlayer(NiumaDataSource ds) {
@@ -439,6 +484,38 @@ void main() {
       await ctrl.initialize();
       // FakeBackendFactory should record the source it was constructed with.
       expect(fake.lastSourceFromMiddleware?.headers, {'X': '1', 'Y': '2'});
+      ctrl.dispose();
+    });
+
+    test('switchLine: dispose old backend, init new at saved position',
+        () async {
+      final fake = FakeBackendFactory();
+      final lineA = MediaLine(
+        id: 'a',
+        label: 'A',
+        source: NiumaDataSource.network('https://a'),
+      );
+      final lineB = MediaLine(
+        id: 'b',
+        label: 'B',
+        source: NiumaDataSource.network('https://b'),
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.lines(lines: [lineA, lineB], defaultLineId: 'a'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+      fake.simulatePosition(const Duration(seconds: 12));
+
+      final events = <NiumaPlayerEvent>[];
+      ctrl.events.listen(events.add);
+
+      await ctrl.switchLine('b');
+
+      expect(events.any((e) => e is LineSwitching && e.toId == 'b'), isTrue);
+      expect(events.any((e) => e is LineSwitched && e.toId == 'b'), isTrue);
+      expect(fake.lastSeekTarget, const Duration(seconds: 12));
       ctrl.dispose();
     });
   });
