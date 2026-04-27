@@ -48,6 +48,8 @@ class AdSchedulerOrchestrator {
   bool _preRollFired = false;
   Duration _lastPos = Duration.zero;
   final Set<int> _midRollFired = {};
+  int _pauseAdShownCount = 0;
+  DateTime? _pauseAdLastShownAt;
 
   /// Starts listening to [playerValue] for phase changes.
   ///
@@ -102,8 +104,30 @@ class AdSchedulerOrchestrator {
       }
     }
 
+    // pauseAd: detect manual pause (playing → paused).
+    final justPaused = _lastPhase == PlayerPhase.playing &&
+        phase == PlayerPhase.paused;
+    if (justPaused && schedule.pauseAd != null && _shouldShowPauseAd()) {
+      _fire(schedule.pauseAd!, AdCueType.pauseAd);
+      _pauseAdShownCount++;
+      _pauseAdLastShownAt = DateTime.now();
+    }
+
     _lastPos = pos;
     _lastPhase = phase;
+  }
+
+  bool _shouldShowPauseAd() {
+    switch (schedule.pauseAdShowPolicy) {
+      case PauseAdShowPolicy.always:
+        return true;
+      case PauseAdShowPolicy.oncePerSession:
+        return _pauseAdShownCount == 0;
+      case PauseAdShowPolicy.cooldown:
+        if (_pauseAdLastShownAt == null) return true;
+        return DateTime.now().difference(_pauseAdLastShownAt!) >=
+            schedule.pauseAdCooldown;
+    }
   }
 
   bool _wasPlaying = false;

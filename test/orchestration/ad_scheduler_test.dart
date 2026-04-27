@@ -115,4 +115,53 @@ void main() {
         reason: 'skipIfSeekedPast should suppress midRoll on jumps');
     orch.dispose();
   });
+
+  test('pauseAd fires on playing → paused (manual)', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        pauseAd: AdCue(builder: (_, __) => const SizedBox()),
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.playing));
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.paused));
+    expect(orch.activeCue.value, isNotNull);
+
+    orch.dispose();
+  });
+
+  test('PauseAdShowPolicy.oncePerSession suppresses second pause', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        pauseAd: AdCue(builder: (_, __) => const SizedBox()),
+        pauseAdShowPolicy: PauseAdShowPolicy.oncePerSession,
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    // First pause.
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.playing));
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.paused));
+    orch.activeCue.value = null; // simulate dismiss
+
+    // Second pause — should NOT fire.
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.playing));
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.paused));
+    expect(orch.activeCue.value, isNull);
+
+    orch.dispose();
+  });
 }
