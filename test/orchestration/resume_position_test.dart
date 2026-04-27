@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/testing/fake_resume_storage.dart';
 import 'package:niuma_player/src/orchestration/resume_position.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,5 +31,18 @@ void main() {
 
     await s.clear('video:abc');
     expect(await s.read('video:abc'), isNull);
+  });
+
+  test('ResumePolicy defaults', () {
+    const p = ResumePolicy();
+    expect(p.behaviour, ResumeBehaviour.auto);
+    expect(p.minSavedPosition, const Duration(seconds: 30));
+    expect(p.discardIfNearEnd, const Duration(seconds: 30));
+    expect(p.savePeriod, const Duration(seconds: 5));
+  });
+
+  test('ResumePolicy.defaultKeyOf hashes uri', () {
+    final ds = NiumaDataSource.network('https://cdn/x.mp4');
+    expect(defaultResumeKey(ds), 'video:https://cdn/x.mp4');
   });
 }
