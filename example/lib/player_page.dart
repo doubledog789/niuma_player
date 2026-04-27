@@ -44,7 +44,7 @@ class _PlayerPageState extends State<PlayerPage> {
     super.initState();
     _looping = widget.sample.startsLooping;
 
-    _controller = NiumaPlayerController(
+    _controller = NiumaPlayerController.dataSource(
       NiumaDataSource.network(widget.sample.url),
       options: NiumaPlayerOptions(
         forceIjkOnAndroid: widget.sample.forceIjkOnAndroid,

@@ -166,7 +166,7 @@ void main() {
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
-      final controller = NiumaPlayerController(
+      final controller = NiumaPlayerController.dataSource(
         ds,
         platform: FakePlatformBridge(isIOS: true),
         backendFactory: factory,
@@ -201,7 +201,7 @@ void main() {
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
-      final controller = NiumaPlayerController(
+      final controller = NiumaPlayerController.dataSource(
         ds,
         platform: FakePlatformBridge(isWeb: true),
         backendFactory: factory,
@@ -226,7 +226,7 @@ void main() {
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
-      final controller = NiumaPlayerController(
+      final controller = NiumaPlayerController.dataSource(
         ds,
         options: const NiumaPlayerOptions(forceIjkOnAndroid: true),
         platform: FakePlatformBridge(),
@@ -253,7 +253,7 @@ void main() {
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
-      final controller = NiumaPlayerController(
+      final controller = NiumaPlayerController.dataSource(
         ds,
         platform: FakePlatformBridge(),
         backendFactory: factory,
@@ -298,7 +298,7 @@ void main() {
         },
       );
 
-      final controller = NiumaPlayerController(
+      final controller = NiumaPlayerController.dataSource(
         ds,
         platform: FakePlatformBridge(),
         backendFactory: factory,
@@ -343,7 +343,7 @@ void main() {
         ),
       );
 
-      final controller = NiumaPlayerController(
+      final controller = NiumaPlayerController.dataSource(
         ds,
         platform: FakePlatformBridge(),
         backendFactory: factory,
@@ -380,7 +380,7 @@ void main() {
         },
       );
 
-      final controller = NiumaPlayerController(
+      final controller = NiumaPlayerController.dataSource(
         ds,
         options: const NiumaPlayerOptions(
           initTimeout: Duration(milliseconds: 100),

@@ -11,6 +11,7 @@ import '../domain/data_source.dart';
 import '../domain/platform_bridge.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
+import '../orchestration/multi_source.dart';
 
 /// Options for tuning [NiumaPlayerController] behaviour. All fields have
 /// reasonable defaults so most callers should not need to touch this.
@@ -46,9 +47,13 @@ class NiumaPlayerOptions {
 /// "needs IJK" and this controller transparently retries once with
 /// `forceIjk=true` — the user just sees a brief delay before playback
 /// starts.
+///
+/// Multi-line playback (CDN failover, quality variants) is supported via
+/// [NiumaMediaSource]. For single-URL use cases, prefer the
+/// [NiumaPlayerController.dataSource] convenience factory.
 class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
-    this.dataSource, {
+    this.source, {
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
@@ -57,7 +62,30 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
         super(NiumaPlayerValue.uninitialized());
 
-  final NiumaDataSource dataSource;
+  /// Single-source convenience factory. Wraps the [ds] in a
+  /// [NiumaMediaSource.single] so callers without multi-line needs can keep
+  /// the simpler ergonomics.
+  factory NiumaPlayerController.dataSource(
+    NiumaDataSource ds, {
+    NiumaPlayerOptions? options,
+    PlatformBridge? platform,
+    BackendFactory? backendFactory,
+  }) =>
+      NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        options: options,
+        platform: platform,
+        backendFactory: backendFactory,
+      );
+
+  /// The [NiumaMediaSource] describing all available playback lines for this
+  /// controller. Pass a [NiumaMediaSource.single] for single-URL playback, or
+  /// a [NiumaMediaSource.lines] for quality/CDN switching.
+  final NiumaMediaSource source;
+
+  /// Backwards-compatible accessor for callers that only use a single line.
+  /// Returns the data source of the currently active line.
+  NiumaDataSource get dataSource => source.currentLine.source;
   final NiumaPlayerOptions options;
 
   final PlatformBridge _platform;
