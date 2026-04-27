@@ -59,3 +59,24 @@ class SignedUrlMiddleware extends SourceMiddleware {
     return NiumaDataSource.network(signedUrl, headers: input.headers);
   }
 }
+
+/// Runs [input] through each middleware in [middlewares] left-to-right,
+/// returning the final transformed [NiumaDataSource].
+///
+/// - Middlewares are applied in order: the output of each middleware becomes
+///   the input to the next one.
+/// - An empty [middlewares] list short-circuits immediately, returning [input]
+///   unchanged (the identical object, not a copy).
+/// - Each middleware sees only the output of the previous one, so transformations
+///   compose cleanly regardless of middleware type.
+Future<NiumaDataSource> runSourceMiddlewares(
+  NiumaDataSource input,
+  List<SourceMiddleware> middlewares,
+) async {
+  if (middlewares.isEmpty) return input;
+  var current = input;
+  for (final m in middlewares) {
+    current = await m.apply(current);
+  }
+  return current;
+}

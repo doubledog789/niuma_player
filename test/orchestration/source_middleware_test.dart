@@ -41,4 +41,20 @@ void main() {
     await m.apply(NiumaDataSource.file('/tmp/v.mp4'));
     expect(called, isFalse);
   });
+
+  test('runMiddlewares applies left-to-right', () async {
+    final result = await runSourceMiddlewares(
+      NiumaDataSource.network('https://cdn/x.mp4'),
+      const [
+        HeaderInjectionMiddleware({'A': '1'}),
+        HeaderInjectionMiddleware({'B': '2'}),
+      ],
+    );
+    expect(result.headers, {'A': '1', 'B': '2'});
+  });
+
+  test('runMiddlewares with empty list returns input as-is', () async {
+    final input = NiumaDataSource.network('https://cdn/x.mp4');
+    expect(await runSourceMiddlewares(input, const []), same(input));
+  });
 }
