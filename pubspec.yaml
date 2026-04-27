@@ -1,7 +1,19 @@
 name: niuma_player
-description: "Flutter video player plugin with video_player→IJK fallback for older/Huawei Android devices."
-version: 0.0.1
-homepage:
+description: >-
+  Production-grade Flutter video player with a unified API across iOS, Android,
+  and Web, plus an automatic ExoPlayer → IJK fallback path on Android for
+  devices without working hardware decoders.
+version: 0.1.0
+homepage: https://github.com/niuma/niuma_player
+repository: https://github.com/niuma/niuma_player
+issue_tracker: https://github.com/niuma/niuma_player/issues
+documentation: https://github.com/niuma/niuma_player#readme
+topics:
+  - video
+  - player
+  - hls
+  - exoplayer
+  - ijkplayer
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -10,8 +22,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # iOS uses video_player → AVPlayer; Web uses video_player → <video>.
+  # Android does NOT use video_player at runtime (we ship native ExoPlayer +
+  # IJK), but the package still has to be in the pubspec because
+  # VideoPlayerBackend on the Dart side imports it. AGP just leaves the
+  # video_player_android plugin's small Java surface unused.
+  #
+  # Web HLS note: we deliberately do NOT depend on video_player_web_hls.
+  # mp4/webm play natively in all browsers via <video>, and Safari supports
+  # m3u8 natively. Chrome/Firefox/Edge can't play m3u8 here, but pulling in
+  # hls.js (~250KB minified) for that one case isn't worth the bundle cost
+  # given mobile is the primary target. Re-add the dep if HLS-in-browser
+  # becomes a hard requirement.
   video_player: ">=2.8.0 <3.0.0"
-  shared_preferences: ^2.3.0
   plugin_platform_interface: ^2.0.2
 
 dev_dependencies:

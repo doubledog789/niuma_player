@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import '../data/default_backend_factory.dart';
 import '../data/default_platform_bridge.dart';
-import '../data/device_memory.dart';
+import '../data/device_memory.dart' show DeviceMemory;
+import '../data/native_backend.dart';
 import '../domain/backend_factory.dart';
 import '../domain/data_source.dart';
 import '../domain/platform_bridge.dart';
@@ -16,39 +17,44 @@ import '../domain/player_state.dart';
 @immutable
 class NiumaPlayerOptions {
   const NiumaPlayerOptions({
-    this.initTimeout = const Duration(seconds: 5),
-    this.memoryTtl = Duration.zero,
+    this.initTimeout = const Duration(seconds: 30),
     this.forceIjkOnAndroid = false,
   });
 
-  /// If video_player hasn't reached "initialized" within this window we treat
-  /// it as a failure and fall back to IJK.
+  /// If the underlying backend hasn't reached "initialized" within this
+  /// window we treat it as a failure and (on Android) retry with IJK.
+  ///
+  /// Default is generous because the native side already runs its own
+  /// no-progress watchdog (20s); this is the absolute wall-clock cap.
   final Duration initTimeout;
 
-  /// If non-zero, DeviceMemory entries expire after this duration so the
-  /// controller will re-probe video_player eventually. `Duration.zero` means
-  /// "remember forever".
-  final Duration memoryTtl;
-
-  /// Bypasses all heuristics and goes straight to IJK on Android. Useful for
-  /// tests and emergency overrides.
+  /// On Android, bypass the ExoPlayer fast path and go straight to IJK.
+  /// Useful for emergency overrides or A/B testing the rescue path. iOS
+  /// and Web ignore this flag (they always use video_player).
   final bool forceIjkOnAndroid;
 }
 
-/// Public controller users interact with. Drop-in-ish replacement for
-/// `VideoPlayerController`; the Try-Fail-Remember state machine picking
-/// between video_player and IJK is implemented here.
+/// Public controller users interact with.
+///
+/// Selection rules:
+///   - iOS / Web → `package:video_player` (AVPlayer / `<video>` + hls.js)
+///   - Android   → niuma_player's native plugin
+///
+/// On Android the native plugin internally chooses between ExoPlayer and
+/// IJK based on its persistent `DeviceMemoryStore`. If ExoPlayer fails
+/// during opening, the native side persistently marks the device as
+/// "needs IJK" and this controller transparently retries once with
+/// `forceIjk=true` — the user just sees a brief delay before playback
+/// starts.
 class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
     this.dataSource, {
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
-    DeviceMemory? deviceMemory,
   })  : options = options ?? const NiumaPlayerOptions(),
         _platform = platform ?? const DefaultPlatformBridge(),
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
-        _deviceMemory = deviceMemory ?? DeviceMemory(),
         super(NiumaPlayerValue.uninitialized());
 
   final NiumaDataSource dataSource;
@@ -56,61 +62,66 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
   final PlatformBridge _platform;
   final BackendFactory _backendFactory;
-  final DeviceMemory _deviceMemory;
 
   PlayerBackend? _backend;
   StreamSubscription<NiumaPlayerValue>? _valueSub;
   StreamSubscription<NiumaPlayerEvent>? _eventSub;
-  Timer? _initTimeout;
   Completer<void>? _initCompleter;
-  bool _fallbackInFlight = false;
   bool _disposed = false;
 
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast();
 
-  String? _fingerprint;
-
   /// Broadcast stream of [BackendSelected] / [FallbackTriggered] events. Safe
   /// to subscribe before [initialize].
   Stream<NiumaPlayerEvent> get events => _eventController.stream;
 
-  /// Which backend is currently active. Before [initialize] completes this
-  /// defaults to `videoPlayer` (arbitrary — callers should wait for
-  /// `BackendSelected`).
+  /// Which Dart-side backend is currently active. Before [initialize]
+  /// completes this defaults to `videoPlayer` (arbitrary — callers should
+  /// wait for `BackendSelected`).
   PlayerBackendKind get activeBackend =>
       _backend?.kind ?? PlayerBackendKind.videoPlayer;
 
-  /// Texture id for the active backend, or null (video_player).
+  /// Texture id for the active backend, or null (video_player doesn't expose
+  /// one — it manages its own widget).
   int? get textureId => _backend?.textureId;
 
   /// The underlying backend instance. Exposed so [NiumaPlayerView] can pick
   /// the right rendering widget.
   PlayerBackend? get backend => _backend;
 
-  /// Runs the Try-Fail-Remember state machine and leaves [backend] populated.
+  /// Drives the platform-specific selection and leaves [backend] populated.
   /// Safe to call more than once; subsequent calls return the same future.
-  Future<void> initialize() async {
+  ///
+  /// Errors are propagated through the cached completer's future rather
+  /// than rethrown: the cached future is the *only* listener, and calling
+  /// `rethrow` here would also surface the error as unhandled because the
+  /// completer's future would never gain a second subscriber.
+  Future<void> initialize() {
     if (_disposed) {
-      throw StateError('NiumaPlayerController has been disposed');
+      return Future<void>.error(
+        StateError('NiumaPlayerController has been disposed'),
+      );
     }
     if (_initCompleter != null) return _initCompleter!.future;
-    _initCompleter = Completer<void>();
-    try {
-      await _runInitialize();
-      if (!_initCompleter!.isCompleted) _initCompleter!.complete();
-    } catch (e, st) {
-      if (!_initCompleter!.isCompleted) _initCompleter!.completeError(e, st);
-      rethrow;
-    }
-    return _initCompleter!.future;
+    final completer = Completer<void>();
+    _initCompleter = completer;
+    _runInitialize().then(
+      (_) {
+        if (!completer.isCompleted) completer.complete();
+      },
+      onError: (Object e, StackTrace st) {
+        if (!completer.isCompleted) completer.completeError(e, st);
+      },
+    );
+    return completer.future;
   }
 
   Future<void> _runInitialize() async {
-    // iOS → always video_player; no fingerprint / memory logic needed.
-    if (_platform.isIOS) {
+    // iOS / Web → always video_player.
+    if (_platform.isIOS || _platform.isWeb) {
       await _attachBackend(_backendFactory.createVideoPlayer(dataSource));
-      await _backend!.initialize();
+      await _backend!.initialize().timeout(options.initTimeout);
       _emit(const BackendSelected(
         PlayerBackendKind.videoPlayer,
         fromMemory: false,
@@ -118,130 +129,50 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       return;
     }
 
-    // Android path from here on.
-    _fingerprint = await _safeFingerprint();
-
+    // Android: single native backend. The Dart-side retry logic below is
+    // the entirety of the Try-Fail-Remember mechanism — native picks the
+    // initial variant and persists "needs IJK" itself, so all we have to
+    // do is dispose-and-reopen with `forceIjk=true` if the first attempt
+    // fails for any non-final reason.
     if (options.forceIjkOnAndroid) {
-      await _attachBackend(_backendFactory.createIjk(dataSource));
-      await _backend!.initialize();
-      _emit(const BackendSelected(
-        PlayerBackendKind.ijk,
-        fromMemory: false,
-      ));
+      await _initNative(forceIjk: true);
       return;
     }
 
-    if (_fingerprint != null &&
-        await _deviceMemory.shouldUseIjk(_fingerprint!)) {
-      await _attachBackend(_backendFactory.createIjk(dataSource));
-      await _backend!.initialize();
-      _emit(const BackendSelected(
-        PlayerBackendKind.ijk,
-        fromMemory: true,
+    try {
+      await _initNative(forceIjk: false);
+    } catch (e) {
+      // First attempt failed. Native should have already marked memory if
+      // the cause was a codec issue; either way we retry with forceIjk to
+      // make sure the user gets *something* playing if IJK can handle it.
+      _emit(FallbackTriggered(
+        FallbackReason.error,
+        errorCode: e.toString(),
       ));
-      return;
-    }
-
-    // Try video_player with a timeout; fall back on error or timeout.
-    await _tryVideoPlayerWithFallback();
-  }
-
-  Future<String?> _safeFingerprint() async {
-    try {
-      return await _platform.deviceFingerprint();
-    } catch (_) {
-      return null;
+      await _disposeCurrentBackend();
+      await _initNative(forceIjk: true);
     }
   }
 
-  Future<void> _tryVideoPlayerWithFallback() async {
-    final vp = _backendFactory.createVideoPlayer(dataSource);
-    await _attachBackend(vp);
-
-    final fallbackCompleter = Completer<FallbackTriggered?>();
-
-    void maybeSucceed(NiumaPlayerValue v) {
-      if (v.initialized && !fallbackCompleter.isCompleted) {
-        fallbackCompleter.complete(null);
-      }
-    }
-
-    void onBackendEvent(NiumaPlayerEvent e) {
-      if (e is FallbackTriggered && !fallbackCompleter.isCompleted) {
-        fallbackCompleter.complete(e);
-      }
-    }
-
-    // The shared _valueSub / _eventSub set in _attachBackend already feed our
-    // own ValueNotifier; we layer these additional listeners on top so we can
-    // observe "initialized" and fallback signals without racing the relay.
-    final valueSub = vp.valueStream.listen(maybeSucceed);
-    final eventSub = vp.eventStream.listen(onBackendEvent);
-
-    _initTimeout = Timer(options.initTimeout, () {
-      if (!fallbackCompleter.isCompleted) {
-        fallbackCompleter.complete(
-          const FallbackTriggered(FallbackReason.timeout),
-        );
-      }
-    });
-
+  Future<void> _initNative({required bool forceIjk}) async {
+    final native =
+        _backendFactory.createNative(dataSource, forceIjk: forceIjk);
+    await _attachBackend(native);
     try {
-      unawaited(vp.initialize().catchError((Object err) {
-        if (!fallbackCompleter.isCompleted) {
-          fallbackCompleter.complete(
-            FallbackTriggered(
-              FallbackReason.error,
-              errorCode: err.toString(),
-            ),
-          );
-        }
-      }));
-
-      final outcome = await fallbackCompleter.future;
-      _initTimeout?.cancel();
-      _initTimeout = null;
-
-      if (outcome == null) {
-        _emit(const BackendSelected(
-          PlayerBackendKind.videoPlayer,
-          fromMemory: false,
-        ));
-        return;
-      }
-
-      await _performFallback(outcome);
-    } finally {
-      await valueSub.cancel();
-      await eventSub.cancel();
+      await native.initialize().timeout(options.initTimeout);
+    } on TimeoutException {
+      // Convert the wall-clock timeout into the FallbackTriggered semantic
+      // the public events stream expects, then rethrow so the caller's
+      // retry path runs.
+      _emit(const FallbackTriggered(FallbackReason.timeout));
+      rethrow;
     }
-  }
-
-  Future<void> _performFallback(FallbackTriggered reason) async {
-    if (_fallbackInFlight) return;
-    _fallbackInFlight = true;
-    try {
-      if (_fingerprint != null) {
-        await _deviceMemory.markIjkNeeded(
-          _fingerprint!,
-          ttl: options.memoryTtl,
-        );
-      }
-      final old = _backend;
-      await _detachBackend();
-      await old?.dispose();
-
-      final ijk = _backendFactory.createIjk(dataSource);
-      await _attachBackend(ijk);
-      await ijk.initialize();
-      _emit(reason);
-      _emit(const BackendSelected(
-        PlayerBackendKind.ijk,
-        fromMemory: false,
-      ));
-    } finally {
-      _fallbackInFlight = false;
-    }
+    final fromMemory =
+        native is NativeBackend ? native.fromMemory : false;
+    _emit(BackendSelected(
+      PlayerBackendKind.native,
+      fromMemory: fromMemory,
+    ));
   }
 
   Future<void> _attachBackend(PlayerBackend backend) async {
@@ -253,9 +184,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     });
     _eventSub = backend.eventStream.listen((e) {
       if (_disposed) return;
-      // `FallbackTriggered` is controller-level: the controller emits its own
-      // canonical version inside [_performFallback], so we drop backend-level
-      // fallback signals here to avoid duplicates.
+      // `FallbackTriggered` is controller-level: the controller emits its
+      // own canonical version inside [_runInitialize], so we drop
+      // backend-level fallback signals here to avoid duplicates.
       if (e is FallbackTriggered) return;
       if (!_eventController.isClosed) {
         _eventController.add(e);
@@ -268,6 +199,13 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     _valueSub = null;
     await _eventSub?.cancel();
     _eventSub = null;
+  }
+
+  Future<void> _disposeCurrentBackend() async {
+    final old = _backend;
+    await _detachBackend();
+    _backend = null;
+    await old?.dispose();
   }
 
   void _emit(NiumaPlayerEvent event) {
@@ -297,19 +235,14 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
   /// Wipes the "this device needs IJK" memory for every device fingerprint.
   /// App-level "clear cache / reset" flows should call this so a future
-  /// initialize re-probes video_player instead of going straight to IJK.
+  /// initialize re-probes ExoPlayer instead of going straight to IJK.
   static Future<void> clearDeviceMemory() => DeviceMemory().clear();
 
   @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    _initTimeout?.cancel();
-    _initTimeout = null;
-    await _detachBackend();
-    final b = _backend;
-    _backend = null;
-    await b?.dispose();
+    await _disposeCurrentBackend();
     await _eventController.close();
     super.dispose();
   }

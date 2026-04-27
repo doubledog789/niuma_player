@@ -9,6 +9,9 @@ export 'src/domain/player_backend.dart'
 export 'src/domain/player_state.dart'
     show
         NiumaPlayerValue,
+        PlayerPhase,
+        PlayerError,
+        PlayerErrorCategory,
         NiumaPlayerEvent,
         BackendSelected,
         FallbackTriggered,

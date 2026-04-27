@@ -1,57 +1,57 @@
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 /// Persistent "this device needs IJK" memory, keyed by device fingerprint.
 ///
-/// Stored as JSON under `niuma_player.ijk_needed.<fingerprint>`:
-/// ```json
-/// { "needed": true, "expiresAt": 1713945600000 | null }
-/// ```
-/// `expiresAt` is epoch milliseconds; `null` means forever.
+/// Storage now lives on the native side (`DeviceMemoryStore` on Android,
+/// SharedPreferences-backed) and is reached via the global `cn.niuma/player`
+/// MethodChannel. The TTL/expiry comparison stays here in Dart so the
+/// existing `DateTime Function() now` injection point — used by tests to
+/// fast-forward the clock — keeps working without having to plumb a clock
+/// through the channel.
+///
+/// Wire protocol (see `NiumaPlayerPlugin.kt`):
+///   - `deviceMemory.get`   { fingerprint } → null | { expiresAt: int? }
+///   - `deviceMemory.set`   { fingerprint, expiresAt: int? } → void
+///   - `deviceMemory.unset` { fingerprint } → void
+///   - `deviceMemory.clear` → void
+///
+/// `expiresAt: null` over the wire means "never expires"; absence of the
+/// fingerprint key means "not marked".
 class DeviceMemory {
   DeviceMemory({
-    SharedPreferences? prefs,
     DateTime Function()? now,
-  })  : _prefsOverride = prefs,
-        _now = now ?? DateTime.now;
+    MethodChannel? channel,
+  })  : _now = now ?? DateTime.now,
+        _channel = channel ?? const MethodChannel('cn.niuma/player');
 
-  final SharedPreferences? _prefsOverride;
   final DateTime Function() _now;
-
-  static const String _prefix = 'niuma_player.ijk_needed.';
-
-  Future<SharedPreferences> _prefs() async {
-    return _prefsOverride ?? await SharedPreferences.getInstance();
-  }
-
-  String _key(String fingerprint) => '$_prefix$fingerprint';
+  final MethodChannel _channel;
 
   /// Returns true if we previously recorded that [fingerprint] needs IJK and
   /// the record hasn't expired.
   Future<bool> shouldUseIjk(String fingerprint) async {
-    final prefs = await _prefs();
-    final raw = prefs.getString(_key(fingerprint));
-    if (raw == null) return false;
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return false;
-      final needed = decoded['needed'] == true;
-      if (!needed) return false;
-      final expiresAt = decoded['expiresAt'];
-      if (expiresAt == null) return true;
-      if (expiresAt is! int) return true;
-      final nowMs = _now().millisecondsSinceEpoch;
-      if (nowMs >= expiresAt) {
-        // Expired → clean up eagerly so we only pay the read cost once.
-        await prefs.remove(_key(fingerprint));
-        return false;
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      'deviceMemory.get',
+      <String, dynamic>{'fingerprint': fingerprint},
+    );
+    if (result == null) return false;
+    final expiresAt = (result['expiresAt'] as num?)?.toInt();
+    if (expiresAt == null) return true;
+    if (_now().millisecondsSinceEpoch >= expiresAt) {
+      // Expired → eagerly clean up so we only pay the read cost once.
+      try {
+        await _channel.invokeMethod<void>(
+          'deviceMemory.unset',
+          <String, dynamic>{'fingerprint': fingerprint},
+        );
+      } catch (_) {
+        // Best-effort: a failed unset just means we'll re-detect next time.
       }
-      return true;
-    } catch (_) {
       return false;
     }
+    return true;
   }
 
   /// Records that [fingerprint] needs IJK. If [ttl] is null or zero, the
@@ -60,24 +60,21 @@ class DeviceMemory {
     String fingerprint, {
     Duration? ttl,
   }) async {
-    final prefs = await _prefs();
     final hasTtl = ttl != null && ttl > Duration.zero;
     final expiresAt = hasTtl
         ? _now().millisecondsSinceEpoch + ttl.inMilliseconds
         : null;
-    final payload = jsonEncode(<String, dynamic>{
-      'needed': true,
-      'expiresAt': expiresAt,
-    });
-    await prefs.setString(_key(fingerprint), payload);
+    await _channel.invokeMethod<void>(
+      'deviceMemory.set',
+      <String, dynamic>{
+        'fingerprint': fingerprint,
+        'expiresAt': expiresAt,
+      },
+    );
   }
 
-  /// Clears all niuma_player memory entries (useful for debug UI).
+  /// Clears every niuma_player memory entry (useful for debug UI).
   Future<void> clear() async {
-    final prefs = await _prefs();
-    final keys = prefs.getKeys().where((k) => k.startsWith(_prefix)).toList();
-    for (final k in keys) {
-      await prefs.remove(k);
-    }
+    await _channel.invokeMethod<void>('deviceMemory.clear');
   }
 }

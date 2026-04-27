@@ -63,17 +63,51 @@ class VideoPlayerBackend implements PlayerBackend {
     await _inner.initialize();
   }
 
+  /// Derive [PlayerPhase] from a [VideoPlayerValue].
+  ///
+  /// Priority is `error → opening → ended → buffering → playing → paused/ready`.
+  /// `isCompleted` only fires on video_player when looping is OFF, so we can
+  /// trust it as the authoritative end-of-media signal here.
+  PlayerPhase _derivePhase(VideoPlayerValue v) {
+    if (v.hasError) return PlayerPhase.error;
+    if (!v.isInitialized) return PlayerPhase.opening;
+    if (v.isCompleted) return PlayerPhase.ended;
+    if (v.isBuffering) return PlayerPhase.buffering;
+    if (v.isPlaying) return PlayerPhase.playing;
+    // Initialized, not playing, not buffering, not ended:
+    //   - position == 0  → ready (just opened, never started)
+    //   - position > 0   → paused (was playing)
+    if (v.position == Duration.zero) return PlayerPhase.ready;
+    return PlayerPhase.paused;
+  }
+
   void _onInnerChanged() {
     if (_disposed) return;
     final v = _inner.value;
+    // video_player reports buffered as a list of DurationRange segments; the
+    // UI cares about "how far have we preloaded" which is the tail of the
+    // last segment. Empty list → no buffer info yet.
+    final buffered =
+        v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
+    final phase = _derivePhase(v);
+    // video_player only gives us a free-form `errorDescription` — no error
+    // codes, no categorisation. Wrap it as `unknown` so consumers still get
+    // a structured [PlayerError] object; switching to IJK is the only real
+    // recovery path so detail beyond "yes there was an error" doesn't add
+    // value here.
+    final PlayerError? playerError = v.hasError
+        ? PlayerError(
+            category: PlayerErrorCategory.unknown,
+            message: v.errorDescription ?? 'video_player error',
+          )
+        : null;
     final mapped = NiumaPlayerValue(
-      initialized: v.isInitialized,
+      phase: phase,
       position: v.position,
       duration: v.duration,
       size: v.size,
-      isPlaying: v.isPlaying,
-      isBuffering: v.isBuffering,
-      errorMessage: v.hasError ? v.errorDescription : null,
+      bufferedPosition: buffered,
+      error: playerError,
     );
     if (mapped != _value) {
       _value = mapped;
@@ -88,6 +122,7 @@ class VideoPlayerBackend implements PlayerBackend {
         FallbackTriggered(
           FallbackReason.error,
           errorCode: v.errorDescription,
+          errorCategory: PlayerErrorCategory.unknown,
         ),
       );
     }
@@ -121,4 +156,3 @@ class VideoPlayerBackend implements PlayerBackend {
     await _eventController.close();
   }
 }
-

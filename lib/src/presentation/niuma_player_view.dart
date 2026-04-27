@@ -30,7 +30,7 @@ class NiumaPlayerView extends StatelessWidget {
         if (backend is VideoPlayerBackend) {
           child = VideoPlayer(backend.innerController);
         } else if (backend != null &&
-            backend.kind == PlayerBackendKind.ijk &&
+            backend.kind == PlayerBackendKind.native &&
             controller.textureId != null) {
           child = Texture(textureId: controller.textureId!);
         } else {

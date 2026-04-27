@@ -59,6 +59,9 @@ android {
         ndk {
             abiFilters "arm64-v8a", "armeabi-v7a"
         }
+        // Propagate our JNI-safety rules into any app that uses this plugin
+        // so release/minified builds don't SIGSEGV inside libijkplayer.so.
+        consumerProguardFiles "consumer-rules.pro"
     }
 
     packagingOptions {
@@ -69,6 +72,14 @@ android {
         // Vendored via localmaven/ instead of fileTree to satisfy AGP 8's
         // prohibition on direct local .aar deps for library modules.
         implementation("tv.danmaku.ijk:ijkplayer:0.8.9-beta-260402150035@aar")
+
+        // ExoPlayer (media3). Used as the hardware-decode fast path on
+        // capable Android devices; IJK remains the software-decode fallback
+        // for problem hardware. The HLS module pulls in HlsMediaSource so
+        // m3u8 sources Just Work — without it ExoPlayer can only do
+        // progressive containers (mp4, webm).
+        implementation("androidx.media3:media3-exoplayer:1.4.1")
+        implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
 
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")

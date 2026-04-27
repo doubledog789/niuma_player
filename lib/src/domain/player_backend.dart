@@ -1,7 +1,21 @@
 import 'player_state.dart';
 
-/// Which concrete backend is currently powering a [NiumaPlayerController].
-enum PlayerBackendKind { videoPlayer, ijk }
+/// Which Dart-side backend is currently powering a [NiumaPlayerController].
+///
+/// Note that `native` covers both ExoPlayer and IJK — those are sub-variants
+/// chosen *inside* the Android plugin, not visible at this layer. Use
+/// `NiumaPlayerValue.openingStage` / events log for that detail.
+enum PlayerBackendKind {
+  /// `package:video_player`. Used on iOS (AVPlayer) and Web (`<video>`).
+  videoPlayer,
+
+  /// niuma_player's own native plugin. Used on Android. Internally selects
+  /// between ExoPlayer (default fast path) and IJK (software-decode rescue);
+  /// the choice is opaque to the Dart side except via the `selectedVariant`
+  /// field on the backend implementation, surfaced through
+  /// [BackendSelected.fromMemory] events for app-level logging.
+  native,
+}
 
 /// Internal contract every backend (video_player / IJK / test doubles) must
 /// implement. [NiumaPlayerController] is written against this abstraction so

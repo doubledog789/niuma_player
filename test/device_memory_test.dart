@@ -1,15 +1,23 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers/fake_device_memory_channel.dart';
 
 /// Tests for [DeviceMemory] — the failure-memory store backing the
-/// Try-Fail-Remember state machine. The device fingerprint is supplied
-/// by the caller so Dart-side tests don't need MethodChannel.
+/// Try-Fail-Remember state machine. Storage now lives on the native side, so
+/// the test substitutes a [FakeDeviceMemoryChannel] for the real Android
+/// plugin via the standard `setMockMethodCallHandler` test hook.
 void main() {
   const fingerprint = 'test-fingerprint-abcdef';
 
-  setUp(() async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
+  late FakeDeviceMemoryChannel fakeChannel;
+
+  setUp(() {
+    fakeChannel = FakeDeviceMemoryChannel.install();
+  });
+
+  tearDown(() {
+    fakeChannel.uninstall();
   });
 
   group('DeviceMemory', () {
@@ -65,6 +73,18 @@ void main() {
 
       expect(await mem.shouldUseIjk('device-A'), isTrue);
       expect(await mem.shouldUseIjk('device-B'), isFalse);
+    });
+
+    test('expired entry is eagerly purged on read', () async {
+      var now = DateTime(2026, 1, 1, 12, 0, 0);
+      final mem = DeviceMemory(now: () => now);
+      await mem.markIjkNeeded(fingerprint, ttl: const Duration(seconds: 1));
+      expect(fakeChannel.store.containsKey(fingerprint), isTrue);
+
+      now = now.add(const Duration(seconds: 2));
+      expect(await mem.shouldUseIjk(fingerprint), isFalse);
+      // The expired entry should have been cleaned up by the read.
+      expect(fakeChannel.store.containsKey(fingerprint), isFalse);
     });
   });
 }
