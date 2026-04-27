@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -147,4 +149,93 @@ class ResumePolicy {
   /// Lower values reduce data loss on crash but increase I/O. Defaults to
   /// every 5 seconds.
   final Duration savePeriod;
+}
+
+/// Sits between controller lifecycle events and [ResumeStorage].
+///
+/// Reads the saved position on init and seeks if [ResumeBehaviour.auto] is
+/// configured. Writes the current position periodically during playback.
+/// Clears the entry when playback reaches `phase = ended` so a finished
+/// video doesn't offer a stale resume on the next play.
+class ResumeOrchestrator {
+  /// Creates a [ResumeOrchestrator].
+  ///
+  /// All four parameters are required; pass a [FakeResumeStorage] and stub
+  /// lambdas in tests.
+  ResumeOrchestrator({
+    required this.policy,
+    required this.source,
+    required this.seekTo,
+    required this.currentPosition,
+  });
+
+  /// Configuration bundle controlling storage backend, key derivation,
+  /// behaviour on init, and save cadence.
+  final ResumePolicy policy;
+
+  /// The data source whose URI (via [ResumePolicy.keyOf]) drives storage
+  /// lookups.
+  final NiumaDataSource source;
+
+  /// Callback that bridges to the controller; called with the position to
+  /// seek to when a saved position is found and behaviour is
+  /// [ResumeBehaviour.auto].
+  final Future<void> Function(Duration) seekTo;
+
+  /// Synchronous function that returns the current playback position.
+  ///
+  /// Called on every periodic tick and at [dispose] time.
+  final Duration Function() currentPosition;
+
+  Timer? _saveTimer;
+  String get _key => policy.keyOf(source);
+
+  /// Call after the controller's `initialize()` resolves.
+  ///
+  /// Reads the saved position from storage; if one exists and
+  /// [ResumePolicy.behaviour] is [ResumeBehaviour.auto], seeks to it
+  /// immediately. For [ResumeBehaviour.askUser] the caller is responsible for
+  /// invoking its own prompt callback.
+  Future<void> onInitialized() async {
+    if (policy.behaviour == ResumeBehaviour.disabled) return;
+    final saved = await policy.storage.read(_key);
+    if (saved == null) return;
+    if (policy.behaviour == ResumeBehaviour.auto) {
+      await seekTo(saved);
+    }
+    // askUser: caller is responsible for invoking onResumePrompt.
+  }
+
+  /// Starts the periodic save timer.
+  ///
+  /// Typically called on the first `play` event. Cancels any existing timer
+  /// first so the method is idempotent.
+  void startPeriodicSave() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer.periodic(policy.savePeriod, (_) => _saveIfApplicable());
+  }
+
+  Future<void> _saveIfApplicable() async {
+    final pos = currentPosition();
+    if (pos < policy.minSavedPosition) return;
+    await policy.storage.write(_key, pos);
+  }
+
+  /// Call when `phase = ended` to clear the resume entry unconditionally.
+  ///
+  /// The user has finished the video, so there is no meaningful position to
+  /// offer on the next play.
+  Future<void> onEnded() async {
+    await policy.storage.clear(_key);
+  }
+
+  /// Cancels the periodic save timer and performs a final save if the current
+  /// position is at or beyond [ResumePolicy.minSavedPosition].
+  Future<void> dispose() async {
+    _saveTimer?.cancel();
+    final pos = currentPosition();
+    if (pos >= policy.minSavedPosition) {
+      await policy.storage.write(_key, pos);
+    }
+  }
 }
