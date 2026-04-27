@@ -107,7 +107,7 @@ final class AdClick extends AnalyticsEvent {
       identical(this, other) || other is AdClick && other.cueType == cueType;
 
   @override
-  int get hashCode => Object.hashAll([cueType]);
+  int get hashCode => cueType.hashCode;
 }
 
 /// Fired when an ad is dismissed, either by user action or automatically.
