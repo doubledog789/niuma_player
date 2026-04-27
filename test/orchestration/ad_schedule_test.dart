@@ -10,4 +10,22 @@ void main() {
     expect(cue.timeout, isNull);
     expect(cue.dismissOnTap, isFalse);
   });
+
+  test('NiumaAdSchedule defaults', () {
+    const s = NiumaAdSchedule();
+    expect(s.preRoll, isNull);
+    expect(s.midRolls, isEmpty);
+    expect(s.pauseAd, isNull);
+    expect(s.postRoll, isNull);
+    expect(s.pauseAdShowPolicy, PauseAdShowPolicy.oncePerSession);
+  });
+
+  test('MidRollAd default skipPolicy is skipIfSeekedPast', () {
+    final m = MidRollAd(
+      at: const Duration(seconds: 30),
+      cue: AdCue(builder: (_, __) => const SizedBox()),
+    );
+    expect(m.skipPolicy, MidRollSkipPolicy.skipIfSeekedPast);
+    expect(m.at, const Duration(seconds: 30));
+  });
 }

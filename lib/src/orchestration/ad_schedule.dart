@@ -86,3 +86,134 @@ class AdCue {
   /// provide their own close button.
   final bool dismissOnTap;
 }
+
+/// Controls how a mid-roll cue behaves when the viewer seeks or loops.
+///
+/// Passed as [MidRollAd.skipPolicy] to configure whether playback seeking
+/// past the cue's [MidRollAd.at] position should suppress the ad.
+enum MidRollSkipPolicy {
+  /// Once the ad has been shown, it is never shown again — even after a
+  /// rewind or loop.
+  fireOnce,
+
+  /// The ad fires every time playback crosses [MidRollAd.at], including
+  /// after rewinds and in looping content.
+  fireEachPass,
+
+  /// If the viewer seeks past [MidRollAd.at] without crossing it through
+  /// normal playback, the ad is suppressed for that seek.  This is the
+  /// default and matches the behaviour of 抖音 / B 站 / 优酷.
+  skipIfSeekedPast,
+}
+
+/// Controls how often the pause-ad is shown when the viewer manually pauses.
+///
+/// Assigned to [NiumaAdSchedule.pauseAdShowPolicy].
+enum PauseAdShowPolicy {
+  /// The pause ad is shown on every manual pause.
+  always,
+
+  /// The pause ad is shown at most once per playback session (default).
+  oncePerSession,
+
+  /// The pause ad is shown at most once per [NiumaAdSchedule.pauseAdCooldown]
+  /// window.  The cooldown resets each time the ad is actually displayed.
+  cooldown,
+}
+
+/// A mid-roll ad cue anchored to a specific timeline position.
+///
+/// [MidRollAd] pairs an [AdCue] payload with a playback [at] offset and a
+/// [skipPolicy] that governs whether the ad fires when seeking jumps past it.
+/// Instances are collected in [NiumaAdSchedule.midRolls], which must be sorted
+/// by [at] in ascending order (caller responsibility).
+@immutable
+class MidRollAd {
+  /// Creates a [MidRollAd].
+  ///
+  /// [at] and [cue] are required; [skipPolicy] defaults to
+  /// [MidRollSkipPolicy.skipIfSeekedPast].
+  const MidRollAd({
+    required this.at,
+    required this.cue,
+    this.skipPolicy = MidRollSkipPolicy.skipIfSeekedPast,
+  });
+
+  /// The playback position at which this ad fires.
+  ///
+  /// The orchestrator compares the current position against [at] on each
+  /// position tick.  Must be a positive, finite duration.
+  final Duration at;
+
+  /// The ad payload to display when playback reaches [at].
+  final AdCue cue;
+
+  /// Governs whether a seek past [at] suppresses the ad for that seek.
+  ///
+  /// Defaults to [MidRollSkipPolicy.skipIfSeekedPast].
+  final MidRollSkipPolicy skipPolicy;
+}
+
+/// Declares all ad slots and pause-ad frequency for a single playback session.
+///
+/// [NiumaAdSchedule] is a pure data bag consumed by [AdSchedulerOrchestrator]
+/// (Task 19).  It covers four distinct ad slots — pre-roll, mid-rolls, pause
+/// and post-roll — plus a policy that limits how often the pause ad appears.
+///
+/// Example:
+/// ```dart
+/// NiumaAdSchedule(
+///   preRoll: AdCue(builder: (ctx, ctrl) => MyPreRollWidget(ctrl)),
+///   midRolls: [
+///     MidRollAd(at: Duration(minutes: 5), cue: AdCue(builder: …)),
+///   ],
+///   pauseAdShowPolicy: PauseAdShowPolicy.cooldown,
+///   pauseAdCooldown: Duration(minutes: 3),
+/// )
+/// ```
+@immutable
+class NiumaAdSchedule {
+  /// Creates a [NiumaAdSchedule].
+  ///
+  /// All fields are optional; omitting them produces a schedule with no ads.
+  const NiumaAdSchedule({
+    this.preRoll,
+    this.midRolls = const <MidRollAd>[],
+    this.pauseAd,
+    this.postRoll,
+    this.pauseAdShowPolicy = PauseAdShowPolicy.oncePerSession,
+    this.pauseAdCooldown = const Duration(minutes: 1),
+  });
+
+  /// Ad that fires on the first transition to `phase=ready`, before playback
+  /// begins.  `null` means no pre-roll.
+  final AdCue? preRoll;
+
+  /// Timeline-anchored mid-roll cues.
+  ///
+  /// **Must be sorted by [MidRollAd.at] in ascending order** — this is the
+  /// caller's responsibility.  The orchestrator performs a linear scan and
+  /// relies on sort order for efficiency.  Defaults to an empty list.
+  final List<MidRollAd> midRolls;
+
+  /// Ad that fires when the viewer manually pauses playback.
+  ///
+  /// Display frequency is controlled by [pauseAdShowPolicy].  `null` means
+  /// no pause ad.
+  final AdCue? pauseAd;
+
+  /// Ad that fires when `phase=ended` (playback reaches the end of content).
+  /// `null` means no post-roll.
+  final AdCue? postRoll;
+
+  /// Frequency policy governing how often [pauseAd] is shown.
+  ///
+  /// Defaults to [PauseAdShowPolicy.oncePerSession].
+  final PauseAdShowPolicy pauseAdShowPolicy;
+
+  /// Minimum gap between two consecutive pause-ad displays.
+  ///
+  /// Only consulted when [pauseAdShowPolicy] is [PauseAdShowPolicy.cooldown].
+  /// Defaults to one minute.
+  final Duration pauseAdCooldown;
+}
