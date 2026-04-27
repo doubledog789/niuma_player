@@ -354,7 +354,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   ///
   /// On failure, [LineSwitchFailed] is emitted and the error is rethrown.
   ///
-  /// Throws [ArgumentError] if [lineId] is not present in [source.lines].
+  /// Throws [ArgumentError] if [lineId] is not present in [source]'s lines.
   /// No-ops silently if [lineId] equals the currently active line.
   Future<void> switchLine(String lineId) async {
     if (_disposed) return;

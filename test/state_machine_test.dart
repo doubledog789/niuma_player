@@ -3,9 +3,6 @@ import 'dart:async';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/orchestration/retry_policy.dart';
-import 'package:niuma_player/src/orchestration/source_middleware.dart';
-import 'package:niuma_player/src/orchestration/multi_source.dart';
 
 import 'helpers/fake_device_memory_channel.dart';
 

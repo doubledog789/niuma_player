@@ -80,10 +80,10 @@ class AdCue {
 
   /// Whether tapping anywhere on the ad overlay dismisses it.
   ///
-  /// When `true`, the [AdOverlay] wraps the ad in a gesture detector that
-  /// swallows taps and calls [AdController.dismiss].  When `false` (the
-  /// default), taps pass through to whatever the [builder] renders — most ads
-  /// provide their own close button.
+  /// When `true`, the host ad overlay (rendered by `NiumaVideoPlayer` in M9)
+  /// wraps the ad in a gesture detector that swallows taps and calls
+  /// [AdController.dismiss]. When `false` (the default), taps pass through to
+  /// whatever the [builder] renders — most ads provide their own close button.
   final bool dismissOnTap;
 }
 
