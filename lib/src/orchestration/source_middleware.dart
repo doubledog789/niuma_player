@@ -2,8 +2,9 @@ import '../domain/data_source.dart';
 
 /// Transforms a [NiumaDataSource] before it reaches the playback backend.
 ///
-/// Applied on every reach for the network: initialize, switchLine, and retry,
-/// ensuring each attempt gets fresh headers or a freshly signed URL.
+/// Applied on every operation that touches the network — `initialize`,
+/// `switchLine`, and retry — so each attempt gets fresh headers or a
+/// freshly signed URL.
 abstract class SourceMiddleware {
   const SourceMiddleware();
 
