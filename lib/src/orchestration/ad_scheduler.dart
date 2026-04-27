@@ -46,6 +46,8 @@ class AdSchedulerOrchestrator {
 
   PlayerPhase? _lastPhase;
   bool _preRollFired = false;
+  Duration _lastPos = Duration.zero;
+  final Set<int> _midRollFired = {};
 
   /// Starts listening to [playerValue] for phase changes.
   ///
@@ -62,15 +64,46 @@ class AdSchedulerOrchestrator {
   }
 
   void _onValue() {
-    final phase = playerValue.value.phase;
+    final v = playerValue.value;
+    final phase = v.phase;
+
     final transitionedToReady =
         _lastPhase != PlayerPhase.ready && phase == PlayerPhase.ready;
-    _lastPhase = phase;
-
     if (transitionedToReady && !_preRollFired && schedule.preRoll != null) {
       _preRollFired = true;
       _fire(schedule.preRoll!, AdCueType.preRoll);
     }
+
+    // midRoll
+    final pos = v.position;
+    final delta = pos - _lastPos;
+    final isLikelySeek = delta > const Duration(seconds: 2) ||
+        delta < Duration.zero;
+
+    for (var i = 0; i < schedule.midRolls.length; i++) {
+      if (_midRollFired.contains(i)) continue;
+      final mr = schedule.midRolls[i];
+      final crossedNow = _lastPos < mr.at && pos >= mr.at;
+      if (!crossedNow) continue;
+
+      switch (mr.skipPolicy) {
+        case MidRollSkipPolicy.fireOnce:
+          _midRollFired.add(i);
+          _fire(mr.cue, AdCueType.midRoll);
+        case MidRollSkipPolicy.fireEachPass:
+          _fire(mr.cue, AdCueType.midRoll);
+        case MidRollSkipPolicy.skipIfSeekedPast:
+          if (isLikelySeek) {
+            _midRollFired.add(i); // mark fired to prevent later natural cross
+          } else {
+            _midRollFired.add(i);
+            _fire(mr.cue, AdCueType.midRoll);
+          }
+      }
+    }
+
+    _lastPos = pos;
+    _lastPhase = phase;
   }
 
   bool _wasPlaying = false;
