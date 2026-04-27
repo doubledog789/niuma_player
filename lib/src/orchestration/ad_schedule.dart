@@ -1,5 +1,4 @@
 // lib/src/orchestration/ad_schedule.dart
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// Contract between an ad widget and the ad system.
