@@ -133,3 +133,50 @@ class NiumaMediaSource {
     return null;
   }
 }
+
+/// Controls whether the controller automatically tries the next priority line
+/// when a source fails to initialise.
+///
+/// Use [MultiSourcePolicy.autoFailover] (the default) to have the controller
+/// silently advance through available [MediaLine]s on init failure.
+/// Use [MultiSourcePolicy.manual] when you want errors to propagate directly
+/// to the UI without any automatic retry.
+@immutable
+class MultiSourcePolicy {
+  const MultiSourcePolicy._({
+    required this.enabled,
+    required this.maxAttempts,
+  });
+
+  /// The default policy: automatically try the next line on failure.
+  ///
+  /// [maxAttempts] is the number of additional lines to attempt after the
+  /// first failure (defaults to `1`, meaning one extra line is tried before
+  /// giving up).
+  const factory MultiSourcePolicy.autoFailover({int maxAttempts}) =
+      _AutoFailover;
+
+  /// Disables automatic failover; init errors propagate directly to the UI.
+  const factory MultiSourcePolicy.manual() = _Manual;
+
+  /// Whether automatic failover is active.
+  ///
+  /// `true` for [MultiSourcePolicy.autoFailover], `false` for
+  /// [MultiSourcePolicy.manual].
+  final bool enabled;
+
+  /// Maximum number of additional lines to attempt after the first failure.
+  ///
+  /// Only meaningful when [enabled] is `true`; always `0` for
+  /// [MultiSourcePolicy.manual].
+  final int maxAttempts;
+}
+
+class _AutoFailover extends MultiSourcePolicy {
+  const _AutoFailover({int maxAttempts = 1})
+      : super._(enabled: true, maxAttempts: maxAttempts);
+}
+
+class _Manual extends MultiSourcePolicy {
+  const _Manual() : super._(enabled: false, maxAttempts: 0);
+}

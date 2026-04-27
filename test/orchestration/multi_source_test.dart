@@ -70,4 +70,15 @@ void main() {
     );
     expect(src.currentLine.id, 'b');
   });
+
+  test('MultiSourcePolicy.autoFailover defaults', () {
+    const p = MultiSourcePolicy.autoFailover();
+    expect(p.maxAttempts, 1);
+    expect(p.enabled, isTrue);
+  });
+
+  test('MultiSourcePolicy.manual disables failover', () {
+    const p = MultiSourcePolicy.manual();
+    expect(p.enabled, isFalse);
+  });
 }
