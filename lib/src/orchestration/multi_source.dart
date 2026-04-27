@@ -173,8 +173,8 @@ class MultiSourcePolicy {
 }
 
 class _AutoFailover extends MultiSourcePolicy {
-  const _AutoFailover({int maxAttempts = 1})
-      : super._(enabled: true, maxAttempts: maxAttempts);
+  const _AutoFailover({super.maxAttempts = 1})
+      : super._(enabled: true);
 }
 
 class _Manual extends MultiSourcePolicy {
