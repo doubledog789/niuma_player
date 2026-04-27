@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/orchestration/source_middleware.dart';
+import 'package:niuma_player/src/orchestration/multi_source.dart';
 
 import 'helpers/fake_device_memory_channel.dart';
 
@@ -107,8 +109,15 @@ class FakeBackendFactory implements BackendFactory {
   final List<FakePlayerBackend> nativePlayers = <FakePlayerBackend>[];
   final List<bool> nativeForceIjkArgs = <bool>[];
 
+  /// Records the last [NiumaDataSource] passed to either [createVideoPlayer]
+  /// or [createNative], after the middleware pipeline has run. Tests assert
+  /// on this to verify middleware mutations were applied before the backend
+  /// factory was invoked.
+  NiumaDataSource? lastSourceFromMiddleware;
+
   @override
   PlayerBackend createVideoPlayer(NiumaDataSource ds) {
+    lastSourceFromMiddleware = ds;
     final b = makeVideoPlayer(ds);
     videoPlayers.add(b);
     return b;
@@ -116,6 +125,7 @@ class FakeBackendFactory implements BackendFactory {
 
   @override
   PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) {
+    lastSourceFromMiddleware = ds;
     final b = makeNative(ds, forceIjk);
     nativePlayers.add(b);
     nativeForceIjkArgs.add(forceIjk);
@@ -405,6 +415,31 @@ void main() {
 
       await sub.cancel();
       await controller.dispose();
+    });
+
+    test(
+        'middleware pipeline runs before backend.initialize() — header injected',
+        () async {
+      final fake = FakeBackendFactory(
+        makeVideoPlayer: (_) =>
+            FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
+        makeNative: (_, __) =>
+            FakePlayerBackend(kind: PlayerBackendKind.native),
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.single(
+          NiumaDataSource.network('https://cdn/x.mp4', headers: {'X': '1'}),
+        ),
+        middlewares: const [
+          HeaderInjectionMiddleware({'Y': '2'}),
+        ],
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+      // FakeBackendFactory should record the source it was constructed with.
+      expect(fake.lastSourceFromMiddleware?.headers, {'X': '1', 'Y': '2'});
+      ctrl.dispose();
     });
   });
 }

@@ -12,6 +12,7 @@ import '../domain/platform_bridge.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
 import '../orchestration/multi_source.dart';
+import '../orchestration/source_middleware.dart';
 
 /// Options for tuning [NiumaPlayerController] behaviour. All fields have
 /// reasonable defaults so most callers should not need to touch this.
@@ -54,6 +55,7 @@ class NiumaPlayerOptions {
 class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
     this.source, {
+    this.middlewares = const [],
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
@@ -83,6 +85,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// a [NiumaMediaSource.lines] for quality/CDN switching.
   final NiumaMediaSource source;
 
+  /// Optional middleware pipeline applied to the data source before each
+  /// backend bring-up. Runs on every `initialize`, every `switchLine`
+  /// (Task 25), and every retry (Task 26) — guarantees fresh headers /
+  /// signed URLs.
+  final List<SourceMiddleware> middlewares;
+
   /// Backwards-compatible accessor for callers that only use a single line.
   /// Returns the data source of the currently active line.
   NiumaDataSource get dataSource => source.currentLine.source;
@@ -96,6 +104,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   StreamSubscription<NiumaPlayerEvent>? _eventSub;
   Completer<void>? _initCompleter;
   bool _disposed = false;
+
+  /// The data source after running through the [middlewares] pipeline.
+  /// Populated at the start of [_runInitialize] and reused by [_initNative].
+  NiumaDataSource? _resolvedSource;
 
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast();
@@ -146,9 +158,16 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _runInitialize() async {
+    // Resolve middlewares once; both iOS/Web and Android paths share the result.
+    _resolvedSource = await runSourceMiddlewares(
+      source.currentLine.source,
+      middlewares,
+    );
+
     // iOS / Web → always video_player.
     if (_platform.isIOS || _platform.isWeb) {
-      await _attachBackend(_backendFactory.createVideoPlayer(dataSource));
+      await _attachBackend(
+          _backendFactory.createVideoPlayer(_resolvedSource!));
       await _backend!.initialize().timeout(options.initTimeout);
       _emit(const BackendSelected(
         PlayerBackendKind.videoPlayer,
@@ -183,8 +202,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _initNative({required bool forceIjk}) async {
-    final native =
-        _backendFactory.createNative(dataSource, forceIjk: forceIjk);
+    final native = _backendFactory.createNative(
+      _resolvedSource ?? source.currentLine.source,
+      forceIjk: forceIjk,
+    );
     await _attachBackend(native);
     try {
       await native.initialize().timeout(options.initTimeout);
