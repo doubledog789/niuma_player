@@ -1,4 +1,6 @@
 // lib/src/orchestration/ad_scheduler.dart
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../domain/player_state.dart';
@@ -113,6 +115,12 @@ class AdSchedulerOrchestrator {
       _pauseAdLastShownAt = DateTime.now();
     }
 
+    if (_lastPhase != PlayerPhase.ended &&
+        phase == PlayerPhase.ended &&
+        schedule.postRoll != null) {
+      _fire(schedule.postRoll!, AdCueType.postRoll);
+    }
+
     _lastPos = pos;
     _lastPhase = phase;
   }
@@ -137,4 +145,67 @@ class AdSchedulerOrchestrator {
     activeCue.value = cue;
     _analytics?.call(AnalyticsEvent.adScheduled(cueType: type));
   }
+}
+
+/// Concrete implementation of [AdController] owned by [AdSchedulerOrchestrator].
+///
+/// Enforces [AdCue.minDisplayDuration] before allowing dismissal: calls to
+/// [dismiss] that arrive too early are silently ignored so a buggy ad widget
+/// cannot crash playback.  The [simulateElapsed] hook is exposed for tests so
+/// wall-clock timing does not have to be awaited in unit tests.
+class AdControllerImpl implements AdController {
+  /// Creates an [AdControllerImpl].
+  ///
+  /// [cue] is the cue this controller manages; [onDismiss] fires exactly once
+  /// after a successful dismiss.
+  AdControllerImpl({required this.cue, required this.onDismiss});
+
+  /// The cue this controller is managing.
+  final AdCue cue;
+
+  /// Fires once when [dismiss] is allowed and succeeds.
+  final VoidCallback onDismiss;
+
+  final _elapsedCtrl = StreamController<Duration>.broadcast();
+  final _start = DateTime.now();
+  Duration _simulatedElapsed = Duration.zero;
+
+  /// Whether this controller has been successfully dismissed.
+  ///
+  /// Flips to `true` exactly once after a successful [dismiss] call.
+  /// Exposed as a public field for test assertions.
+  bool dismissed = false;
+
+  @override
+  Duration get elapsed =>
+      _simulatedElapsed > Duration.zero
+          ? _simulatedElapsed
+          : DateTime.now().difference(_start);
+
+  @override
+  Stream<Duration> get elapsedStream => _elapsedCtrl.stream;
+
+  /// Overrides the wall-clock elapsed value for test purposes.
+  ///
+  /// When set to a non-zero value, [elapsed] returns this value instead of
+  /// computing a real wall-clock difference.
+  @visibleForTesting
+  void simulateElapsed(Duration d) => _simulatedElapsed = d;
+
+  @override
+  void dismiss() {
+    // Silently ignore (rather than throw / assert) so a buggy ad widget
+    // doesn't crash playback.
+    if (elapsed < cue.minDisplayDuration) return;
+    if (dismissed) return;
+    dismissed = true;
+    onDismiss();
+    _elapsedCtrl.close();
+  }
+
+  @override
+  void reportImpression() {}
+
+  @override
+  void reportClick() {}
 }

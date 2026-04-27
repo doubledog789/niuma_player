@@ -164,4 +164,45 @@ void main() {
 
     orch.dispose();
   });
+
+  test('postRoll fires on phase=ended', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        postRoll: AdCue(builder: (_, __) => const SizedBox()),
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.ended));
+    expect(orch.activeCue.value, isNotNull);
+    orch.dispose();
+  });
+
+  test('AdController.dismiss() before minDisplayDuration is ignored', () {
+    final cue = AdCue(
+      builder: (_, __) => const SizedBox(),
+      minDisplayDuration: const Duration(seconds: 5),
+    );
+    final ctl = AdControllerImpl(cue: cue, onDismiss: () {});
+    ctl.dismiss(); // 0s elapsed
+    expect(ctl.dismissed, isFalse, reason: 'release builds silently ignore');
+  });
+
+  test('AdController.dismiss after minDisplayDuration completes', () {
+    final cue = AdCue(
+      builder: (_, __) => const SizedBox(),
+      minDisplayDuration: const Duration(seconds: 5),
+    );
+    var dismissed = false;
+    final ctl = AdControllerImpl(cue: cue, onDismiss: () {
+      dismissed = true;
+    });
+    ctl.simulateElapsed(const Duration(seconds: 6));
+    ctl.dismiss();
+    expect(dismissed, isTrue);
+  });
 }
