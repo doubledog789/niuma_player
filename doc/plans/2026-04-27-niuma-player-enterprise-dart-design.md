@@ -716,7 +716,7 @@ abstract class SourceMiddleware {
 典型实现：
 
 ```dart
-class HeaderInjectionMiddleware implements SourceMiddleware {
+class HeaderInjectionMiddleware extends SourceMiddleware {
   const HeaderInjectionMiddleware(this.headers);
   final Map<String, String> headers;
 
@@ -730,7 +730,7 @@ class HeaderInjectionMiddleware implements SourceMiddleware {
   }
 }
 
-class SignedUrlMiddleware implements SourceMiddleware {
+class SignedUrlMiddleware extends SourceMiddleware {
   SignedUrlMiddleware(this._signer);
   final Future<String> Function(String) _signer;
 
