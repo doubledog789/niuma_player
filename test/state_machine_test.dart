@@ -3,10 +3,18 @@ import 'dart:async';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/orchestration/retry_policy.dart';
 import 'package:niuma_player/src/orchestration/source_middleware.dart';
 import 'package:niuma_player/src/orchestration/multi_source.dart';
 
 import 'helpers/fake_device_memory_channel.dart';
+
+/// Test helper that carries a [PlayerErrorCategory] so [_categorize] in
+/// [NiumaPlayerController] can classify it correctly via duck-typing.
+class _RetryableError implements Exception {
+  _RetryableError(this.category);
+  final PlayerErrorCategory category;
+}
 
 /// Simple controllable fake. Tests provide [initFuture] to drive the
 /// "Try-Once-Then-Retry" state machine in [NiumaPlayerController].
@@ -484,6 +492,54 @@ void main() {
       await ctrl.initialize();
       // FakeBackendFactory should record the source it was constructed with.
       expect(fake.lastSourceFromMiddleware?.headers, {'X': '1', 'Y': '2'});
+      ctrl.dispose();
+    });
+
+    test('RetryPolicy retries network errors and eventually succeeds', () async {
+      var initCount = 0;
+      final fake = FakeBackendFactory(
+        makeNative: (_, __) {
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.native,
+            initBlock: () async {
+              initCount++;
+              if (initCount == 1) {
+                throw _RetryableError(PlayerErrorCategory.network);
+              }
+            },
+          );
+        },
+      );
+
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.single(NiumaDataSource.network('https://x')),
+        retryPolicy: const RetryPolicy.smart(maxAttempts: 3),
+        platform: FakePlatformBridge(isIOS: false),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+      expect(initCount, 2, reason: '1 network throw + 1 retry success');
+      ctrl.dispose();
+    });
+
+    test('RetryPolicy does not retry codecUnsupported (short-circuits)',
+        () async {
+      final fake = FakeBackendFactory(
+        makeNative: (_, __) {
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.native,
+            initBlock: () async =>
+                throw _RetryableError(PlayerErrorCategory.codecUnsupported),
+          );
+        },
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.single(NiumaDataSource.network('https://x')),
+        retryPolicy: const RetryPolicy.smart(),
+        platform: FakePlatformBridge(isIOS: false),
+        backendFactory: fake,
+      );
+      await expectLater(ctrl.initialize(), throwsA(anything));
       ctrl.dispose();
     });
 

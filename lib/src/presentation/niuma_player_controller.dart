@@ -12,6 +12,7 @@ import '../domain/platform_bridge.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
 import '../orchestration/multi_source.dart';
+import '../orchestration/retry_policy.dart';
 import '../orchestration/source_middleware.dart';
 
 /// Options for tuning [NiumaPlayerController] behaviour. All fields have
@@ -56,6 +57,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
     this.source, {
     this.middlewares = const [],
+    this.retryPolicy = const RetryPolicy.smart(),
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
@@ -90,6 +92,20 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// (Task 25), and every retry (Task 26) — guarantees fresh headers /
   /// signed URLs.
   final List<SourceMiddleware> middlewares;
+
+  /// Retry policy applied when [initialize] throws a recoverable error
+  /// (network / transient by default). Caps at the policy's [RetryPolicy.maxAttempts];
+  /// if all attempts fail, the error propagates and triggers the existing
+  /// Android forceIjk Try-Fail-Remember fallback.
+  ///
+  /// **Trade-off**: retry runs *inside* the forceIjk fallback layer. In the
+  /// worst case, a single user-visible [initialize] call may make up to
+  /// `maxAttempts × 2` total backend initialisation attempts — e.g., with the
+  /// default `maxAttempts: 3` that is 3 ExoPlayer attempts (with back-off) then
+  /// 3 IJK attempts (with back-off), for a maximum wait of roughly 14 seconds
+  /// before a final failure is surfaced. Tune [retryPolicy] or set
+  /// [RetryPolicy.none] to trade resilience for latency.
+  final RetryPolicy retryPolicy;
 
   /// Backwards-compatible accessor for callers that only use a single line.
   /// Returns the data source of the currently active line.
@@ -161,6 +177,44 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     return completer.future;
   }
 
+  /// Classifies an exception into a [PlayerErrorCategory] for retry decisions.
+  ///
+  /// [TimeoutException] maps to [PlayerErrorCategory.network]. Objects that
+  /// carry a `.category` getter of type [PlayerErrorCategory] (e.g., the test
+  /// helper `_RetryableError`) are classified via that getter using duck-typing,
+  /// so the test class never needs to be visible in production code.
+  PlayerErrorCategory _categorize(Object e) {
+    if (e is TimeoutException) return PlayerErrorCategory.network;
+    try {
+      final dynamic d = e;
+      final c = d.category;
+      if (c is PlayerErrorCategory) return c;
+    } catch (_) {
+      // not a categorized exception; fall through
+    }
+    return PlayerErrorCategory.unknown;
+  }
+
+  /// Runs [bringUp] with retry according to [retryPolicy].
+  ///
+  /// On each throw, classifies the error via [_categorize] and asks
+  /// [retryPolicy] whether to retry. If not, the exception is rethrown
+  /// immediately so the caller's error-handling path (e.g. forceIjk fallback)
+  /// can take over.
+  Future<T> _withRetry<T>(Future<T> Function() bringUp) async {
+    var attempt = 1;
+    while (true) {
+      try {
+        return await bringUp();
+      } catch (e) {
+        final category = _categorize(e);
+        if (!retryPolicy.shouldRetry(category, attempt: attempt)) rethrow;
+        await Future<void>.delayed(retryPolicy.delayFor(attempt));
+        attempt++;
+      }
+    }
+  }
+
   Future<void> _runInitialize() async {
     // Resolve middlewares once; both iOS/Web and Android paths share the result.
     _resolvedSource = await runSourceMiddlewares(
@@ -172,7 +226,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     if (_platform.isIOS || _platform.isWeb) {
       await _attachBackend(
           _backendFactory.createVideoPlayer(_resolvedSource!));
-      await _backend!.initialize().timeout(options.initTimeout);
+      await _withRetry(() => _backend!.initialize().timeout(options.initTimeout));
       _emit(const BackendSelected(
         PlayerBackendKind.videoPlayer,
         fromMemory: false,
@@ -212,7 +266,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     );
     await _attachBackend(native);
     try {
-      await native.initialize().timeout(options.initTimeout);
+      await _withRetry(() => native.initialize().timeout(options.initTimeout));
     } on TimeoutException {
       // Convert the wall-clock timeout into the FallbackTriggered semantic
       // the public events stream expects, then rethrow so the caller's
@@ -324,7 +378,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
       if (_platform.isIOS || _platform.isWeb) {
         await _attachBackend(_backendFactory.createVideoPlayer(resolved));
-        await _backend!.initialize().timeout(options.initTimeout);
+        await _withRetry(
+            () => _backend!.initialize().timeout(options.initTimeout));
       } else {
         await _initNative(forceIjk: options.forceIjkOnAndroid);
       }
