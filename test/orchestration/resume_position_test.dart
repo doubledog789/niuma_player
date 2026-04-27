@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/orchestration/resume_position.dart';
 import 'package:niuma_player/src/testing/fake_resume_storage.dart';
 
 void main() {
