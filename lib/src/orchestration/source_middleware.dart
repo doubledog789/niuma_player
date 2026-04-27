@@ -34,3 +34,28 @@ class HeaderInjectionMiddleware extends SourceMiddleware {
     );
   }
 }
+
+/// Replaces the URL of every network [NiumaDataSource] with a freshly signed
+/// URL produced by the caller-supplied signer function.
+///
+/// On each [apply] call the signer is invoked with the raw URL and the result
+/// is used to build a new network source that carries the original headers
+/// unchanged. Non-network sources are returned as-is without calling the
+/// signer.
+class SignedUrlMiddleware extends SourceMiddleware {
+  /// Creates a middleware that calls [_signer] to map each raw URL to a
+  /// signed URL. [_signer] receives the raw URL and must return the signed URL.
+  SignedUrlMiddleware(this._signer);
+
+  final Future<String> Function(String rawUrl) _signer;
+
+  /// Returns [input] unchanged for non-network sources; otherwise returns a
+  /// new network source whose URI is the signed URL with the original headers
+  /// passed through.
+  @override
+  Future<NiumaDataSource> apply(NiumaDataSource input) async {
+    if (input.type != NiumaSourceType.network) return input;
+    final signedUrl = await _signer(input.uri);
+    return NiumaDataSource.network(signedUrl, headers: input.headers);
+  }
+}
