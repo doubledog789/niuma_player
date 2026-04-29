@@ -85,5 +85,22 @@ void main() {
       );
       expect(frame, isNull);
     });
+
+    // C5: 恶意 baseUrl 不能让 resolve 抛——契约是"永远不抛"。
+    test('非法 baseUrl 时返回 null 不抛（C5）', () {
+      final cache = ThumbnailCache();
+      // IPv6 字面量未关闭——Uri.parse 会抛 FormatException
+      const badBase = 'http://[bad-ipv6';
+      late final ThumbnailFrame? frame;
+      expect(() {
+        frame = ThumbnailResolver.resolve(
+          position: Duration.zero,
+          cues: cues,
+          baseUrl: badBase,
+          cache: cache,
+        );
+      }, returnsNormally);
+      expect(frame, isNull);
+    });
   });
 }
