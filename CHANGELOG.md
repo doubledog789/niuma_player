@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (M8 — 缩略图 VTT)
+- `NiumaMediaSource.thumbnailVtt` 可选字段，传入 WebVTT thumbnail track URL。
+- `controller.thumbnailFor(Duration position) → ThumbnailFrame?` —— 按播放位置查
+  对应缩略图（sprite 图引用 + 裁剪矩形）。
+- 内置 `WebVttParser.parseThumbnails`：支持 MM:SS.mmm / HH:MM:SS.mmm 时间格式
+  和 `sprite.jpg#xywh=x,y,w,h` 引用语法；单条 cue 解析失败会跳过不影响整体。
+- `ThumbnailCache`：sprite URL 去重 + LRU 淘汰（默认 8 张上限）。
+- 公共类型导出：`ThumbnailFrame`、`WebVttCue`（其他实现细节内部化）。
+- VTT URL 走 `SourceMiddleware` 流水线（跟视频 URL 同样的签名 / header 规则）。
+- VTT 加载失败静默降级：不抛异常，只 log 一条，`thumbnailFor` 返回 null，
+  视频播放完全不受影响。
+- 新增依赖 `package:http ^1.0.0`，跨平台 VTT fetch（VM 走 `dart:io`，web 自动
+  走 `XMLHttpRequest`；CORS 由调用方保证）。
+
 ## [0.2.0] - 2026-04-29
 
 ### Added (M7 — orchestration layer)

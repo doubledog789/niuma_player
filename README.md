@@ -94,6 +94,42 @@ await controller.switchLine('cdn-b');
 See [`example/lib/multi_line_page.dart`](example/lib/multi_line_page.dart)
 for an end-to-end demo.
 
+## M8 features (缩略图 VTT)
+
+支持 WebVTT thumbnail track，让你给进度条悬浮预览图层取数。
+
+```dart
+final controller = NiumaPlayerController(
+  NiumaMediaSource.single(
+    NiumaDataSource.network('https://cdn.com/video.mp4'),
+    thumbnailVtt: 'https://cdn.com/thumbnails.vtt',
+  ),
+);
+await controller.initialize();
+
+// 在进度条 hover 时调用
+final frame = controller.thumbnailFor(const Duration(seconds: 30));
+if (frame != null) {
+  // frame.image 是 ImageProvider，frame.region 是 sprite 内裁剪 rect
+  // 用 RawImage / Image + custom paint 渲染即可
+}
+```
+
+支持的 VTT 格式（thumbnail 变种）：
+
+```
+WEBVTT
+
+00:00.000 --> 00:05.000
+sprite.jpg#xywh=0,0,128,72
+```
+
+特性：
+- 自动 fetch + 解析；失败静默降级（视频不受影响）
+- Sprite 图按 URL 去重 + LRU（默认 8 张上限）
+- VTT URL 同样走 `SourceMiddleware`（HeaderInjection / SignedUrl）
+- 不提供 UI 组件 —— 数据层为 M9 overlay 准备
+
 ## Listening to backend selection
 
 ```dart
@@ -183,8 +219,9 @@ No, it's in `SharedPreferences`, which is wiped on uninstall. This is intentiona
 - **M4** — Optional disk cache layer (replays hit cache; Android via `SimpleCache`, iOS via AVAssetResourceLoader)
 - **M5** — Preload pool for short-video reels (N parallel pre-warmed controllers + LRU)
 - **M7** ✅ — Orchestration layer (multi-line + `switchLine`, source middleware, resume position, retry policy, ad scheduler, analytics)
-- **M8** — Tracks: WebVTT subtitle tracks (multi-language) + thumbnail-VTT scrub preview (sprite-based)
-- **M9** — UI / overlay layer: fullscreen, picture-in-picture, custom controls, ad overlay
+- **M8** ✅ — 缩略图 VTT scrub preview（sprite 解析 + ImageProvider 暴露）
+- **M9** — UI overlay：fullscreen / picture-in-picture / 自定义控件 / 广告 overlay / 缩略图 hover 组件
+- **Backlog** — 字幕 track 选择（WebVTT 多语言字幕 + sidecar / HLS 内嵌都支持）
 - Built-in `video_player_web_hls` opt-in flag
 
 ## Contributing
