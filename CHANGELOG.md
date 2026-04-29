@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-29
+
 ### Added (M7 — orchestration layer)
 - `NiumaMediaSource` (`single` + `lines` factories) carrying `MediaLine` entries with `MediaQuality`.
 - `MultiSourcePolicy.autoFailover(maxAttempts: 1)` (default) / `MultiSourcePolicy.manual()`.
@@ -80,5 +82,6 @@ First public release.
 - 14 unit tests covering iOS / Web / Android happy path, retry success,
   retry failure, wall-clock timeout, plus `DeviceMemory` persistence.
 
-[Unreleased]: https://github.com/niuma/niuma_player/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/axin789/niuma_player/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/axin789/niuma_player/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niuma/niuma_player/releases/tag/v0.1.0
