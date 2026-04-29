@@ -103,13 +103,14 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// the simpler ergonomics.
   factory NiumaPlayerController.dataSource(
     NiumaDataSource ds, {
+    String? thumbnailVtt,
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
     ThumbnailFetcher? thumbnailFetcher,
   }) =>
       NiumaPlayerController(
-        NiumaMediaSource.single(ds),
+        NiumaMediaSource.single(ds, thumbnailVtt: thumbnailVtt),
         options: options,
         platform: platform,
         backendFactory: backendFactory,

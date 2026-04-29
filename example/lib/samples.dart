@@ -88,6 +88,29 @@ class MultiLineSample {
   final String defaultLineId;
 }
 
+/// Demo case exercising M8 缩略图 VTT support. Single video URL paired with a
+/// WebVTT thumbnail track; opens `ThumbnailDemoPage` instead of `PlayerPage`.
+class ThumbnailVttSample {
+  const ThumbnailVttSample({
+    required this.label,
+    required this.videoUrl,
+    required this.thumbnailVttUrl,
+  });
+
+  final String label;
+  final String videoUrl;
+  final String thumbnailVttUrl;
+}
+
+const List<ThumbnailVttSample> thumbnailVttSamples = <ThumbnailVttSample>[
+  ThumbnailVttSample(
+    label: 'Big Buck Bunny — 进度条缩略图预览',
+    videoUrl: 'https://artplayer.org/assets/sample/bbb-video.mp4',
+    thumbnailVttUrl:
+        'https://artplayer.org/assets/sample/bbb-thumbnails.vtt',
+  ),
+];
+
 const List<MultiLineSample> multiLineSamples = <MultiLineSample>[
   // 三条线路均为 Big Buck Bunny 同内容 / 10 秒 / 仅画质或编码不同。
   // 切换时位置不变 — 这是 switchLine 的正确使用场景（同内容多清晰度）。
