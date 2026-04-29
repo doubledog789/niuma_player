@@ -13,6 +13,24 @@ class _RetryableError implements Exception {
   final PlayerErrorCategory category;
 }
 
+/// Test double that counts how many times the middleware pipeline runs.
+///
+/// Used to verify middleware re-execution semantics on retry / switchLine.
+class _CountingMiddleware extends SourceMiddleware {
+  _CountingMiddleware();
+
+  int callCount = 0;
+  Map<String, String>? lastInputHeaders;
+
+  @override
+  Future<NiumaDataSource> apply(NiumaDataSource input) async {
+    callCount++;
+    lastInputHeaders =
+        input.headers == null ? null : Map<String, String>.from(input.headers!);
+    return input;
+  }
+}
+
 /// Simple controllable fake. Tests provide [initFuture] to drive the
 /// "Try-Once-Then-Retry" state machine in [NiumaPlayerController].
 class FakePlayerBackend implements PlayerBackend {
@@ -420,7 +438,7 @@ void main() {
         'G. Android default + native init wall-clock timeout → retry kicks in',
         () async {
       // The first native attempt never resolves; the controller should hit
-      // its wall-clock timeout and retry with forceIjk=true.
+      // its wall-clock timeout and retry by rebuilding the backend.
       final firstAttemptCompleter = Completer<void>();
       var nativeCallIndex = 0;
 
@@ -440,10 +458,70 @@ void main() {
         },
       );
 
-      final controller = NiumaPlayerController.dataSource(
-        ds,
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds),
         options: const NiumaPlayerOptions(
           initTimeout: Duration(milliseconds: 100),
+        ),
+        // Use a tiny backoff so the test doesn't spend seconds on the
+        // smart-retry default 1s base delay.
+        retryPolicy: const RetryPolicy.exponential(
+          base: Duration(milliseconds: 1),
+          max: Duration(milliseconds: 1),
+          maxAttempts: 3,
+        ),
+        platform: FakePlatformBridge(),
+        backendFactory: factory,
+      );
+
+      final events = <NiumaPlayerEvent>[];
+      final sub = controller.events.listen(events.add);
+
+      await controller.initialize();
+      await Future<void>.delayed(Duration.zero);
+
+      // Both attempts ran; both with forceIjk=false (retry rebuilds the
+      // backend on the same path, so the outer Try-Fail-Remember layer
+      // never has to fire).
+      expect(controller.activeBackend, PlayerBackendKind.native);
+      expect(factory.nativeForceIjkArgs, <bool>[false, false],
+          reason: 'retry rebuilds with the same forceIjk value; outer '
+              'fallback only kicks in when retry is fully exhausted');
+      // The first (timed-out) backend was disposed before retry built the
+      // second one.
+      expect(factory.nativePlayers[0].disposed, isTrue);
+
+      await sub.cancel();
+      await controller.dispose();
+    });
+
+    test(
+        'G2. Android default + native timeout exhausts retry → forceIjk fallback fires',
+        () async {
+      // Every non-forceIjk attempt times out; only forceIjk=true succeeds.
+      final factory = FakeBackendFactory(
+        makeVideoPlayer: (_) =>
+            FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
+        makeNative: (_, forceIjk) {
+          if (!forceIjk) {
+            return FakePlayerBackend(
+              kind: PlayerBackendKind.native,
+              initBlock: () => Completer<void>().future,
+            );
+          }
+          return FakePlayerBackend(kind: PlayerBackendKind.native);
+        },
+      );
+
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        options: const NiumaPlayerOptions(
+          initTimeout: Duration(milliseconds: 50),
+        ),
+        retryPolicy: const RetryPolicy.exponential(
+          base: Duration(milliseconds: 1),
+          max: Duration(milliseconds: 1),
+          maxAttempts: 2,
         ),
         platform: FakePlatformBridge(),
         backendFactory: factory,
@@ -456,12 +534,15 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(controller.activeBackend, PlayerBackendKind.native);
-      expect(factory.nativeForceIjkArgs, <bool>[false, true]);
+      // With maxAttempts=2: attempt 1 → retry, attempt 2 → retry, attempt 3 →
+      // exhausted. Then the outer forceIjk fallback fires once.
+      expect(factory.nativeForceIjkArgs, <bool>[false, false, false, true]);
 
-      // We expect a timeout fallback emitted from the first native init.
-      final fb = events.whereType<FallbackTriggered>();
-      expect(fb, isNotEmpty);
-      expect(fb.first.reason, FallbackReason.timeout);
+      // Both controller-level FallbackTriggered events fire: timeout (from
+      // exhausted retry) and error (from outer try/catch).
+      final fb = events.whereType<FallbackTriggered>().toList();
+      expect(fb.map((e) => e.reason),
+          containsAll([FallbackReason.timeout, FallbackReason.error]));
 
       await sub.cancel();
       await controller.dispose();
@@ -569,6 +650,161 @@ void main() {
       expect(events.any((e) => e is LineSwitching && e.toId == 'b'), isTrue);
       expect(events.any((e) => e is LineSwitched && e.toId == 'b'), isTrue);
       expect(fake.lastSeekTarget, const Duration(seconds: 12));
+      ctrl.dispose();
+    });
+
+    test(
+        'retry rebuilds the backend on each attempt: first backend disposed, '
+        'second backend constructed (Android path)', () async {
+      var nativeIdx = 0;
+      final fake = FakeBackendFactory(
+        makeNative: (_, __) {
+          final attempt = nativeIdx++;
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.native,
+            initBlock: () async {
+              if (attempt == 0) {
+                throw _RetryableError(PlayerErrorCategory.network);
+              }
+            },
+          );
+        },
+      );
+
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.single(NiumaDataSource.network('https://x')),
+        retryPolicy: const RetryPolicy.exponential(
+          base: Duration(milliseconds: 1),
+          max: Duration(milliseconds: 1),
+          maxAttempts: 3,
+        ),
+        platform: FakePlatformBridge(isIOS: false),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+
+      // Two distinct backends were constructed (one per attempt).
+      expect(fake.nativePlayers.length, 2,
+          reason: 'each retry attempt must build a fresh backend');
+      // First (failed) backend was disposed.
+      expect(fake.nativePlayers[0].disposed, isTrue,
+          reason: 'failed backend must be disposed before retry');
+      // Second backend is the active one.
+      expect(fake.nativePlayers[1].disposed, isFalse);
+
+      ctrl.dispose();
+    });
+
+    test(
+        'retry rebuilds the backend on each attempt: first backend disposed, '
+        'second backend constructed (iOS / video_player path)', () async {
+      var idx = 0;
+      final fake = FakeBackendFactory(
+        makeVideoPlayer: (_) {
+          final attempt = idx++;
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.videoPlayer,
+            initBlock: () async {
+              if (attempt == 0) {
+                throw _RetryableError(PlayerErrorCategory.network);
+              }
+            },
+          );
+        },
+      );
+
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.single(NiumaDataSource.network('https://x')),
+        retryPolicy: const RetryPolicy.exponential(
+          base: Duration(milliseconds: 1),
+          max: Duration(milliseconds: 1),
+          maxAttempts: 3,
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+
+      expect(fake.videoPlayers.length, 2);
+      expect(fake.videoPlayers[0].disposed, isTrue);
+      expect(fake.videoPlayers[1].disposed, isFalse);
+
+      ctrl.dispose();
+    });
+
+    test('middleware pipeline re-runs on every retry attempt', () async {
+      final mw = _CountingMiddleware();
+      var idx = 0;
+      final fake = FakeBackendFactory(
+        makeVideoPlayer: (_) {
+          final attempt = idx++;
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.videoPlayer,
+            initBlock: () async {
+              if (attempt == 0) {
+                throw _RetryableError(PlayerErrorCategory.network);
+              }
+            },
+          );
+        },
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.single(NiumaDataSource.network('https://x')),
+        middlewares: [mw],
+        retryPolicy: const RetryPolicy.exponential(
+          base: Duration(milliseconds: 1),
+          max: Duration(milliseconds: 1),
+          maxAttempts: 3,
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+      expect(mw.callCount, 2,
+          reason: 'middleware runs once per attempt (initial + retry)');
+      ctrl.dispose();
+    });
+
+    test('middleware ordering preserved across retries', () async {
+      final counter = _CountingMiddleware();
+      var idx = 0;
+      final fake = FakeBackendFactory(
+        makeVideoPlayer: (_) {
+          final attempt = idx++;
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.videoPlayer,
+            initBlock: () async {
+              if (attempt == 0) {
+                throw _RetryableError(PlayerErrorCategory.network);
+              }
+            },
+          );
+        },
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.single(
+          NiumaDataSource.network('https://x', headers: {'A': '1'}),
+        ),
+        middlewares: [
+          const HeaderInjectionMiddleware({'B': '2'}),
+          counter,
+        ],
+        retryPolicy: const RetryPolicy.exponential(
+          base: Duration(milliseconds: 1),
+          max: Duration(milliseconds: 1),
+          maxAttempts: 3,
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+      // The counter saw the post-HeaderInjection source on each attempt.
+      expect(counter.callCount, 2);
+      expect(counter.lastInputHeaders, {'A': '1', 'B': '2'},
+          reason:
+              'order preserved: HeaderInjection runs before _CountingMiddleware');
+      // Final backend's data source has both headers.
+      expect(fake.lastSourceFromMiddleware?.headers, {'A': '1', 'B': '2'});
       ctrl.dispose();
     });
   });

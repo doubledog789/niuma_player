@@ -216,17 +216,21 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _runInitialize() async {
-    // Resolve middlewares once; both iOS/Web and Android paths share the result.
-    _resolvedSource = await runSourceMiddlewares(
-      source.currentLine.source,
-      middlewares,
-    );
-
     // iOS / Web → always video_player.
     if (_platform.isIOS || _platform.isWeb) {
-      await _attachBackend(
-          _backendFactory.createVideoPlayer(_resolvedSource!));
-      await _withRetry(() => _backend!.initialize().timeout(options.initTimeout));
+      await _withRetry(() async {
+        // Each retry attempt: dispose any prior (failed) backend, re-run the
+        // middleware pipeline (so signed URLs / fresh headers are recomputed),
+        // build a fresh backend, then call initialize().
+        await _disposeCurrentBackend();
+        _resolvedSource = await runSourceMiddlewares(
+          source.currentLine.source,
+          middlewares,
+        );
+        await _attachBackend(
+            _backendFactory.createVideoPlayer(_resolvedSource!));
+        await _backend!.initialize().timeout(options.initTimeout);
+      });
       _emit(const BackendSelected(
         PlayerBackendKind.videoPlayer,
         fromMemory: false,
@@ -260,13 +264,25 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _initNative({required bool forceIjk}) async {
-    final native = _backendFactory.createNative(
-      _resolvedSource ?? source.currentLine.source,
-      forceIjk: forceIjk,
-    );
-    await _attachBackend(native);
+    PlayerBackend? lastBackend;
     try {
-      await _withRetry(() => native.initialize().timeout(options.initTimeout));
+      await _withRetry(() async {
+        // Each retry attempt: dispose any prior (failed) backend, re-run the
+        // middleware pipeline (so signed URLs / fresh headers are recomputed),
+        // build a fresh native backend, then call initialize().
+        await _disposeCurrentBackend();
+        _resolvedSource = await runSourceMiddlewares(
+          source.currentLine.source,
+          middlewares,
+        );
+        final native = _backendFactory.createNative(
+          _resolvedSource!,
+          forceIjk: forceIjk,
+        );
+        lastBackend = native;
+        await _attachBackend(native);
+        await native.initialize().timeout(options.initTimeout);
+      });
     } on TimeoutException {
       // Convert the wall-clock timeout into the FallbackTriggered semantic
       // the public events stream expects, then rethrow so the caller's
@@ -274,6 +290,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       _emit(const FallbackTriggered(FallbackReason.timeout));
       rethrow;
     }
+    final native = lastBackend;
     final fromMemory =
         native is NativeBackend ? native.fromMemory : false;
     _emit(BackendSelected(
