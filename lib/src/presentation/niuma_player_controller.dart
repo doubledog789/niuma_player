@@ -11,6 +11,9 @@ import '../domain/data_source.dart';
 import '../domain/platform_bridge.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
+import '../orchestration/multi_source.dart';
+import '../orchestration/retry_policy.dart';
+import '../orchestration/source_middleware.dart';
 
 /// Options for tuning [NiumaPlayerController] behaviour. All fields have
 /// reasonable defaults so most callers should not need to touch this.
@@ -46,9 +49,15 @@ class NiumaPlayerOptions {
 /// "needs IJK" and this controller transparently retries once with
 /// `forceIjk=true` — the user just sees a brief delay before playback
 /// starts.
+///
+/// Multi-line playback (CDN failover, quality variants) is supported via
+/// [NiumaMediaSource]. For single-URL use cases, prefer the
+/// [NiumaPlayerController.dataSource] convenience factory.
 class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
-    this.dataSource, {
+    this.source, {
+    this.middlewares = const [],
+    this.retryPolicy = const RetryPolicy.smart(),
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
@@ -57,7 +66,55 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
         super(NiumaPlayerValue.uninitialized());
 
-  final NiumaDataSource dataSource;
+  /// Single-source convenience factory. Wraps the [ds] in a
+  /// [NiumaMediaSource.single] so callers without multi-line needs can keep
+  /// the simpler ergonomics.
+  factory NiumaPlayerController.dataSource(
+    NiumaDataSource ds, {
+    NiumaPlayerOptions? options,
+    PlatformBridge? platform,
+    BackendFactory? backendFactory,
+  }) =>
+      NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        options: options,
+        platform: platform,
+        backendFactory: backendFactory,
+      );
+
+  /// The [NiumaMediaSource] describing all available playback lines for this
+  /// controller. Pass a [NiumaMediaSource.single] for single-URL playback, or
+  /// a [NiumaMediaSource.lines] for quality/CDN switching.
+  final NiumaMediaSource source;
+
+  /// Optional middleware pipeline applied to the data source before each
+  /// backend bring-up. Runs on every `initialize`, every `switchLine`
+  /// (Task 25), and every retry (Task 26) — guarantees fresh headers /
+  /// signed URLs.
+  final List<SourceMiddleware> middlewares;
+
+  /// Retry policy applied when [initialize] throws a recoverable error
+  /// (network / transient by default). Caps at the policy's [RetryPolicy.maxAttempts];
+  /// if all attempts fail, the error propagates and triggers the existing
+  /// Android forceIjk Try-Fail-Remember fallback.
+  ///
+  /// **Trade-off**: retry runs *inside* the forceIjk fallback layer. In the
+  /// worst case, a single user-visible [initialize] call may make up to
+  /// `maxAttempts × 2` total backend initialisation attempts — first
+  /// `maxAttempts` ExoPlayer attempts, then `maxAttempts` IJK attempts.
+  ///
+  /// Worst case wall-clock budget for a never-completing initialize:
+  /// `maxAttempts × initTimeout × 2 + sum(backoff) × 2`. With the defaults
+  /// (`initTimeout: 30s`, `maxAttempts: 3`, exponential 1s + 2s + 4s = 7s),
+  /// that is `(3 × 30 + 7) × 2 ≈ 194s` before failure surfaces. To tighten
+  /// the bound, lower [RetryPolicy.maxAttempts], lower
+  /// [NiumaPlayerOptions.initTimeout], or pass [RetryPolicy.none] to trade
+  /// resilience for latency.
+  final RetryPolicy retryPolicy;
+
+  /// Backwards-compatible accessor for callers that only use a single line.
+  /// Returns the data source of the currently active line.
+  NiumaDataSource get dataSource => source.currentLine.source;
   final NiumaPlayerOptions options;
 
   final PlatformBridge _platform;
@@ -69,8 +126,16 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Completer<void>? _initCompleter;
   bool _disposed = false;
 
+  /// Tracks the id of the currently active line so [switchLine] can emit the
+  /// correct [LineSwitching.fromId]. Updated by [switchLine] on success.
+  String? _activeLineId;
+
+  /// The data source after running through the [middlewares] pipeline.
+  /// Populated at the start of [_runInitialize] and reused by [_initNative].
+  NiumaDataSource? _resolvedSource;
+
   final StreamController<NiumaPlayerEvent> _eventController =
-      StreamController<NiumaPlayerEvent>.broadcast();
+      StreamController<NiumaPlayerEvent>.broadcast(sync: true);
 
   /// Broadcast stream of [BackendSelected] / [FallbackTriggered] events. Safe
   /// to subscribe before [initialize].
@@ -117,11 +182,60 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     return completer.future;
   }
 
+  /// Classifies an exception into a [PlayerErrorCategory] for retry decisions.
+  ///
+  /// [TimeoutException] maps to [PlayerErrorCategory.network]. Objects that
+  /// carry a `.category` getter of type [PlayerErrorCategory] (e.g., the test
+  /// helper `_RetryableError`) are classified via that getter using duck-typing,
+  /// so the test class never needs to be visible in production code.
+  PlayerErrorCategory _categorize(Object e) {
+    if (e is TimeoutException) return PlayerErrorCategory.network;
+    try {
+      final dynamic d = e;
+      final c = d.category;
+      if (c is PlayerErrorCategory) return c;
+    } catch (_) {
+      // not a categorized exception; fall through
+    }
+    return PlayerErrorCategory.unknown;
+  }
+
+  /// Runs [bringUp] with retry according to [retryPolicy].
+  ///
+  /// On each throw, classifies the error via [_categorize] and asks
+  /// [retryPolicy] whether to retry. If not, the exception is rethrown
+  /// immediately so the caller's error-handling path (e.g. forceIjk fallback)
+  /// can take over.
+  Future<T> _withRetry<T>(Future<T> Function() bringUp) async {
+    var attempt = 1;
+    while (true) {
+      try {
+        return await bringUp();
+      } catch (e) {
+        final category = _categorize(e);
+        if (!retryPolicy.shouldRetry(category, attempt: attempt)) rethrow;
+        await Future<void>.delayed(retryPolicy.delayFor(attempt));
+        attempt++;
+      }
+    }
+  }
+
   Future<void> _runInitialize() async {
     // iOS / Web → always video_player.
     if (_platform.isIOS || _platform.isWeb) {
-      await _attachBackend(_backendFactory.createVideoPlayer(dataSource));
-      await _backend!.initialize().timeout(options.initTimeout);
+      await _withRetry(() async {
+        // Each retry attempt: dispose any prior (failed) backend, re-run the
+        // middleware pipeline (so signed URLs / fresh headers are recomputed),
+        // build a fresh backend, then call initialize().
+        await _disposeCurrentBackend();
+        _resolvedSource = await runSourceMiddlewares(
+          source.currentLine.source,
+          middlewares,
+        );
+        await _attachBackend(
+            _backendFactory.createVideoPlayer(_resolvedSource!));
+        await _backend!.initialize().timeout(options.initTimeout);
+      });
       _emit(const BackendSelected(
         PlayerBackendKind.videoPlayer,
         fromMemory: false,
@@ -155,11 +269,25 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _initNative({required bool forceIjk}) async {
-    final native =
-        _backendFactory.createNative(dataSource, forceIjk: forceIjk);
-    await _attachBackend(native);
+    PlayerBackend? lastBackend;
     try {
-      await native.initialize().timeout(options.initTimeout);
+      await _withRetry(() async {
+        // Each retry attempt: dispose any prior (failed) backend, re-run the
+        // middleware pipeline (so signed URLs / fresh headers are recomputed),
+        // build a fresh native backend, then call initialize().
+        await _disposeCurrentBackend();
+        _resolvedSource = await runSourceMiddlewares(
+          source.currentLine.source,
+          middlewares,
+        );
+        final native = _backendFactory.createNative(
+          _resolvedSource!,
+          forceIjk: forceIjk,
+        );
+        lastBackend = native;
+        await _attachBackend(native);
+        await native.initialize().timeout(options.initTimeout);
+      });
     } on TimeoutException {
       // Convert the wall-clock timeout into the FallbackTriggered semantic
       // the public events stream expects, then rethrow so the caller's
@@ -167,6 +295,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       _emit(const FallbackTriggered(FallbackReason.timeout));
       rethrow;
     }
+    final native = lastBackend;
     final fromMemory =
         native is NativeBackend ? native.fromMemory : false;
     _emit(BackendSelected(
@@ -232,6 +361,80 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       _backend?.setSpeed(speed);
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
   Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
+
+  /// Switches playback to the line identified by [lineId].
+  ///
+  /// Saves the current playback position and `isPlaying` state, tears down
+  /// the active backend, runs the middleware pipeline against the new line's
+  /// source, brings up a fresh backend for the target line, seeks back to the
+  /// saved position (if non-zero), and resumes playback if the player was
+  /// playing before the switch.
+  ///
+  /// Events emitted (in order on success):
+  ///   1. [LineSwitching] — backend tear-down is about to begin.
+  ///   2. [LineSwitched]  — new backend is ready.
+  ///
+  /// On failure, [LineSwitchFailed] is emitted and the error is rethrown.
+  ///
+  /// Throws [ArgumentError] if [lineId] is not present in [source]'s lines.
+  /// No-ops silently if [lineId] equals the currently active line.
+  Future<void> switchLine(String lineId) async {
+    if (_disposed) return;
+    final target = source.lineById(lineId);
+    if (target == null) {
+      throw ArgumentError.value(lineId, 'lineId', 'unknown line id');
+    }
+    final fromId = _activeLineId ?? source.defaultLineId;
+    if (fromId == lineId) return;
+
+    _emit(LineSwitching(fromId: fromId, toId: lineId));
+
+    final savedPos = value.position;
+    final wasPlaying = value.isPlaying;
+
+    try {
+      await _disposeCurrentBackend();
+      if (_disposed) return;
+      _activeLineId = lineId;
+      final resolved = await runSourceMiddlewares(target.source, middlewares);
+      if (_disposed) return;
+      _resolvedSource = resolved;
+
+      if (_platform.isIOS || _platform.isWeb) {
+        await _attachBackend(_backendFactory.createVideoPlayer(resolved));
+        if (_disposed) {
+          // The backend we just attached must not leak; tear it down before
+          // bailing.
+          await _disposeCurrentBackend();
+          return;
+        }
+        await _withRetry(
+            () => _backend!.initialize().timeout(options.initTimeout));
+      } else {
+        await _initNative(forceIjk: options.forceIjkOnAndroid);
+      }
+      if (_disposed) {
+        // Backend reached "initialized" but the controller was disposed
+        // mid-flight — clean up and bail without emitting LineSwitched.
+        await _disposeCurrentBackend();
+        return;
+      }
+
+      if (savedPos > Duration.zero) {
+        await _backend!.seekTo(savedPos);
+        if (_disposed) return;
+      }
+      if (wasPlaying) {
+        await _backend!.play();
+        if (_disposed) return;
+      }
+      _emit(LineSwitched(lineId));
+    } catch (e) {
+      if (_disposed) return;
+      _emit(LineSwitchFailed(toId: lineId, error: e));
+      rethrow;
+    }
+  }
 
   /// Wipes the "this device needs IJK" memory for every device fingerprint.
   /// App-level "clear cache / reset" flows should call this so a future

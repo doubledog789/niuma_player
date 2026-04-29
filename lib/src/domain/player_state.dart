@@ -302,3 +302,46 @@ final class FallbackTriggered extends NiumaPlayerEvent {
       'FallbackTriggered(reason: $reason, errorCode: $errorCode, '
       'errorCategory: $errorCategory)';
 }
+
+/// Fired when [NiumaPlayerController.switchLine] begins tearing down the
+/// current backend before bringing up the new line.
+final class LineSwitching extends NiumaPlayerEvent {
+  const LineSwitching({required this.fromId, required this.toId});
+
+  /// Id of the line that was previously active.
+  final String fromId;
+
+  /// Id of the line that the controller is moving to.
+  final String toId;
+
+  @override
+  String toString() => 'LineSwitching(from: $fromId, to: $toId)';
+}
+
+/// Fired exactly once after [NiumaPlayerController.switchLine] successfully
+/// brings up the new backend on the target line.
+final class LineSwitched extends NiumaPlayerEvent {
+  const LineSwitched(this.toId);
+
+  /// Id of the line now active.
+  final String toId;
+
+  @override
+  String toString() => 'LineSwitched(to: $toId)';
+}
+
+/// Fired when [NiumaPlayerController.switchLine] could not bring up the new
+/// line. The current backend (if any) is left in whatever state it was in;
+/// the caller decides whether to attempt another line manually.
+final class LineSwitchFailed extends NiumaPlayerEvent {
+  const LineSwitchFailed({required this.toId, required this.error});
+
+  /// Id of the line the controller failed to switch to.
+  final String toId;
+
+  /// Underlying error from the backend or middleware pipeline.
+  final Object error;
+
+  @override
+  String toString() => 'LineSwitchFailed(to: $toId, error: $error)';
+}

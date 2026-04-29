@@ -57,3 +57,65 @@ const List<Sample> samples = <Sample>[
     url: 'https://this-host-does-not-exist.invalid/video.mp4',
   ),
 ];
+
+/// One playable line inside a [MultiLineSample]. Mirrors `MediaLine` but
+/// without depending on the SDK in this layer (samples are pure data).
+class MultiLineDemoLine {
+  const MultiLineDemoLine({
+    required this.id,
+    required this.label,
+    required this.url,
+    required this.priority,
+  });
+
+  final String id;
+  final String label;
+  final String url;
+  final int priority;
+}
+
+/// Demo case exercising the M7 multi-line + middleware pipeline. Opens the
+/// dedicated `MultiLinePlayerPage` instead of `PlayerPage`.
+class MultiLineSample {
+  const MultiLineSample({
+    required this.label,
+    required this.lines,
+    required this.defaultLineId,
+  });
+
+  final String label;
+  final List<MultiLineDemoLine> lines;
+  final String defaultLineId;
+}
+
+const List<MultiLineSample> multiLineSamples = <MultiLineSample>[
+  // 三条线路均为 Big Buck Bunny 同内容 / 10 秒 / 仅画质或编码不同。
+  // 切换时位置不变 — 这是 switchLine 的正确使用场景（同内容多清晰度）。
+  MultiLineSample(
+    label: 'Big Buck Bunny — 多清晰度切换 (10s)',
+    defaultLineId: 'sd-h264',
+    lines: <MultiLineDemoLine>[
+      MultiLineDemoLine(
+        id: 'sd-h264',
+        label: '720p H.264',
+        url:
+            'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
+        priority: 0,
+      ),
+      MultiLineDemoLine(
+        id: 'hd-h264',
+        label: '1080p H.264',
+        url:
+            'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_5MB.mp4',
+        priority: 1,
+      ),
+      MultiLineDemoLine(
+        id: 'hd-h265',
+        label: '1080p H.265',
+        url:
+            'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h265/1080/Big_Buck_Bunny_1080_10s_1MB.mp4',
+        priority: 2,
+      ),
+    ],
+  ),
+];

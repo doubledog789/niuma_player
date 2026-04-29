@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'diagnostics_page.dart';
+import 'multi_line_page.dart';
 import 'player_page.dart';
 import 'samples.dart';
 
@@ -42,6 +43,28 @@ class HomeScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute<void>(
                   builder: (_) => PlayerPage(sample: sample),
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 24),
+          const _SectionHeader('M7 多线路演示'),
+          for (final ml in multiLineSamples)
+            Card(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              child: ListTile(
+                leading: const Icon(Icons.swap_horiz),
+                title: Text(ml.label),
+                subtitle: Text(
+                  '${ml.lines.length} 条线路 · 验证 switchLine + middleware',
+                  style: const TextStyle(fontSize: 11),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => MultiLinePlayerPage(sample: ml),
+                  ),
                 ),
               ),
             ),
