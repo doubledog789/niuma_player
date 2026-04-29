@@ -150,9 +150,10 @@ No, it's in `SharedPreferences`, which is wiped on uninstall. This is intentiona
 
 - **M4** — Optional disk cache layer (replays hit cache; Android via `SimpleCache`, iOS via AVAssetResourceLoader)
 - **M5** — Preload pool for short-video reels (N parallel pre-warmed controllers + LRU)
+- **M7** ✅ — Orchestration layer (multi-line + `switchLine`, source middleware, resume position, retry policy, ad scheduler, analytics)
+- **M8** — Tracks: WebVTT subtitle tracks (multi-language) + thumbnail-VTT scrub preview (sprite-based)
+- **M9** — UI / overlay layer: fullscreen, picture-in-picture, custom controls, ad overlay
 - Built-in `video_player_web_hls` opt-in flag
-- Picture-in-picture support
-- Subtitle track selection
 
 ## Contributing
 
