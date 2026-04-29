@@ -25,6 +25,8 @@ export 'src/presentation/niuma_player_view.dart';
 // orchestration
 export 'src/orchestration/multi_source.dart'
     show MediaQuality, MediaLine, NiumaMediaSource, MultiSourcePolicy;
+export 'src/orchestration/thumbnail_track.dart'
+    show ThumbnailFrame, WebVttCue;
 export 'src/orchestration/source_middleware.dart'
     show
         SourceMiddleware,
