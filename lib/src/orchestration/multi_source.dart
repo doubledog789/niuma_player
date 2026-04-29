@@ -135,11 +135,14 @@ class NiumaMediaSource {
   }
 }
 
-/// Controls whether the controller automatically tries the next priority line
-/// when a source fails to initialise.
+/// Controls whether the next priority line is tried automatically when a
+/// source fails to initialise.
 ///
-/// Use [MultiSourcePolicy.autoFailover] (the default) to have the controller
-/// silently advance through available [MediaLine]s on init failure.
+/// Used by [AutoFailoverOrchestrator] (a standalone helper in M7) to advance
+/// through priority-ordered [MediaLine]s after init failure. The controller
+/// itself does NOT consume this policy in M7 — wiring is deferred to a
+/// follow-up milestone.
+///
 /// Use [MultiSourcePolicy.manual] when you want errors to propagate directly
 /// to the UI without any automatic retry.
 @immutable

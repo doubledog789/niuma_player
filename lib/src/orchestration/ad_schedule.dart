@@ -6,9 +6,10 @@ import 'package:flutter/widgets.dart';
 /// Business widgets receive an [AdController] instance through the
 /// [AdCue.builder] callback and use it to control their own dismissal and
 /// to report telemetry events (impressions, clicks).  The concrete
-/// implementation — [AdControllerImpl] — is owned by
-/// [AdSchedulerOrchestrator] (Task 19) and is never constructed directly by
-/// callers.
+/// implementation — `AdControllerImpl` (Task 19 plus follow-up wiring task)
+/// — currently the orchestrator only signals `activeCue`; the host overlay
+/// is responsible for instantiating an `AdControllerImpl` and threading it
+/// into [AdCue.builder]. This will be moved into the orchestrator in M9.
 abstract class AdController {
   /// Closes the ad. Calls before [AdCue.minDisplayDuration] are silently
   /// ignored in release builds and asserted in debug builds.

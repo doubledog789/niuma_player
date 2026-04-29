@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LineSwitchFailed` events; preserves position + play state across the switch.
 - `AutoFailoverOrchestrator` — picks the next priority line on `network` / `terminal`
   errors only (codec-unsupported short-circuits); priority is ascending (lower number
-  = tried first).
+  = tried first). **Note**: M7 ships this as a standalone helper; the controller
+  does not yet consume it. Wiring `MultiSourcePolicy` into the controller is
+  deferred to a follow-up milestone.
 - `SourceMiddleware` abstract + `HeaderInjectionMiddleware` + `SignedUrlMiddleware`
   + `runSourceMiddlewares` pipeline; runs before backend init, on switchLine, and on
   retry — guarantees fresh headers / freshly signed URLs each time.
@@ -31,8 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `MidRollSkipPolicy` + `PauseAdShowPolicy`.
 - `AdSchedulerOrchestrator` covering preRoll (idle→ready), midRoll (with
   `skipIfSeekedPast` default), pauseAd (with `oncePerSession` default + `cooldown`
-  option), postRoll (phase=ended), plus `AdControllerImpl` enforcing
-  `minDisplayDuration` before allowing dismiss.
+  option), postRoll (phase=ended). Note: `AdControllerImpl` exists internally to
+  enforce `minDisplayDuration` before allowing dismiss, but is **not** part of
+  the M7 public API — the orchestrator only signals `activeCue` for now and
+  controller wiring through `cue.builder` lands in M9.
 - `AnalyticsEvent` sealed hierarchy (`AdScheduled` / `AdImpression` / `AdClick` /
   `AdDismissed`) + `AnalyticsEmitter` typedef hook.
 - Public test doubles via `package:niuma_player/testing.dart`:

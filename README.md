@@ -51,7 +51,7 @@ dependencies:
 ## 5-line quick start
 
 ```dart
-final controller = NiumaPlayerController(
+final controller = NiumaPlayerController.dataSource(
   NiumaDataSource.network('https://example.com/big_buck_bunny.mp4'),
 );
 await controller.initialize();
@@ -61,6 +61,38 @@ NiumaPlayerView(controller);
 ```
 
 That's the whole API for the happy path. The Try-Fail-Remember mechanism, error categorization, and backend selection events are all opt-in extras you don't need to touch.
+
+## M7 features (multi-line, middleware, retry)
+
+Wrap multiple CDN mirrors or quality variants into one controller via
+`NiumaMediaSource.lines(...)` and switch between them with `switchLine`:
+
+```dart
+final controller = NiumaPlayerController(
+  NiumaMediaSource.lines(
+    lines: [
+      MediaLine(id: 'cdn-a', label: 'CDN A',
+        source: NiumaDataSource.network('https://a/video.m3u8')),
+      MediaLine(id: 'cdn-b', label: 'CDN B',
+        source: NiumaDataSource.network('https://b/video.m3u8'),
+        priority: 1),
+    ],
+    defaultLineId: 'cdn-a',
+  ),
+  middlewares: const [
+    HeaderInjectionMiddleware({'Authorization': 'Bearer ...'}),
+  ],
+  retryPolicy: const RetryPolicy.smart(),
+);
+await controller.initialize();
+// later — switch CDNs while preserving position + play state:
+await controller.switchLine('cdn-b');
+```
+
+`SourceMiddleware` runs before every backend bring-up — initial init,
+`switchLine`, and every retry attempt — so signed URLs stay fresh.
+See [`example/lib/multi_line_page.dart`](example/lib/multi_line_page.dart)
+for an end-to-end demo.
 
 ## Listening to backend selection
 

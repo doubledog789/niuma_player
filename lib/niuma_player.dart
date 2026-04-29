@@ -49,8 +49,7 @@ export 'src/orchestration/ad_schedule.dart'
         MidRollAd,
         MidRollSkipPolicy,
         PauseAdShowPolicy;
-export 'src/orchestration/ad_scheduler.dart'
-    show AdSchedulerOrchestrator, AdControllerImpl;
+export 'src/orchestration/ad_scheduler.dart' show AdSchedulerOrchestrator;
 export 'src/orchestration/auto_failover.dart' show AutoFailoverOrchestrator;
 
 // observability

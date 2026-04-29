@@ -100,11 +100,16 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   ///
   /// **Trade-off**: retry runs *inside* the forceIjk fallback layer. In the
   /// worst case, a single user-visible [initialize] call may make up to
-  /// `maxAttempts × 2` total backend initialisation attempts — e.g., with the
-  /// default `maxAttempts: 3` that is 3 ExoPlayer attempts (with back-off) then
-  /// 3 IJK attempts (with back-off), for a maximum wait of roughly 14 seconds
-  /// before a final failure is surfaced. Tune [retryPolicy] or set
-  /// [RetryPolicy.none] to trade resilience for latency.
+  /// `maxAttempts × 2` total backend initialisation attempts — first
+  /// `maxAttempts` ExoPlayer attempts, then `maxAttempts` IJK attempts.
+  ///
+  /// Worst case wall-clock budget for a never-completing initialize:
+  /// `maxAttempts × initTimeout × 2 + sum(backoff) × 2`. With the defaults
+  /// (`initTimeout: 30s`, `maxAttempts: 3`, exponential 1s + 2s + 4s = 7s),
+  /// that is `(3 × 30 + 7) × 2 ≈ 194s` before failure surfaces. To tighten
+  /// the bound, lower [RetryPolicy.maxAttempts], lower
+  /// [NiumaPlayerOptions.initTimeout], or pass [RetryPolicy.none] to trade
+  /// resilience for latency.
   final RetryPolicy retryPolicy;
 
   /// Backwards-compatible accessor for callers that only use a single line.
