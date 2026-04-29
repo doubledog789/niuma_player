@@ -72,18 +72,25 @@ class NiumaMediaSource {
   const NiumaMediaSource._({
     required this.lines,
     required this.defaultLineId,
+    this.thumbnailVtt,
   });
 
   /// Creates a [NiumaMediaSource] backed by a single [NiumaDataSource].
   ///
   /// The resulting source has one [MediaLine] with id `'default'`.
   /// Use this when there is only one URL and no quality/CDN switching needed.
-  factory NiumaMediaSource.single(NiumaDataSource source) {
+  ///
+  /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
+  factory NiumaMediaSource.single(
+    NiumaDataSource source, {
+    String? thumbnailVtt,
+  }) {
     return NiumaMediaSource._(
       lines: [
         MediaLine(id: 'default', label: 'default', source: source),
       ],
       defaultLineId: 'default',
+      thumbnailVtt: thumbnailVtt,
     );
   }
 
@@ -92,9 +99,12 @@ class NiumaMediaSource {
   /// [lines] must be non-empty. [defaultLineId] must match the [MediaLine.id]
   /// of exactly one entry in [lines]; an [ArgumentError] is thrown otherwise.
   /// Use this for multi-quality playlists or CDN failover configurations.
+  ///
+  /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
   factory NiumaMediaSource.lines({
     required List<MediaLine> lines,
     required String defaultLineId,
+    String? thumbnailVtt,
   }) {
     if (lines.isEmpty) {
       throw ArgumentError.value(lines, 'lines', 'must not be empty');
@@ -106,7 +116,11 @@ class NiumaMediaSource {
         'is not the id of any provided line',
       );
     }
-    return NiumaMediaSource._(lines: lines, defaultLineId: defaultLineId);
+    return NiumaMediaSource._(
+      lines: lines,
+      defaultLineId: defaultLineId,
+      thumbnailVtt: thumbnailVtt,
+    );
   }
 
   /// The ordered list of playback lines available for this source.
@@ -119,6 +133,14 @@ class NiumaMediaSource {
   ///
   /// Guaranteed to match one entry in [lines] by construction.
   final String defaultLineId;
+
+  /// 可选的 WebVTT 缩略图轨道 URL。
+  ///
+  /// 为 `null` 时表示不启用缩略图功能。Controller 启动后若不为 `null`，
+  /// 会异步走 `SourceMiddleware` 流水线 + fetch + 解析；解析失败静默降级。
+  ///
+  /// 不区分清晰度——thumbnail 是内容属性，所有 [lines] 共享一份。
+  final String? thumbnailVtt;
 
   /// Returns the [MediaLine] whose [MediaLine.id] equals [defaultLineId].
   ///

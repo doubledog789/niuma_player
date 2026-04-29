@@ -81,4 +81,27 @@ void main() {
     const p = MultiSourcePolicy.manual();
     expect(p.enabled, isFalse);
   });
+
+  test('NiumaMediaSource.single 带 thumbnailVtt 时正确暴露', () {
+    final ds = NiumaDataSource.network('https://x/v.mp4');
+    final src = NiumaMediaSource.single(
+      ds,
+      thumbnailVtt: 'https://x/thumbs.vtt',
+    );
+    expect(src.thumbnailVtt, 'https://x/thumbs.vtt');
+  });
+
+  test('NiumaMediaSource.lines 不传 thumbnailVtt 时为 null', () {
+    final src = NiumaMediaSource.lines(
+      lines: [
+        MediaLine(
+          id: 'a',
+          label: 'A',
+          source: NiumaDataSource.network('https://x/a.mp4'),
+        ),
+      ],
+      defaultLineId: 'a',
+    );
+    expect(src.thumbnailVtt, isNull);
+  });
 }
