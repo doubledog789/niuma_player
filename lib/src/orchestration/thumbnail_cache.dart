@@ -1,10 +1,12 @@
 import 'dart:collection';
 
+import 'package:flutter/painting.dart' show PaintingBinding;
 import 'package:flutter/widgets.dart' show ImageProvider, NetworkImage;
 
 /// 按 sprite URL 去重的 [ImageProvider] 缓存，支持 LRU 上限。
 ///
-/// 同一 `NiumaPlayerController` 生命周期内复用；dispose 时清空。
+/// 同一 `NiumaPlayerController` 生命周期内复用；dispose 时清空 controller-local
+/// 引用并 evict 全局 [PaintingBinding.imageCache] 中已解码的位图。
 class ThumbnailCache {
   /// 创建一个 thumbnail 缓存。
   ///
@@ -30,7 +32,13 @@ class ThumbnailCache {
     final provider = NetworkImage(url);
     _entries[url] = provider;
     if (_entries.length > maxEntries) {
-      _entries.remove(_entries.keys.first); // 淘汰最旧的
+      // 淘汰最旧的，并把它从全局 imageCache 中 evict —— 否则解码后的位图
+      // 可能继续占住 RAM 直到下次 GC。
+      final oldestKey = _entries.keys.first;
+      final oldestProvider = _entries.remove(oldestKey);
+      if (oldestProvider != null) {
+        _evictFromGlobalImageCache(oldestProvider);
+      }
     }
     return provider;
   }
@@ -38,6 +46,20 @@ class ThumbnailCache {
   /// 是否已经缓存过 [url]。
   bool contains(String url) => _entries.containsKey(url);
 
-  /// 清空所有缓存条目。
-  void clear() => _entries.clear();
+  /// 清空所有缓存条目，并 evict 全局 [PaintingBinding.imageCache] 中
+  /// 对应的解码位图。否则即使 controller 已 dispose，sprite 像素仍可能
+  /// 占住 imageCache 直到 GC（I1/I8）。
+  void clear() {
+    for (final provider in _entries.values) {
+      _evictFromGlobalImageCache(provider);
+    }
+    _entries.clear();
+  }
+
+  static void _evictFromGlobalImageCache(ImageProvider provider) {
+    // PaintingBinding 在纯 Dart 环境（无 Flutter binding）下可能是 null。
+    // 测试代码会触发 binding 初始化；生产环境一定有 binding。这里防御一下。
+    final binding = PaintingBinding.instance;
+    binding.imageCache.evict(provider);
+  }
 }

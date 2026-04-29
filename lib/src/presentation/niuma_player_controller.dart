@@ -31,18 +31,56 @@ typedef ThumbnailFetcher = Future<String> Function(
   Map<String, String> headers,
 );
 
+/// Hard wall-clock cap on the default VTT fetch. Anything beyond this is
+/// treated as a hung server and the thumbnail track is silently disabled
+/// (failing-open—video keeps playing).
+const Duration kThumbnailFetchTimeout = Duration(seconds: 30);
+
+/// Hard cap on the VTT body size. A 5MB VTT would already imply tens of
+/// thousands of cues; anything past this is almost certainly a malicious
+/// or misconfigured server. Reject early so the VM doesn't unbounded-eat RAM.
+const int kThumbnailMaxBodyBytes = 5 * 1024 * 1024;
+
 Future<String> _defaultThumbnailFetcher(
   Uri uri,
   Map<String, String> headers,
+) =>
+    fetchThumbnailVtt(uri, headers, http.Client());
+
+/// Internal helper exposed for testing: fetches a VTT body using the given
+/// [client]. Honours the global [kThumbnailFetchTimeout] and
+/// [kThumbnailMaxBodyBytes] caps; throws [http.ClientException] on
+/// non-2xx, oversized body, or timeout.
+///
+/// In production [_defaultThumbnailFetcher] passes a fresh `http.Client()`;
+/// tests can pass a `MockClient` to drive the size cap / timeout / error
+/// branches without touching the network.
+@visibleForTesting
+Future<String> fetchThumbnailVtt(
+  Uri uri,
+  Map<String, String> headers,
+  http.Client client,
 ) async {
-  final response = await http.get(uri, headers: headers);
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw http.ClientException(
-      'thumbnail VTT fetch failed: HTTP ${response.statusCode}',
-      uri,
-    );
+  try {
+    final response =
+        await client.get(uri, headers: headers).timeout(kThumbnailFetchTimeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw http.ClientException(
+        'thumbnail VTT fetch failed: HTTP ${response.statusCode}',
+        uri,
+      );
+    }
+    if (response.bodyBytes.length > kThumbnailMaxBodyBytes) {
+      throw http.ClientException(
+        'thumbnail VTT body too large: '
+        '${response.bodyBytes.length} bytes (max $kThumbnailMaxBodyBytes)',
+        uri,
+      );
+    }
+    return response.body;
+  } finally {
+    client.close();
   }
-  return response.body;
 }
 
 /// Options for tuning [NiumaPlayerController] behaviour. All fields have
@@ -174,6 +212,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   List<WebVttCue> _thumbnailCues = const <WebVttCue>[];
   String? _resolvedThumbnailUrl;
   final ThumbnailFetcher _thumbnailFetcher;
+
+  /// In-flight load future — used to dedup concurrent calls to
+  /// [_loadThumbnailsIfAny] so multiple `unawaited(...)` triggers only
+  /// ever do one fetch.
+  Future<void>? _thumbnailLoadFuture;
 
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast(sync: true);
@@ -315,7 +358,19 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// Loads + parses the optional [NiumaMediaSource.thumbnailVtt] in the
   /// background. Failures are swallowed (logged via [debugPrint]) so video
   /// playback is never affected by a broken thumbnail track.
-  Future<void> _loadThumbnailsIfAny() async {
+  ///
+  /// Idempotent: concurrent invocations share a single in-flight future
+  /// (I6). After completion the future is reset to null so a future call —
+  /// e.g. after a configured retry — could in principle re-attempt; today
+  /// nothing in the controller does that, but the door is open.
+  Future<void> _loadThumbnailsIfAny() {
+    if (_thumbnailLoadFuture != null) return _thumbnailLoadFuture!;
+    final fut = _runThumbnailLoad();
+    _thumbnailLoadFuture = fut;
+    return fut;
+  }
+
+  Future<void> _runThumbnailLoad() async {
     final url = source.thumbnailVtt;
     if (url == null) return;
     try {
@@ -324,16 +379,25 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         middlewares,
       );
       if (_disposed) return;
-      _resolvedThumbnailUrl = ds.uri;
       final body = await _thumbnailFetcher(
         Uri.parse(ds.uri),
         ds.headers ?? const <String, String>{},
       );
       if (_disposed) return;
-      _thumbnailCues = WebVttParser.parseThumbnails(body);
+      final cues = WebVttParser.parseThumbnails(body);
+      if (_disposed) return;
+      // 顺序很关键：解析完成后才把两个状态字段（cues + resolvedUrl）一起设进去。
+      // 这样 thumbnailFor 看到 _thumbnailCues 非空时也一定有 _resolvedThumbnailUrl。
+      _thumbnailCues = cues;
+      _resolvedThumbnailUrl = ds.uri;
     } catch (e) {
+      // I5: catch 块进入前先检查 _disposed —— dispose 中途完成的 fetcher
+      // 不应该再写已 disposed 的字段。
+      if (_disposed) return;
       debugPrint('[niuma_player] thumbnail VTT 加载失败：$e（不影响播放）');
+      // I9: 同时清掉两个状态字段，避免 partial state（cues 空但 resolvedUrl 有值）。
       _thumbnailCues = const <WebVttCue>[];
+      _resolvedThumbnailUrl = null;
     }
   }
 

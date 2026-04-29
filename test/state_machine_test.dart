@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart' as http_testing;
 import 'package:niuma_player/niuma_player.dart';
 
 import 'helpers/fake_device_memory_channel.dart';
@@ -1006,6 +1010,126 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
       await controller.dispose();
+    });
+
+    // I7: fetcher 没超时 / 没大小上限会让 web tab 拖死 / VM 无界吃 RAM。
+    test('fetcher 超时被静默降级（I7 timeout）', () async {
+      final factory = FakeBackendFactory();
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(
+          ds,
+          thumbnailVtt: 'https://x/thumbs.vtt',
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: factory,
+        thumbnailFetcher: (uri, headers) async {
+          // 永不返回，模拟挂死的服务器。controller 内部应有自己的超时上限。
+          throw TimeoutException('fetcher timed out', const Duration(seconds: 30));
+        },
+      );
+      await controller.initialize();
+      // 让 unawaited 加载完成。
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
+      await controller.dispose();
+    });
+
+    // I6: _loadThumbnailsIfAny 不能被多次触发后并行 fetch 多次——浪费带宽。
+    test('多次 initialize 只触发一次 fetch（I6 idempotent）', () async {
+      var fetchCount = 0;
+      final factory = FakeBackendFactory();
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(
+          ds,
+          thumbnailVtt: 'https://x/thumbs.vtt',
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: factory,
+        thumbnailFetcher: (uri, headers) async {
+          fetchCount++;
+          return 'WEBVTT\n\n00:00.000 --> 00:05.000\nx.jpg#xywh=0,0,1,1\n';
+        },
+      );
+      await controller.initialize();
+      // 再次调 initialize（已 init 完毕也应安全）+ 让加载完成。
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      // 即使 controller 被外部多次刷激发，VTT 只被 fetch 一次。
+      expect(fetchCount, 1);
+      await controller.dispose();
+    });
+
+    // I7: 默认 fetcher 必须有 5MB 大小上限，否则恶意服务器可以让 VM 吃光 RAM。
+    test('默认 fetcher 拒绝超过 5MB 的 body（I7 size cap）', () async {
+      // 6MB 的假 body：用全是 ASCII 字符（每个 1 byte）。
+      final oversize = Uint8List(kThumbnailMaxBodyBytes + 1024);
+      // 填一些 ASCII 数据（'a'）让 body 是合法的 UTF-8。
+      for (var i = 0; i < oversize.length; i++) {
+        oversize[i] = 0x61; // 'a'
+      }
+      final mock = http_testing.MockClient(
+        (req) async => http.Response.bytes(oversize, 200),
+      );
+
+      Object? caught;
+      try {
+        await fetchThumbnailVtt(
+          Uri.parse('https://x/thumbs.vtt'),
+          const <String, String>{},
+          mock,
+        );
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught, isA<http.ClientException>(),
+          reason: 'oversized VTT body must be rejected');
+      expect(caught.toString(), contains('too large'));
+    });
+
+    // I7: 正常大小的 body 通过。
+    test('默认 fetcher 接受正常大小的 VTT body', () async {
+      final body = utf8.encode(
+        'WEBVTT\n\n00:00.000 --> 00:05.000\nx.jpg#xywh=0,0,1,1\n',
+      );
+      final mock = http_testing.MockClient(
+        (req) async => http.Response.bytes(body, 200),
+      );
+      final result = await fetchThumbnailVtt(
+        Uri.parse('https://x/thumbs.vtt'),
+        const <String, String>{},
+        mock,
+      );
+      expect(result, contains('WEBVTT'));
+    });
+
+    // F5: thumbnailVtt 必须在 NiumaMediaSource 构造时校验，
+    // 不要等到 fetch 才静默降级。
+    test('NiumaMediaSource.single 非法 thumbnailVtt 立即抛 ArgumentError（F5）',
+        () {
+      expect(
+        () => NiumaMediaSource.single(
+          ds,
+          thumbnailVtt: 'http://[bad-ipv6',
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('NiumaMediaSource.lines 非法 thumbnailVtt 立即抛 ArgumentError（F5）',
+        () {
+      expect(
+        () => NiumaMediaSource.lines(
+          lines: [
+            MediaLine(id: 'a', label: 'A', source: ds),
+          ],
+          defaultLineId: 'a',
+          thumbnailVtt: 'http://[bad-ipv6',
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('成功 fetch + 解析后能查出对应 frame', () async {

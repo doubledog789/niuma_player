@@ -81,10 +81,13 @@ class NiumaMediaSource {
   /// Use this when there is only one URL and no quality/CDN switching needed.
   ///
   /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
+  /// 若非 `null`，会立即用 [Uri.parse] 校验；非法 URL 会抛 [ArgumentError]，
+  /// 不会延后到 fetch 时静默吞掉（F5）。
   factory NiumaMediaSource.single(
     NiumaDataSource source, {
     String? thumbnailVtt,
   }) {
+    _validateThumbnailVtt(thumbnailVtt);
     return NiumaMediaSource._(
       lines: [
         MediaLine(id: 'default', label: 'default', source: source),
@@ -101,6 +104,8 @@ class NiumaMediaSource {
   /// Use this for multi-quality playlists or CDN failover configurations.
   ///
   /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
+  /// 若非 `null`，会立即用 [Uri.parse] 校验；非法 URL 会抛 [ArgumentError]，
+  /// 不会延后到 fetch 时静默吞掉（F5）。
   factory NiumaMediaSource.lines({
     required List<MediaLine> lines,
     required String defaultLineId,
@@ -116,11 +121,30 @@ class NiumaMediaSource {
         'is not the id of any provided line',
       );
     }
+    _validateThumbnailVtt(thumbnailVtt);
     return NiumaMediaSource._(
       lines: lines,
       defaultLineId: defaultLineId,
       thumbnailVtt: thumbnailVtt,
     );
+  }
+
+  /// Throws an [ArgumentError] if [url] is non-null and not a syntactically
+  /// valid URL parseable by [Uri.parse]. Empty strings are also rejected.
+  static void _validateThumbnailVtt(String? url) {
+    if (url == null) return;
+    if (url.isEmpty) {
+      throw ArgumentError.value(url, 'thumbnailVtt', 'must not be empty');
+    }
+    try {
+      Uri.parse(url);
+    } on FormatException catch (e) {
+      throw ArgumentError.value(
+        url,
+        'thumbnailVtt',
+        'not a valid URL (${e.message})',
+      );
+    }
   }
 
   /// The ordered list of playback lines available for this source.
