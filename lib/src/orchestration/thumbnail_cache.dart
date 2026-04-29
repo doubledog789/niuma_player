@@ -10,11 +10,19 @@ import 'package:flutter/widgets.dart' show ImageProvider, NetworkImage;
 class ThumbnailCache {
   /// 创建一个 thumbnail 缓存。
   ///
-  /// [maxEntries] 默认 8，能覆盖长视频常见的多张 sprite。
-  ThumbnailCache({this.maxEntries = 8});
+  /// [maxEntries] 默认 32，覆盖长视频典型的 sprite 数（4 小时视频，每张 sprite
+  /// ~120 帧，总共约 24 张 sprite，留 8 张 headroom 应对 line / quality 切换
+  /// 时短暂的双套缓存。
+  ///
+  /// 调大估算：
+  /// - 总 sprite 数 ≈ ⌈视频时长(s) / cue 时长(s) / 每 sprite 帧数⌉
+  /// - 例：6 小时视频 + 5s/cue + 100 frames/sprite ≈ 43 张 → 设 maxEntries=64
+  /// - 调大不会增加内存几何，只是延长 LRU 链——实际驻留内存仍由
+  ///   [PaintingBinding.imageCache] 的 maxBytes (默认 100MB) 兜底。
+  ThumbnailCache({this.maxEntries = 32});
 
   /// 单个 source 同时缓存的最大 sprite 数。短视频通常 1 张就够，
-  /// 长视频按 100 张缩略图 / sprite 估，[maxEntries]=8 能覆盖 800 帧。
+  /// 长视频按 100 张缩略图 / sprite 估，[maxEntries]=32 能覆盖约 3200 帧。
   final int maxEntries;
 
   // LinkedHashMap 保留插入顺序，便于实现 LRU。

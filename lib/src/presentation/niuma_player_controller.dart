@@ -121,6 +121,20 @@ class NiumaPlayerOptions {
 /// Multi-line playback (CDN failover, quality variants) is supported via
 /// [NiumaMediaSource]. For single-URL use cases, prefer the
 /// [NiumaPlayerController.dataSource] convenience factory.
+///
+/// **事件 / 值通知是同步触发的**：[events] 流和这个 controller（作为
+/// [ValueNotifier]）的监听器在 backend 推上来事件 / 值变更时**同步** fire。
+/// 如果监听端在 build / layout / paint 阶段直接调 `setState` 会撞
+/// `'setState() or markNeedsBuild() called during build'`（framework is
+/// locked）。建议消费方式：
+/// 1. **`ValueListenableBuilder`** 包住要响应 [value] 的 widget——框架
+///    自动调度 rebuild，不需要手写 listener。
+/// 2. **`events` 监听里手动检测** [SchedulerBinding.schedulerPhase]，
+///    在 `idle` 之外的相位用 `addPostFrameCallback` 把 setState 延后到
+///    下一帧。
+/// 3. 参考 `example/lib/thumbnail_demo_page.dart` 的 `_safeSetState`
+///    封装——把"如果在 build / layout 阶段就 post-frame 延后，否则同步
+///    setState" 这套防御封装成助手函数，所有事件监听都过它。
 class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
     this.source, {
@@ -134,6 +148,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         _platform = platform ?? const DefaultPlatformBridge(),
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
         _thumbnailFetcher = thumbnailFetcher ?? _defaultThumbnailFetcher,
+        _thumbnailLoadState = source.thumbnailVtt == null
+            ? ThumbnailLoadState.none
+            : ThumbnailLoadState.idle,
         super(NiumaPlayerValue.uninitialized());
 
   /// Single-source convenience factory. Wraps the [ds] in a
@@ -212,11 +229,21 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   List<WebVttCue> _thumbnailCues = const <WebVttCue>[];
   String? _resolvedThumbnailUrl;
   final ThumbnailFetcher _thumbnailFetcher;
+  ThumbnailLoadState _thumbnailLoadState;
 
   /// In-flight load future — used to dedup concurrent calls to
   /// [_loadThumbnailsIfAny] so multiple `unawaited(...)` triggers only
   /// ever do one fetch.
   Future<void>? _thumbnailLoadFuture;
+
+  /// 当前缩略图加载状态。详见 [ThumbnailLoadState] 文档。
+  ///
+  /// 状态变更**不会**触发 ValueNotifier 通知或 events 流广播——避免和
+  /// player 自身的 value / 事件混在一起。如果上层需要响应这个状态：
+  /// 1. 在 build 时直接读这个 getter；
+  /// 2. 围绕 player 自身的 events 做轮询（loading→ready 通常 < 100ms）；
+  /// 3. 简单 setState 后让 [thumbnailFor] 返回值自然反映"暂时还没好"。
+  ThumbnailLoadState get thumbnailLoadState => _thumbnailLoadState;
 
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast(sync: true);
@@ -373,6 +400,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Future<void> _runThumbnailLoad() async {
     final url = source.thumbnailVtt;
     if (url == null) return;
+    _thumbnailLoadState = ThumbnailLoadState.loading;
     try {
       final ds = await runSourceMiddlewares(
         NiumaDataSource.network(url),
@@ -390,6 +418,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // 这样 thumbnailFor 看到 _thumbnailCues 非空时也一定有 _resolvedThumbnailUrl。
       _thumbnailCues = cues;
       _resolvedThumbnailUrl = ds.uri;
+      _thumbnailLoadState = ThumbnailLoadState.ready;
     } catch (e) {
       // I5: catch 块进入前先检查 _disposed —— dispose 中途完成的 fetcher
       // 不应该再写已 disposed 的字段。
@@ -398,6 +427,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // I9: 同时清掉两个状态字段，避免 partial state（cues 空但 resolvedUrl 有值）。
       _thumbnailCues = const <WebVttCue>[];
       _resolvedThumbnailUrl = null;
+      _thumbnailLoadState = ThumbnailLoadState.failed;
     }
   }
 
@@ -405,7 +435,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 还未就绪时返回 `null`。
   ///
   /// 安全调用：在 [initialize] 之前 / 缩略图加载失败 / 没配置 thumbnailVtt
-  /// 都会返回 `null`，永远不抛。
+  /// 都会返回 `null`。**在所有合法输入下不抛**——实现内部 [ThumbnailResolver]
+  /// 已用 try/catch 防御 `Uri.parse` 等可抛点；但极端非法输入（例如自行
+  /// 构造 cue 时传入 NaN 时间）仍可能触发 framework-level 异常，调用方
+  /// 不应依赖"绝对不抛"的强保证。
   ThumbnailFrame? thumbnailFor(Duration position) {
     if (_thumbnailCues.isEmpty || _resolvedThumbnailUrl == null) return null;
     return ThumbnailResolver.resolve(

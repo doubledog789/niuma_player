@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -194,11 +193,35 @@ class _ThumbnailDemoPageState extends State<ThumbnailDemoPage> {
             clipBehavior: Clip.none,
             children: <Widget>[
               // Thumbnail preview (only while user is touching the bar)
-              if (_scrubMs != null && _previewFrame != null)
+              if (_scrubMs != null)
                 Positioned(
                   left: previewLeft.toDouble(),
                   top: 0,
-                  child: _ThumbnailPreview(frame: _previewFrame!),
+                  child: Container(
+                    width: 160,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      border: Border.all(color: Colors.white70, width: 1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: NiumaThumbnailView(
+                      frame: _previewFrame,
+                      width: 160,
+                      height: 90,
+                      loadingBuilder: (_) => const Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               // The custom progress bar — Listener (raw pointer events) gives
               // immediate touch-to-drag without the GestureDetector arena's
@@ -291,104 +314,6 @@ class _ThumbnailDemoPageState extends State<ThumbnailDemoPage> {
   }
 }
 
-/// Renders a [ThumbnailFrame] (sprite ImageProvider + crop rect) at a fixed
-/// 160×90 display size. Resolves the image asynchronously; shows an empty
-/// black box while the sprite loads.
-class _ThumbnailPreview extends StatefulWidget {
-  const _ThumbnailPreview({required this.frame});
-
-  final ThumbnailFrame frame;
-
-  @override
-  State<_ThumbnailPreview> createState() => _ThumbnailPreviewState();
-}
-
-class _ThumbnailPreviewState extends State<_ThumbnailPreview> {
-  ui.Image? _resolved;
-  ImageStream? _stream;
-  ImageStreamListener? _listener;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolveCurrent();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ThumbnailPreview old) {
-    super.didUpdateWidget(old);
-    if (old.frame.image != widget.frame.image) {
-      _detach();
-      _resolveCurrent();
-    }
-  }
-
-  void _resolveCurrent() {
-    final stream = widget.frame.image.resolve(ImageConfiguration.empty);
-    final listener = ImageStreamListener((info, synchronousCall) {
-      if (!mounted) return;
-      if (synchronousCall) {
-        // 图已缓存 → listener 在 addListener 内同步 fire；此时仍在 build/initState
-        // 阶段，直接 setState 会触发 "widget tree locked" 错误。延后到下一帧。
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _resolved = info.image);
-        });
-      } else {
-        setState(() => _resolved = info.image);
-      }
-    });
-    stream.addListener(listener);
-    _stream = stream;
-    _listener = listener;
-  }
-
-  void _detach() {
-    if (_stream != null && _listener != null) {
-      _stream!.removeListener(_listener!);
-    }
-    _stream = null;
-    _listener = null;
-  }
-
-  @override
-  void dispose() {
-    _detach();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 160,
-      height: 90,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        border: Border.all(color: Colors.white70, width: 1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: _resolved == null
-          ? const Center(
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: Colors.white54,
-                ),
-              ),
-            )
-          : CustomPaint(
-              size: const Size(160, 90),
-              painter: _SpriteCropPainter(
-                image: _resolved!,
-                srcRect: widget.frame.region,
-              ),
-            ),
-    );
-  }
-}
-
 /// Custom progress bar painter: track + buffered fill + active fill + thumb.
 /// Thumb grows when [isDragging] so the user gets visual feedback that the
 /// scrubber has engaged.
@@ -471,24 +396,3 @@ class _ScrubBarPainter extends CustomPainter {
       old.isDragging != isDragging;
 }
 
-class _SpriteCropPainter extends CustomPainter {
-  _SpriteCropPainter({required this.image, required this.srcRect});
-
-  final ui.Image image;
-  final Rect srcRect;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final dstRect = Offset.zero & size;
-    canvas.drawImageRect(
-      image,
-      srcRect,
-      dstRect,
-      Paint()..filterQuality = FilterQuality.medium,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _SpriteCropPainter old) =>
-      old.image != image || old.srcRect != srcRect;
-}

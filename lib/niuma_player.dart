@@ -21,12 +21,13 @@ export 'src/domain/player_state.dart'
         LineSwitchFailed;
 export 'src/presentation/niuma_player_controller.dart';
 export 'src/presentation/niuma_player_view.dart';
+export 'src/presentation/niuma_thumbnail_view.dart' show NiumaThumbnailView;
 
 // orchestration
 export 'src/orchestration/multi_source.dart'
     show MediaQuality, MediaLine, NiumaMediaSource, MultiSourcePolicy;
 export 'src/orchestration/thumbnail_track.dart'
-    show ThumbnailFrame, WebVttCue;
+    show ThumbnailFrame, WebVttCue, ThumbnailLoadState;
 export 'src/orchestration/source_middleware.dart'
     show
         SourceMiddleware,
