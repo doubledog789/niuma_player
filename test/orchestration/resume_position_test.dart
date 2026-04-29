@@ -94,4 +94,59 @@ void main() {
       orch.dispose();
     });
   });
+
+  test('ResumeOrchestrator.onEnded clears the saved entry', () async {
+    final storage = FakeResumeStorage();
+    await storage.write('k', const Duration(seconds: 42));
+    final orch = ResumeOrchestrator(
+      policy: ResumePolicy(
+        storage: storage,
+        keyOf: (_) => 'k',
+      ),
+      source: NiumaDataSource.network('x'),
+      seekTo: (_) async {},
+      currentPosition: () => Duration.zero,
+    );
+    await orch.onEnded();
+    expect(await storage.read('k'), isNull,
+        reason: 'phase=ended must clear the saved resume entry');
+  });
+
+  test(
+      'ResumeOrchestrator.dispose writes a final position when '
+      '>= minSavedPosition', () async {
+    final storage = FakeResumeStorage();
+    final orch = ResumeOrchestrator(
+      policy: ResumePolicy(
+        storage: storage,
+        keyOf: (_) => 'k',
+        minSavedPosition: const Duration(seconds: 30),
+      ),
+      source: NiumaDataSource.network('x'),
+      seekTo: (_) async {},
+      currentPosition: () => const Duration(seconds: 45),
+    );
+    await orch.dispose();
+    expect(await storage.read('k'), const Duration(seconds: 45),
+        reason: 'dispose() must persist the final position');
+  });
+
+  test(
+      'ResumeOrchestrator.dispose does NOT write below minSavedPosition',
+      () async {
+    final storage = FakeResumeStorage();
+    final orch = ResumeOrchestrator(
+      policy: ResumePolicy(
+        storage: storage,
+        keyOf: (_) => 'k',
+        minSavedPosition: const Duration(seconds: 30),
+      ),
+      source: NiumaDataSource.network('x'),
+      seekTo: (_) async {},
+      currentPosition: () => const Duration(seconds: 5),
+    );
+    await orch.dispose();
+    expect(await storage.read('k'), isNull,
+        reason: 'dispose at <minSavedPosition must not persist');
+  });
 }

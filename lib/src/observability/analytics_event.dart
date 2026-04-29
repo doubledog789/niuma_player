@@ -1,4 +1,3 @@
-// lib/src/observability/analytics_event.dart
 import 'package:flutter/foundation.dart';
 
 /// Categorizes the placement of an ad within the content timeline.
@@ -54,7 +53,8 @@ sealed class AnalyticsEvent {
   }) = AdDismissed;
 }
 
-/// Fired when an ad has been registered with the scheduler but not yet shown.
+/// Emitted when the orchestrator activates a cue (at-show, before any
+/// impression has been counted).
 final class AdScheduled extends AnalyticsEvent {
   const AdScheduled({required this.cueType, this.at});
 

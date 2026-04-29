@@ -74,13 +74,16 @@ void main() {
       position: const Duration(seconds: 29),
     ));
     expect(orch.activeCue.value, isNull);
+    expect(player.pauseCalled, isFalse);
 
-    // t=31s; fire.
+    // t=31s; fire while playing → onPause is called.
     player.emit(NiumaPlayerValue.uninitialized().copyWith(
       phase: PlayerPhase.playing,
       position: const Duration(seconds: 31),
     ));
     expect(orch.activeCue.value, isNotNull);
+    expect(player.pauseCalled, isTrue,
+        reason: 'cue firing while playing must invoke the onPause callback');
     orch.dispose();
   });
 
@@ -204,5 +207,83 @@ void main() {
     ctl.simulateElapsed(const Duration(seconds: 6));
     ctl.dismiss();
     expect(dismissed, isTrue);
+  });
+
+  test(
+      'cold-start at t=10s does not falsely consume skipIfSeekedPast midRoll@5s',
+      () {
+    // Mid-stream resume scenario: first observed position is past the cue.
+    // Without the cold-start guard, the scheduler interprets the jump from
+    // baseline 0s → 10s as a seek and (under skipIfSeekedPast) MARKS the
+    // cue as fired — meaning if the user later rewinds and naturally
+    // crosses t=5, the ad won't fire either. With the guard, the first
+    // tick simply records the baseline and a subsequent rewind+cross
+    // fires the cue normally.
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        midRolls: [
+          MidRollAd(
+            at: const Duration(seconds: 5),
+            cue: AdCue(builder: (_, __) => const SizedBox()),
+            // default: skipIfSeekedPast
+          ),
+        ],
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    // First emit at t=10s (mid-stream resume).
+    player.emit(NiumaPlayerValue.uninitialized().copyWith(
+      phase: PlayerPhase.playing,
+      position: const Duration(seconds: 10),
+    ));
+    expect(orch.activeCue.value, isNull,
+        reason: 'cold-start position must not fire midRoll');
+
+    // User rewinds to t=4, then plays forward through t=6 — natural cross.
+    // Without the cold-start guard this would NOT fire because the cue was
+    // already (incorrectly) marked fired during the cold-start tick.
+    player.emit(NiumaPlayerValue.uninitialized().copyWith(
+      phase: PlayerPhase.playing,
+      position: const Duration(seconds: 4),
+    ));
+    player.emit(NiumaPlayerValue.uninitialized().copyWith(
+      phase: PlayerPhase.playing,
+      position: const Duration(seconds: 6),
+    ));
+    expect(orch.activeCue.value, isNotNull,
+        reason: 'after rewind, natural forward cross of the cue must still '
+            'fire — the cold-start tick should not have consumed it');
+
+    orch.dispose();
+  });
+
+  test('pauseAd fires on playing → paused (manual) — onPause is called', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        pauseAd: AdCue(builder: (_, __) => const SizedBox()),
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.playing));
+    expect(player.pauseCalled, isFalse,
+        reason: 'no ad fired yet; onPause should not have been called');
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.paused));
+    expect(orch.activeCue.value, isNotNull);
+    // The ad fires from a paused state, so isPlaying is false → no onPause.
+    // Validate that the player's recorded state at fire-time was 'paused'.
+    expect(player.pauseCalled, isFalse);
+
+    orch.dispose();
   });
 }

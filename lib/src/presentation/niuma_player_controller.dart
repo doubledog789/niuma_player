@@ -394,26 +394,43 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
     try {
       await _disposeCurrentBackend();
+      if (_disposed) return;
       _activeLineId = lineId;
       final resolved = await runSourceMiddlewares(target.source, middlewares);
+      if (_disposed) return;
       _resolvedSource = resolved;
 
       if (_platform.isIOS || _platform.isWeb) {
         await _attachBackend(_backendFactory.createVideoPlayer(resolved));
+        if (_disposed) {
+          // The backend we just attached must not leak; tear it down before
+          // bailing.
+          await _disposeCurrentBackend();
+          return;
+        }
         await _withRetry(
             () => _backend!.initialize().timeout(options.initTimeout));
       } else {
         await _initNative(forceIjk: options.forceIjkOnAndroid);
       }
+      if (_disposed) {
+        // Backend reached "initialized" but the controller was disposed
+        // mid-flight — clean up and bail without emitting LineSwitched.
+        await _disposeCurrentBackend();
+        return;
+      }
 
       if (savedPos > Duration.zero) {
         await _backend!.seekTo(savedPos);
+        if (_disposed) return;
       }
       if (wasPlaying) {
         await _backend!.play();
+        if (_disposed) return;
       }
       _emit(LineSwitched(lineId));
     } catch (e) {
+      if (_disposed) return;
       _emit(LineSwitchFailed(toId: lineId, error: e));
       rethrow;
     }

@@ -1,4 +1,3 @@
-// lib/src/testing/fake_analytics_emitter.dart
 import '../observability/analytics_event.dart';
 
 /// A capturing test double for the `AnalyticsEmitter` typedef

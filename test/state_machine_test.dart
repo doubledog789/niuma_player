@@ -807,5 +807,168 @@ void main() {
       expect(fake.lastSourceFromMiddleware?.headers, {'A': '1', 'B': '2'});
       ctrl.dispose();
     });
+
+    test('switchLine to the same lineId short-circuits (no events, no rebuild)',
+        () async {
+      final fake = FakeBackendFactory();
+      final lineA = MediaLine(
+        id: 'a',
+        label: 'A',
+        source: NiumaDataSource.network('https://a'),
+      );
+      final lineB = MediaLine(
+        id: 'b',
+        label: 'B',
+        source: NiumaDataSource.network('https://b'),
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.lines(lines: [lineA, lineB], defaultLineId: 'a'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+
+      final events = <NiumaPlayerEvent>[];
+      final sub = ctrl.events.listen(events.add);
+
+      // Switching to the active line is a no-op.
+      await ctrl.switchLine('a');
+      // Yield so any spurious async event would have flushed by now.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events.whereType<LineSwitching>(), isEmpty);
+      expect(events.whereType<LineSwitched>(), isEmpty);
+      // Still only the initial backend.
+      expect(fake.videoPlayers.length, 1);
+
+      await sub.cancel();
+      ctrl.dispose();
+    });
+
+    test('switchLine with an unknown lineId throws ArgumentError, no events',
+        () async {
+      final fake = FakeBackendFactory();
+      final lineA = MediaLine(
+        id: 'a',
+        label: 'A',
+        source: NiumaDataSource.network('https://a'),
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.lines(lines: [lineA], defaultLineId: 'a'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+
+      final events = <NiumaPlayerEvent>[];
+      final sub = ctrl.events.listen(events.add);
+
+      expect(() => ctrl.switchLine('does-not-exist'),
+          throwsA(isA<ArgumentError>()));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events.whereType<LineSwitching>(), isEmpty);
+      expect(events.whereType<LineSwitched>(), isEmpty);
+      expect(events.whereType<LineSwitchFailed>(), isEmpty);
+
+      await sub.cancel();
+      ctrl.dispose();
+    });
+
+    test('switchLine: middleware re-runs on every switch', () async {
+      final mw = _CountingMiddleware();
+      final fake = FakeBackendFactory();
+      final lineA = MediaLine(
+        id: 'a',
+        label: 'A',
+        source: NiumaDataSource.network('https://a'),
+      );
+      final lineB = MediaLine(
+        id: 'b',
+        label: 'B',
+        source: NiumaDataSource.network('https://b'),
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.lines(lines: [lineA, lineB], defaultLineId: 'a'),
+        middlewares: [mw],
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+      expect(mw.callCount, 1, reason: 'initial init runs middleware once');
+
+      await ctrl.switchLine('b');
+      expect(mw.callCount, 2,
+          reason: 'switchLine must re-run the middleware pipeline');
+
+      ctrl.dispose();
+    });
+
+    test(
+        'switchLine mid-init dispose race: dispose() during switchLine '
+        'does not leak a half-built backend or emit late LineSwitched',
+        () async {
+      // Block initialize on the second backend so we can race dispose() into
+      // the middle of switchLine.
+      final blocker = Completer<void>();
+      var idx = 0;
+      final fake = FakeBackendFactory(
+        makeVideoPlayer: (_) {
+          final attempt = idx++;
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.videoPlayer,
+            initBlock: () async {
+              if (attempt == 1) {
+                // Wait until the test releases us.
+                await blocker.future;
+              }
+            },
+          );
+        },
+      );
+      final lineA = MediaLine(
+        id: 'a',
+        label: 'A',
+        source: NiumaDataSource.network('https://a'),
+      );
+      final lineB = MediaLine(
+        id: 'b',
+        label: 'B',
+        source: NiumaDataSource.network('https://b'),
+      );
+      final ctrl = NiumaPlayerController(
+        NiumaMediaSource.lines(lines: [lineA, lineB], defaultLineId: 'a'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: fake,
+      );
+      await ctrl.initialize();
+
+      final events = <NiumaPlayerEvent>[];
+      final sub = ctrl.events.listen(events.add);
+
+      // Kick off switchLine; it will block on initialize() of the new backend.
+      final switchFuture = ctrl.switchLine('b');
+      // Yield so switchLine reaches the await on initialize().
+      await Future<void>.delayed(Duration.zero);
+
+      // Dispose mid-flight, then unblock the half-built backend.
+      final disposeFuture = ctrl.dispose();
+      blocker.complete();
+
+      await switchFuture.timeout(const Duration(seconds: 2),
+          onTimeout: () async {});
+      await disposeFuture;
+      await Future<void>.delayed(Duration.zero);
+
+      // No late LineSwitched leaked after dispose.
+      expect(events.whereType<LineSwitched>(), isEmpty,
+          reason: 'dispose mid-switchLine must suppress LineSwitched');
+      // Both backends ended up disposed (no leak).
+      expect(fake.videoPlayers.every((b) => b.disposed), isTrue,
+          reason: 'every backend constructed during the race must be '
+              'disposed exactly once');
+
+      await sub.cancel();
+    });
   });
 }

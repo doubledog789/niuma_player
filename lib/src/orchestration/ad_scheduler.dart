@@ -1,4 +1,3 @@
-// lib/src/orchestration/ad_scheduler.dart
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -49,6 +48,15 @@ class AdSchedulerOrchestrator {
   PlayerPhase? _lastPhase;
   bool _preRollFired = false;
   Duration _lastPos = Duration.zero;
+
+  /// Whether the orchestrator has observed at least one position tick.
+  ///
+  /// Eliminates the cold-start false-positive: on the very first tick we
+  /// have no baseline, so the jump from `Duration.zero` to e.g. `t=10s`
+  /// (a mid-stream resume) is misread as a seek by the
+  /// `delta > 2s || delta < 0` heuristic. We skip the seek-detection
+  /// branch on the first tick and just record `_lastPos`.
+  bool _haveSeenFirstPos = false;
   final Set<int> _midRollFired = {};
   int _pauseAdShownCount = 0;
   DateTime? _pauseAdLastShownAt;
@@ -78,31 +86,35 @@ class AdSchedulerOrchestrator {
       _fire(schedule.preRoll!, AdCueType.preRoll);
     }
 
-    // midRoll
+    // midRoll. Skip seek-detection entirely on the first tick — there is
+    // no baseline yet, so e.g. a mid-stream resume at t=10s would be
+    // misread as a seek-past and incorrectly consume any cue at t < 10s.
     final pos = v.position;
-    final delta = pos - _lastPos;
-    final isLikelySeek = delta > const Duration(seconds: 2) ||
-        delta < Duration.zero;
+    if (_haveSeenFirstPos) {
+      final delta = pos - _lastPos;
+      final isLikelySeek = delta > const Duration(seconds: 2) ||
+          delta < Duration.zero;
 
-    for (var i = 0; i < schedule.midRolls.length; i++) {
-      if (_midRollFired.contains(i)) continue;
-      final mr = schedule.midRolls[i];
-      final crossedNow = _lastPos < mr.at && pos >= mr.at;
-      if (!crossedNow) continue;
+      for (var i = 0; i < schedule.midRolls.length; i++) {
+        if (_midRollFired.contains(i)) continue;
+        final mr = schedule.midRolls[i];
+        final crossedNow = _lastPos < mr.at && pos >= mr.at;
+        if (!crossedNow) continue;
 
-      switch (mr.skipPolicy) {
-        case MidRollSkipPolicy.fireOnce:
-          _midRollFired.add(i);
-          _fire(mr.cue, AdCueType.midRoll);
-        case MidRollSkipPolicy.fireEachPass:
-          _fire(mr.cue, AdCueType.midRoll);
-        case MidRollSkipPolicy.skipIfSeekedPast:
-          if (isLikelySeek) {
-            _midRollFired.add(i); // mark fired to prevent later natural cross
-          } else {
+        switch (mr.skipPolicy) {
+          case MidRollSkipPolicy.fireOnce:
             _midRollFired.add(i);
             _fire(mr.cue, AdCueType.midRoll);
-          }
+          case MidRollSkipPolicy.fireEachPass:
+            _fire(mr.cue, AdCueType.midRoll);
+          case MidRollSkipPolicy.skipIfSeekedPast:
+            if (isLikelySeek) {
+              _midRollFired.add(i); // mark fired to prevent later natural cross
+            } else {
+              _midRollFired.add(i);
+              _fire(mr.cue, AdCueType.midRoll);
+            }
+        }
       }
     }
 
@@ -123,6 +135,7 @@ class AdSchedulerOrchestrator {
 
     _lastPos = pos;
     _lastPhase = phase;
+    _haveSeenFirstPos = true;
   }
 
   bool _shouldShowPauseAd() {
@@ -138,10 +151,8 @@ class AdSchedulerOrchestrator {
     }
   }
 
-  bool _wasPlaying = false;
   void _fire(AdCue cue, AdCueType type) {
-    _wasPlaying = playerValue.value.isPlaying;
-    if (_wasPlaying) onPause();
+    if (playerValue.value.isPlaying) onPause();
     activeCue.value = cue;
     _analytics?.call(AnalyticsEvent.adScheduled(cueType: type));
   }
@@ -168,7 +179,7 @@ class AdControllerImpl implements AdController {
 
   final _elapsedCtrl = StreamController<Duration>.broadcast();
   final _start = DateTime.now();
-  Duration _simulatedElapsed = Duration.zero;
+  Duration? _simulatedElapsed;
 
   /// Whether this controller has been successfully dismissed.
   ///
@@ -178,17 +189,15 @@ class AdControllerImpl implements AdController {
 
   @override
   Duration get elapsed =>
-      _simulatedElapsed > Duration.zero
-          ? _simulatedElapsed
-          : DateTime.now().difference(_start);
+      _simulatedElapsed ?? DateTime.now().difference(_start);
 
   @override
   Stream<Duration> get elapsedStream => _elapsedCtrl.stream;
 
   /// Overrides the wall-clock elapsed value for test purposes.
   ///
-  /// When set to a non-zero value, [elapsed] returns this value instead of
-  /// computing a real wall-clock difference.
+  /// Once set (to any value, including [Duration.zero]), [elapsed] returns
+  /// this value instead of computing a real wall-clock difference.
   @visibleForTesting
   void simulateElapsed(Duration d) => _simulatedElapsed = d;
 
@@ -204,8 +213,14 @@ class AdControllerImpl implements AdController {
   }
 
   @override
-  void reportImpression() {}
+  void reportImpression() {
+    // TODO(m9): forward to AnalyticsEmitter once the host overlay wires
+    // AdControllerImpl through cue.builder.
+  }
 
   @override
-  void reportClick() {}
+  void reportClick() {
+    // TODO(m9): forward to AnalyticsEmitter once the host overlay wires
+    // AdControllerImpl through cue.builder.
+  }
 }
