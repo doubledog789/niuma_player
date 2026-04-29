@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../data/default_backend_factory.dart';
 import '../data/default_platform_bridge.dart';
@@ -14,6 +15,35 @@ import '../domain/player_state.dart';
 import '../orchestration/multi_source.dart';
 import '../orchestration/retry_policy.dart';
 import '../orchestration/source_middleware.dart';
+import '../orchestration/thumbnail_cache.dart';
+import '../orchestration/thumbnail_resolver.dart';
+import '../orchestration/thumbnail_track.dart';
+import '../orchestration/webvtt_parser.dart';
+
+/// Function shape for fetching a WebVTT body.
+///
+/// Defaults to a thin wrapper over `http.get`. Tests inject a fake to avoid
+/// real network calls. Throwing or returning a non-VTT body is safe — the
+/// controller treats any failure as "thumbnails disabled" and continues to
+/// play the video normally.
+typedef ThumbnailFetcher = Future<String> Function(
+  Uri uri,
+  Map<String, String> headers,
+);
+
+Future<String> _defaultThumbnailFetcher(
+  Uri uri,
+  Map<String, String> headers,
+) async {
+  final response = await http.get(uri, headers: headers);
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw http.ClientException(
+      'thumbnail VTT fetch failed: HTTP ${response.statusCode}',
+      uri,
+    );
+  }
+  return response.body;
+}
 
 /// Options for tuning [NiumaPlayerController] behaviour. All fields have
 /// reasonable defaults so most callers should not need to touch this.
@@ -61,9 +91,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
+    ThumbnailFetcher? thumbnailFetcher,
   })  : options = options ?? const NiumaPlayerOptions(),
         _platform = platform ?? const DefaultPlatformBridge(),
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
+        _thumbnailFetcher = thumbnailFetcher ?? _defaultThumbnailFetcher,
         super(NiumaPlayerValue.uninitialized());
 
   /// Single-source convenience factory. Wraps the [ds] in a
@@ -74,12 +106,14 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
+    ThumbnailFetcher? thumbnailFetcher,
   }) =>
       NiumaPlayerController(
         NiumaMediaSource.single(ds),
         options: options,
         platform: platform,
         backendFactory: backendFactory,
+        thumbnailFetcher: thumbnailFetcher,
       );
 
   /// The [NiumaMediaSource] describing all available playback lines for this
@@ -133,6 +167,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// The data source after running through the [middlewares] pipeline.
   /// Populated at the start of [_runInitialize] and reused by [_initNative].
   NiumaDataSource? _resolvedSource;
+
+  // ----- Thumbnail (M8) -----
+  final ThumbnailCache _thumbnailCache = ThumbnailCache();
+  List<WebVttCue> _thumbnailCues = const <WebVttCue>[];
+  String? _resolvedThumbnailUrl;
+  final ThumbnailFetcher _thumbnailFetcher;
 
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast(sync: true);
@@ -240,6 +280,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         PlayerBackendKind.videoPlayer,
         fromMemory: false,
       ));
+      unawaited(_loadThumbnailsIfAny());
       return;
     }
 
@@ -250,6 +291,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     // fails for any non-final reason.
     if (options.forceIjkOnAndroid) {
       await _initNative(forceIjk: true);
+      unawaited(_loadThumbnailsIfAny());
       return;
     }
 
@@ -266,6 +308,47 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       await _disposeCurrentBackend();
       await _initNative(forceIjk: true);
     }
+    unawaited(_loadThumbnailsIfAny());
+  }
+
+  /// Loads + parses the optional [NiumaMediaSource.thumbnailVtt] in the
+  /// background. Failures are swallowed (logged via [debugPrint]) so video
+  /// playback is never affected by a broken thumbnail track.
+  Future<void> _loadThumbnailsIfAny() async {
+    final url = source.thumbnailVtt;
+    if (url == null) return;
+    try {
+      final ds = await runSourceMiddlewares(
+        NiumaDataSource.network(url),
+        middlewares,
+      );
+      if (_disposed) return;
+      _resolvedThumbnailUrl = ds.uri;
+      final body = await _thumbnailFetcher(
+        Uri.parse(ds.uri),
+        ds.headers ?? const <String, String>{},
+      );
+      if (_disposed) return;
+      _thumbnailCues = WebVttParser.parseThumbnails(body);
+    } catch (e) {
+      debugPrint('[niuma_player] thumbnail VTT 加载失败：$e（不影响播放）');
+      _thumbnailCues = const <WebVttCue>[];
+    }
+  }
+
+  /// 根据当前播放位置 [position] 返回对应的 [ThumbnailFrame]，没有命中或缩略图
+  /// 还未就绪时返回 `null`。
+  ///
+  /// 安全调用：在 [initialize] 之前 / 缩略图加载失败 / 没配置 thumbnailVtt
+  /// 都会返回 `null`，永远不抛。
+  ThumbnailFrame? thumbnailFor(Duration position) {
+    if (_thumbnailCues.isEmpty || _resolvedThumbnailUrl == null) return null;
+    return ThumbnailResolver.resolve(
+      position: position,
+      cues: _thumbnailCues,
+      baseUrl: _resolvedThumbnailUrl!,
+      cache: _thumbnailCache,
+    );
   }
 
   Future<void> _initNative({required bool forceIjk}) async {
@@ -447,6 +530,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     _disposed = true;
     await _disposeCurrentBackend();
     await _eventController.close();
+    _thumbnailCache.clear();
     super.dispose();
   }
 }

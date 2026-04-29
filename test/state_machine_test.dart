@@ -971,4 +971,84 @@ void main() {
       await sub.cancel();
     });
   });
+
+  group('thumbnailFor', () {
+    test('source.thumbnailVtt 为 null 时返回 null', () async {
+      final factory = FakeBackendFactory();
+      final controller = NiumaPlayerController.dataSource(
+        ds,
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: factory,
+      );
+      await controller.initialize();
+      // Yield so any pending unawaited init paths complete.
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
+      await controller.dispose();
+    });
+
+    test('VTT fetch 失败时 thumbnailFor 返回 null（不影响播放）', () async {
+      final factory = FakeBackendFactory();
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(
+          ds,
+          thumbnailVtt: 'https://x/thumbs.vtt',
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: factory,
+        thumbnailFetcher: (uri, headers) async {
+          throw const FormatException('boom');
+        },
+      );
+      await controller.initialize();
+      // Wait for the unawaited thumbnail load to settle.
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
+      await controller.dispose();
+    });
+
+    test('成功 fetch + 解析后能查出对应 frame', () async {
+      const vttBody = '''
+WEBVTT
+
+00:00.000 --> 00:05.000
+sprite.jpg#xywh=0,0,128,72
+
+00:05.000 --> 00:10.000
+sprite.jpg#xywh=128,0,128,72
+''';
+      final factory = FakeBackendFactory();
+      final fetched = <Uri>[];
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(
+          ds,
+          thumbnailVtt: 'https://cdn.com/x/thumbs.vtt',
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: factory,
+        thumbnailFetcher: (uri, headers) async {
+          fetched.add(uri);
+          return vttBody;
+        },
+      );
+      await controller.initialize();
+      // Allow the async thumbnail load to complete.
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(fetched.single, Uri.parse('https://cdn.com/x/thumbs.vtt'));
+      final frame = controller.thumbnailFor(const Duration(seconds: 3));
+      expect(frame, isNotNull);
+      expect(frame!.region.left, 0);
+      final frame2 = controller.thumbnailFor(const Duration(seconds: 7));
+      expect(frame2, isNotNull);
+      expect(frame2!.region.left, 128);
+      // Out-of-range
+      expect(controller.thumbnailFor(const Duration(seconds: 99)), isNull);
+
+      await controller.dispose();
+    });
+  });
 }
