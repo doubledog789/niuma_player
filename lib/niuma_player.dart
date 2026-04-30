@@ -34,6 +34,9 @@ export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;
 // M9 控件条组合
 export 'src/presentation/niuma_control_bar.dart' show NiumaControlBar;
 
+// M9 广告 overlay
+export 'src/presentation/niuma_ad_overlay.dart' show NiumaAdOverlay;
+
 // M9 原子控件
 export 'src/presentation/controls/play_pause_button.dart'
     show PlayPauseButton;
