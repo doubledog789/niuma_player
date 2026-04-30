@@ -141,7 +141,14 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
   @override
   void dispose() {
     if (!kIsWeb) {
-      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+      // 传空 list 而不是 DeviceOrientation.values：
+      // - 空 list = 释放锁定，Android 回到 manifest screenOrientation
+      //   设置（通常是 unspecified，跟设备传感器走）+ iOS 回到 plist
+      //   UISupportedInterfaceOrientations。
+      // - DeviceOrientation.values（含全 4 方向）会让 Android 解读
+      //   成 SCREEN_ORIENTATION_FULL_USER 显式锁定，Activity 不再
+      //   重新评估当前方向，用户感觉"无法旋转"。
+      SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     super.dispose();

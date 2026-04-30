@@ -100,7 +100,7 @@ void main() {
     expect(modeCalls.first.arguments, 'SystemUiMode.immersiveSticky');
   });
 
-  testWidgets('dispose 恢复 orientation = values + edgeToEdge', (tester) async {
+  testWidgets('dispose 释放 orientation 锁（空 list）+ edgeToEdge', (tester) async {
     final ctl = FakeNiumaPlayerController();
 
     final navKey = GlobalKey<NavigatorState>();
@@ -129,14 +129,13 @@ void main() {
         .toList();
     expect(orientationCalls, isNotEmpty,
         reason: 'dispose 应当再次调用 setPreferredOrientations 恢复');
-    // 恢复值必须包含全部 4 个方向（默认 DeviceOrientation.values）。
+    // 恢复时传空 list——告诉 Flutter "释放锁定，回到 OS / app 默认
+    // 方向"。如果传 DeviceOrientation.values（4 个全开），Android 会
+    // 解读成 SCREEN_ORIENTATION_FULL_USER 显式锁定，Activity 不重新
+    // 评估当前方向，用户感觉"无法旋转"。
     final args = orientationCalls.last.arguments as List<dynamic>;
-    expect(args, containsAll(<String>[
-      'DeviceOrientation.portraitUp',
-      'DeviceOrientation.portraitDown',
-      'DeviceOrientation.landscapeLeft',
-      'DeviceOrientation.landscapeRight',
-    ]));
+    expect(args, isEmpty,
+        reason: 'dispose 必须传空 list 释放方向锁，否则 Android 仍处显式锁定状态');
 
     final modeCalls = calls
         .where((c) => c.method == 'SystemChrome.setEnabledSystemUIMode')
