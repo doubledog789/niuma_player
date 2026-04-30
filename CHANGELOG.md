@@ -9,7 +9,7 @@
 
 ## [0.3.0] - 2026-04-30
 
-### Added (M8 — 缩略图 VTT)
+### 新增（M8 — 缩略图 VTT）
 - `NiumaMediaSource.thumbnailVtt` 可选字段，传入 WebVTT thumbnail track URL。
 - `controller.thumbnailFor(Duration position) → ThumbnailFrame?` —— 按播放位置查
   对应缩略图（sprite 图引用 + 裁剪矩形）。复杂度 O(log n)（二分查找）。
@@ -34,53 +34,51 @@
 
 ## [0.2.0] - 2026-04-29
 
-### Added (M7 — orchestration layer)
-- `NiumaMediaSource` (`single` + `lines` factories) carrying `MediaLine` entries with `MediaQuality`.
-- `MultiSourcePolicy.autoFailover(maxAttempts: 1)` (default) / `MultiSourcePolicy.manual()`.
-- `NiumaPlayerController.switchLine(id)` with `LineSwitching` / `LineSwitched` /
-  `LineSwitchFailed` events; preserves position + play state across the switch.
-- `AutoFailoverOrchestrator` — picks the next priority line on `network` / `terminal`
-  errors only (codec-unsupported short-circuits); priority is ascending (lower number
-  = tried first). **Note**: M7 ships this as a standalone helper; the controller
-  does not yet consume it. Wiring `MultiSourcePolicy` into the controller is
-  deferred to a follow-up milestone.
-- `SourceMiddleware` abstract + `HeaderInjectionMiddleware` + `SignedUrlMiddleware`
-  + `runSourceMiddlewares` pipeline; runs before backend init, on switchLine, and on
-  retry — guarantees fresh headers / freshly signed URLs each time.
-- `NiumaPlayerController` constructor now accepts an optional `middlewares`
-  parameter; pipeline executes once before the backend is built.
-- `ResumeStorage` (abstract) + `SharedPreferencesResumeStorage` (default) +
-  `ResumePolicy` + `ResumeBehaviour` (`auto` / `askUser` / `disabled`) +
-  `ResumeOrchestrator` (read on init, periodic save, ended-clear, dispose final-save).
-- `RetryPolicy.smart()` / `.exponential()` / `.none()`. `NiumaPlayerController`
-  applies the policy around `backend.initialize()` (default `smart` retries
-  `network` + `transient` up to 3 attempts with exponential 1s → 10s backoff);
-  the existing forceIjk Try-Fail-Remember fallback continues underneath.
-- `AdCue` + `AdController` contract + `NiumaAdSchedule` + `MidRollAd` +
-  `MidRollSkipPolicy` + `PauseAdShowPolicy`.
-- `AdSchedulerOrchestrator` covering preRoll (idle→ready), midRoll (with
-  `skipIfSeekedPast` default), pauseAd (with `oncePerSession` default + `cooldown`
-  option), postRoll (phase=ended). Note: `AdControllerImpl` exists internally to
-  enforce `minDisplayDuration` before allowing dismiss, but is **not** part of
-  the M7 public API — the orchestrator only signals `activeCue` for now and
-  controller wiring through `cue.builder` lands in M9.
-- `AnalyticsEvent` sealed hierarchy (`AdScheduled` / `AdImpression` / `AdClick` /
-  `AdDismissed`) + `AnalyticsEmitter` typedef hook.
-- Public test doubles via `package:niuma_player/testing.dart`:
-  `FakeResumeStorage`, `FakeAnalyticsEmitter`.
+### 新增（M7 — 编排层）
+- `NiumaMediaSource`（`single` + `lines` 两个 factory），承载带 `MediaQuality` 的 `MediaLine` 列表。
+- `MultiSourcePolicy.autoFailover(maxAttempts: 1)`（默认）/ `MultiSourcePolicy.manual()`。
+- `NiumaPlayerController.switchLine(id)` + `LineSwitching` / `LineSwitched` /
+  `LineSwitchFailed` 事件；切换时保留位置和播放状态。
+- `AutoFailoverOrchestrator` —— 仅在 `network` / `terminal` 错误时挑选下一条优先级
+  线路（codec-unsupported 直接短路）；priority 升序（数值小的先尝试）。
+  **注意**：M7 把它作为独立 helper 交付，controller 还没消费它。把
+  `MultiSourcePolicy` 接入 controller 留到后续里程碑。
+- `SourceMiddleware` 抽象类 + `HeaderInjectionMiddleware` + `SignedUrlMiddleware`
+  + `runSourceMiddlewares` 流水线；在 backend init、switchLine、retry 之前都跑一次
+  —— 每次都拿到新鲜的 headers / 重新签名的 URL。
+- `NiumaPlayerController` 构造函数新增可选 `middlewares` 参数；流水线在
+  backend 启动之前执行。
+- `ResumeStorage`（抽象类）+ `SharedPreferencesResumeStorage`（默认实现）+
+  `ResumePolicy` + `ResumeBehaviour`（`auto` / `askUser` / `disabled`）+
+  `ResumeOrchestrator`（init 时读、周期性保存、ended 清空、dispose 时终态写入）。
+- `RetryPolicy.smart()` / `.exponential()` / `.none()`。`NiumaPlayerController`
+  在 `backend.initialize()` 周围应用该策略（默认 `smart` 对 `network` + `transient`
+  类错误最多重试 3 次，指数退避 1s → 10s）；原有的 forceIjk Try-Fail-Remember
+  兜底层在下面继续工作。
+- `AdCue` + `AdController` 协议 + `NiumaAdSchedule` + `MidRollAd` +
+  `MidRollSkipPolicy` + `PauseAdShowPolicy`。
+- `AdSchedulerOrchestrator` 覆盖 preRoll（idle→ready）、midRoll（默认
+  `skipIfSeekedPast`）、pauseAd（默认 `oncePerSession` + 可选 `cooldown`）、
+  postRoll（phase=ended）。注意：`AdControllerImpl` 在内部存在用于强制
+  `minDisplayDuration` 才允许 dismiss，但**不是** M7 公开 API ——
+  orchestrator 目前只更新 `activeCue`，把它和 `cue.builder` 串起来的
+  controller 接入留到 M9。
+- `AnalyticsEvent` sealed 体系（`AdScheduled` / `AdImpression` / `AdClick` /
+  `AdDismissed`）+ `AnalyticsEmitter` typedef hook。
+- 公开测试 double 通过 `package:niuma_player/testing.dart` 提供：
+  `FakeResumeStorage`、`FakeAnalyticsEmitter`。
 
-### Changed
-- `NiumaPlayerController` first-arg type: `NiumaDataSource` → `NiumaMediaSource`.
-  Use `NiumaPlayerController.dataSource(ds)` factory for the single-source case
-  (drop-in replacement for old call sites). The `dataSource` getter still returns
-  `source.currentLine.source`.
-- `shared_preferences` is now an explicit dependency (was previously a transitive).
+### 变更
+- `NiumaPlayerController` 首参数类型：`NiumaDataSource` → `NiumaMediaSource`。
+  单源场景用 `NiumaPlayerController.dataSource(ds)` factory（旧调用点 drop-in
+  替换）。`dataSource` getter 仍然返回 `source.currentLine.source`。
+- `shared_preferences` 现在是显式依赖（之前是传递依赖）。
 
 ## [0.1.0] - 2026-04-27
 
 首次公开发布。
 
-### Added
+### 新增
 - `NiumaPlayerController` —— 跨 iOS、Web、Android 的统一 Dart 侧 controller。
 - `NiumaPlayerView` —— 开箱即用的 widget，会根据当前后端选择正确的渲染原语。
 - `NiumaPlayerValue` 快照，自带互斥状态机
