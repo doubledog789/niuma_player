@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'diagnostics_page.dart';
+import 'm9_custom_demo_page.dart';
+import 'm9_default_demo_page.dart';
 import 'multi_line_page.dart';
 import 'player_page.dart';
 import 'samples.dart';
@@ -47,6 +49,45 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
+
+          const SizedBox(height: 24),
+          const _SectionHeader('M9 UI overlay 演示'),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.smart_display),
+              title: const Text('NiumaPlayer 默认外观'),
+              subtitle: const Text(
+                '5 行起步：B 站风格底栏 + auto-hide + 缩略图 + 全屏 + mock 广告',
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const M9DefaultDemoPage(),
+                ),
+              ),
+            ),
+          ),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.dashboard_customize),
+              title: const Text('积木拼自定义布局'),
+              subtitle: const Text(
+                '原子控件 + 自定义主题：控件分上下 + 紫色 accent',
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const M9CustomDemoPage(),
+                ),
+              ),
+            ),
+          ),
 
           const SizedBox(height: 24),
           const _SectionHeader('M8 缩略图 VTT 演示'),
