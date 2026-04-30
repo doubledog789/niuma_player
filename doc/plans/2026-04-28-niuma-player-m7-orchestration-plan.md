@@ -1,24 +1,24 @@
-# M7 Orchestration Layer — Implementation Plan
+# M7 编排层 — 实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **执行方式**：必备子 skill：用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 按任务推进本计划。步骤用复选框 `- [ ]` 跟踪。
 
-**Goal:** Build the pure-Dart orchestration layer (`lib/src/orchestration/` + `lib/src/observability/` + initial `lib/src/testing/` doubles) and wire its kernel touchpoints (multi-source switch + middleware + retry on `NiumaPlayerController`).
+**目标**：构建纯 Dart 编排层（`lib/src/orchestration/` + `lib/src/observability/` + 初版 `lib/src/testing/` 测试替身），并接通 kernel 触点（`NiumaPlayerController` 上的多源切换 + middleware + retry）。
 
-**Architecture:** Add five orchestration units (multi-source, resume, retry, ads, source middleware) plus an analytics event hook. Each unit is a value class (data) + an orchestrator (behaviour). The kernel `NiumaPlayerController` gains a `NiumaMediaSource` first arg, optional `middlewares:` and `retryPolicy:` params, and a `switchLine(id)` method. Everything orchestration-side is pure Dart and unit-testable without platform channels.
+**架构**：新增五个编排单元（multi-source、resume、retry、ads、source middleware），加上一个 analytics 事件 hook。每个单元由 value class（数据）+ orchestrator（行为）组成。kernel 的 `NiumaPlayerController` 第一参数改为 `NiumaMediaSource`，新增可选 `middlewares:` / `retryPolicy:` 参数和 `switchLine(id)` 方法。编排层全部纯 Dart，无需 platform channel 即可单测。
 
-**Tech Stack:** Dart, `flutter_test`, `fake_async`, `shared_preferences` (already in pubspec via dependency tree — added explicitly here).
+**技术栈**：Dart、`flutter_test`、`fake_async`、`shared_preferences`（已通过依赖树进入 pubspec — 这里显式声明）。
 
-**Spec reference:** `doc/plans/2026-04-27-niuma-player-enterprise-dart-design.md` Sections 1, 5, 6, 7.3.
+**Spec 参考**：`doc/plans/2026-04-27-niuma-player-enterprise-dart-design.md` 第 1、5、6、7.3 节。
 
 ---
 
-## File Structure
+## 文件结构
 
-### New files
+### 新增文件
 
 ```
 lib/src/observability/
-├── analytics_event.dart                  AnalyticsEvent sealed class hierarchy
+├── analytics_event.dart                  AnalyticsEvent sealed 类层级
 └── analytics_emitter.dart                AnalyticsEmitter typedef
 
 lib/src/orchestration/
@@ -27,14 +27,14 @@ lib/src/orchestration/
 ├── resume_position.dart                  ResumeStorage, ResumePolicy, ResumeBehaviour, ResumeOrchestrator
 ├── retry_policy.dart                     RetryPolicy value class
 ├── ad_schedule.dart                      AdCue, AdController, NiumaAdSchedule, MidRollAd, ad enums
-├── ad_scheduler.dart                     AdSchedulerOrchestrator (behaviour)
-└── auto_failover.dart                    AutoFailoverOrchestrator (behaviour)
+├── ad_scheduler.dart                     AdSchedulerOrchestrator（行为）
+└── auto_failover.dart                    AutoFailoverOrchestrator（行为）
 
 lib/src/testing/
-├── fake_resume_storage.dart              In-memory ResumeStorage for tests
-└── fake_analytics_emitter.dart           Capturing AnalyticsEmitter for tests
+├── fake_resume_storage.dart              内存版 ResumeStorage，供测试用
+└── fake_analytics_emitter.dart           捕获式 AnalyticsEmitter，供测试用
 
-lib/testing.dart                          Public test-double exports
+lib/testing.dart                          公开测试替身导出
 
 test/orchestration/
 ├── source_middleware_test.dart
@@ -46,36 +46,36 @@ test/orchestration/
 └── auto_failover_test.dart
 ```
 
-### Modified files
+### 修改的文件
 
 ```
 lib/src/presentation/niuma_player_controller.dart
-   ↳ accept `NiumaMediaSource` + `middlewares` + `retryPolicy`; add `switchLine`
-   ↳ emit LineSwitching / LineSwitched / LineSwitchFailed
+   ↳ 接受 `NiumaMediaSource` + `middlewares` + `retryPolicy`；新增 `switchLine`
+   ↳ 抛 LineSwitching / LineSwitched / LineSwitchFailed 事件
 lib/src/domain/player_state.dart
-   ↳ add LineSwitching / LineSwitched / LineSwitchFailed event subclasses
+   ↳ 新增 LineSwitching / LineSwitched / LineSwitchFailed 事件子类
 lib/niuma_player.dart
-   ↳ export new orchestration / observability surface
+   ↳ 导出新增的 orchestration / observability API
 test/state_machine_test.dart
-   ↳ migrate to NiumaMediaSource.single(NiumaDataSource(...)) form
+   ↳ 迁移到 NiumaMediaSource.single(NiumaDataSource(...)) 形式
 example/lib/player_page.dart
-   ↳ same migration
+   ↳ 同上迁移
 pubspec.yaml
-   ↳ add shared_preferences explicitly
+   ↳ 显式声明 shared_preferences
 CHANGELOG.md
-   ↳ document M7 additions under [Unreleased]
+   ↳ 在 [Unreleased] 下记录 M7 新增内容
 ```
 
 ---
 
-## Task 1: Analytics event hierarchy
+## Task 1：Analytics 事件层级
 
-**Files:**
-- Create: `lib/src/observability/analytics_event.dart`
-- Create: `lib/src/observability/analytics_emitter.dart`
-- Test: `test/orchestration/analytics_event_test.dart`
+**文件**：
+- 新建：`lib/src/observability/analytics_event.dart`
+- 新建：`lib/src/observability/analytics_emitter.dart`
+- 测试：`test/orchestration/analytics_event_test.dart`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **步骤 1：先写失败测试**
 
 ```dart
 // test/orchestration/analytics_event_test.dart
@@ -111,12 +111,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/analytics_event_test.dart`
-Expected: FAIL — `analytics_event.dart` does not exist.
+执行：`flutter test test/orchestration/analytics_event_test.dart`
+预期：失败 — `analytics_event.dart` 不存在。
 
-- [ ] **Step 3: Implement `AnalyticsEvent`**
+- [ ] **步骤 3：实现 `AnalyticsEvent`**
 
 ```dart
 // lib/src/observability/analytics_event.dart
@@ -210,17 +210,17 @@ final class AdDismissed extends AnalyticsEvent {
 // lib/src/observability/analytics_emitter.dart
 import 'analytics_event.dart';
 
-/// User-supplied hook. niuma_player calls this on every internal event;
-/// app forwards to its own analytics SDK (Sensors / GIO / Bugly / ...).
+/// 业务方传入的回调。niuma_player 在每个内部事件上调用此函数；
+/// app 自行转发到自己的埋点 SDK（神策 / GIO / Bugly / ...）。
 typedef AnalyticsEmitter = void Function(AnalyticsEvent event);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **步骤 4：跑测试确认通过**
 
-Run: `flutter test test/orchestration/analytics_event_test.dart`
-Expected: PASS — both tests green.
+执行：`flutter test test/orchestration/analytics_event_test.dart`
+预期：通过 — 两个 case 都绿。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/observability/ test/orchestration/analytics_event_test.dart
@@ -229,13 +229,13 @@ git commit -m "feat(observability): add AnalyticsEvent sealed hierarchy + Analyt
 
 ---
 
-## Task 2: SourceMiddleware abstract + HeaderInjection
+## Task 2：SourceMiddleware abstract + HeaderInjection
 
-**Files:**
-- Create: `lib/src/orchestration/source_middleware.dart`
-- Test: `test/orchestration/source_middleware_test.dart`
+**文件**：
+- 新建：`lib/src/orchestration/source_middleware.dart`
+- 测试：`test/orchestration/source_middleware_test.dart`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **步骤 1：先写失败测试**
 
 ```dart
 // test/orchestration/source_middleware_test.dart
@@ -266,20 +266,20 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/source_middleware_test.dart`
-Expected: FAIL — `source_middleware.dart` does not exist.
+执行：`flutter test test/orchestration/source_middleware_test.dart`
+预期：失败 — `source_middleware.dart` 不存在。
 
-- [ ] **Step 3: Implement abstract + HeaderInjectionMiddleware**
+- [ ] **步骤 3：实现 abstract + HeaderInjectionMiddleware**
 
 ```dart
 // lib/src/orchestration/source_middleware.dart
 import '../domain/data_source.dart';
 
-/// Transforms a [NiumaDataSource] before it reaches the backend.
-/// Run on initialize, on switchLine, and on retry — every reach for
-/// the network gets a fresh signed URL / fresh headers.
+/// 在 [NiumaDataSource] 抵达 backend 之前对其变换。
+/// 在 initialize / switchLine / retry 时各运行一次 —— 每次访问网络
+/// 都能拿到新的签名 URL / 新的 header。
 abstract class SourceMiddleware {
   const SourceMiddleware();
   Future<NiumaDataSource> apply(NiumaDataSource input);
@@ -300,12 +300,12 @@ class HeaderInjectionMiddleware extends SourceMiddleware {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **步骤 4：跑测试确认通过**
 
-Run: `flutter test test/orchestration/source_middleware_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/source_middleware_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/source_middleware.dart test/orchestration/source_middleware_test.dart
@@ -314,15 +314,15 @@ git commit -m "feat(orchestration): SourceMiddleware abstract + HeaderInjectionM
 
 ---
 
-## Task 3: SignedUrlMiddleware
+## Task 3：SignedUrlMiddleware
 
-**Files:**
-- Modify: `lib/src/orchestration/source_middleware.dart`
-- Test: `test/orchestration/source_middleware_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/source_middleware.dart`
+- 测试：`test/orchestration/source_middleware_test.dart`
 
-- [ ] **Step 1: Add the failing test**
+- [ ] **步骤 1：追加失败测试**
 
-Append to `test/orchestration/source_middleware_test.dart`:
+在 `test/orchestration/source_middleware_test.dart` 末尾追加：
 
 ```dart
 test('SignedUrlMiddleware swaps URL via signer', () async {
@@ -345,14 +345,14 @@ test('SignedUrlMiddleware ignores non-network sources', () async {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/source_middleware_test.dart`
-Expected: FAIL — `SignedUrlMiddleware` not defined.
+执行：`flutter test test/orchestration/source_middleware_test.dart`
+预期：失败 — `SignedUrlMiddleware` 未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Append to `lib/src/orchestration/source_middleware.dart`:
+在 `lib/src/orchestration/source_middleware.dart` 末尾追加：
 
 ```dart
 class SignedUrlMiddleware extends SourceMiddleware {
@@ -368,12 +368,12 @@ class SignedUrlMiddleware extends SourceMiddleware {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/source_middleware_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/source_middleware_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/source_middleware.dart test/orchestration/source_middleware_test.dart
@@ -382,15 +382,15 @@ git commit -m "feat(orchestration): SignedUrlMiddleware"
 
 ---
 
-## Task 4: Middleware pipeline runner
+## Task 4：Middleware pipeline runner
 
-**Files:**
-- Modify: `lib/src/orchestration/source_middleware.dart`
-- Test: `test/orchestration/source_middleware_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/source_middleware.dart`
+- 测试：`test/orchestration/source_middleware_test.dart`
 
-- [ ] **Step 1: Add failing test**
+- [ ] **步骤 1：追加失败测试**
 
-Append:
+追加：
 
 ```dart
 test('runMiddlewares applies left-to-right', () async {
@@ -410,14 +410,14 @@ test('runMiddlewares with empty list returns input as-is', () async {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/source_middleware_test.dart`
-Expected: FAIL — `runSourceMiddlewares` not defined.
+执行：`flutter test test/orchestration/source_middleware_test.dart`
+预期：失败 — `runSourceMiddlewares` 未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Append to `source_middleware.dart`:
+在 `source_middleware.dart` 末尾追加：
 
 ```dart
 Future<NiumaDataSource> runSourceMiddlewares(
@@ -433,12 +433,12 @@ Future<NiumaDataSource> runSourceMiddlewares(
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/source_middleware_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/source_middleware_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/source_middleware.dart test/orchestration/source_middleware_test.dart
@@ -447,13 +447,13 @@ git commit -m "feat(orchestration): runSourceMiddlewares pipeline"
 
 ---
 
-## Task 5: MediaQuality + MediaLine value classes
+## Task 5：MediaQuality + MediaLine value class
 
-**Files:**
-- Create: `lib/src/orchestration/multi_source.dart`
-- Test: `test/orchestration/multi_source_test.dart`
+**文件**：
+- 新建：`lib/src/orchestration/multi_source.dart`
+- 测试：`test/orchestration/multi_source_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 // test/orchestration/multi_source_test.dart
@@ -488,12 +488,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/multi_source_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/multi_source_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 ```dart
 // lib/src/orchestration/multi_source.dart
@@ -537,12 +537,12 @@ class MediaLine {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/multi_source_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/multi_source_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/multi_source.dart test/orchestration/multi_source_test.dart
@@ -551,15 +551,15 @@ git commit -m "feat(orchestration): MediaQuality + MediaLine value classes"
 
 ---
 
-## Task 6: NiumaMediaSource (single + lines factories)
+## Task 6：NiumaMediaSource（single + lines factory）
 
-**Files:**
-- Modify: `lib/src/orchestration/multi_source.dart`
-- Test: `test/orchestration/multi_source_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/multi_source.dart`
+- 测试：`test/orchestration/multi_source_test.dart`
 
-- [ ] **Step 1: Failing tests**
+- [ ] **步骤 1：失败测试**
 
-Append:
+追加：
 
 ```dart
 test('NiumaMediaSource.single wraps a NiumaDataSource', () {
@@ -607,14 +607,14 @@ test('NiumaMediaSource.currentLine resolves by id', () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/multi_source_test.dart`
-Expected: FAIL — `NiumaMediaSource` not defined.
+执行：`flutter test test/orchestration/multi_source_test.dart`
+预期：失败 — `NiumaMediaSource` 未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Append to `multi_source.dart`:
+在 `multi_source.dart` 末尾追加：
 
 ```dart
 @immutable
@@ -664,12 +664,12 @@ class NiumaMediaSource {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/multi_source_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/multi_source_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/multi_source.dart test/orchestration/multi_source_test.dart
@@ -678,13 +678,13 @@ git commit -m "feat(orchestration): NiumaMediaSource with single + lines factori
 
 ---
 
-## Task 7: MultiSourcePolicy
+## Task 7：MultiSourcePolicy
 
-**Files:**
-- Modify: `lib/src/orchestration/multi_source.dart`
-- Test: `test/orchestration/multi_source_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/multi_source.dart`
+- 测试：`test/orchestration/multi_source_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 test('MultiSourcePolicy.autoFailover defaults', () {
@@ -699,14 +699,14 @@ test('MultiSourcePolicy.manual disables failover', () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/multi_source_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/multi_source_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Append to `multi_source.dart`:
+在 `multi_source.dart` 末尾追加：
 
 ```dart
 @immutable
@@ -734,12 +734,12 @@ class _Manual extends MultiSourcePolicy {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/multi_source_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/multi_source_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/multi_source.dart test/orchestration/multi_source_test.dart
@@ -748,14 +748,14 @@ git commit -m "feat(orchestration): MultiSourcePolicy.autoFailover + manual"
 
 ---
 
-## Task 8: ResumeStorage abstract + FakeResumeStorage
+## Task 8：ResumeStorage abstract + FakeResumeStorage
 
-**Files:**
-- Create: `lib/src/orchestration/resume_position.dart`
-- Create: `lib/src/testing/fake_resume_storage.dart`
-- Test: `test/orchestration/resume_position_test.dart`
+**文件**：
+- 新建：`lib/src/orchestration/resume_position.dart`
+- 新建：`lib/src/testing/fake_resume_storage.dart`
+- 测试：`test/orchestration/resume_position_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 // test/orchestration/resume_position_test.dart
@@ -783,12 +783,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 ```dart
 // lib/src/orchestration/resume_position.dart
@@ -824,12 +824,12 @@ class FakeResumeStorage implements ResumeStorage {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/resume_position.dart lib/src/testing/fake_resume_storage.dart test/orchestration/resume_position_test.dart
@@ -838,26 +838,26 @@ git commit -m "feat(orchestration,testing): ResumeStorage abstract + FakeResumeS
 
 ---
 
-## Task 9: SharedPreferencesResumeStorage
+## Task 9：SharedPreferencesResumeStorage
 
-**Files:**
-- Modify: `lib/src/orchestration/resume_position.dart`
-- Modify: `pubspec.yaml`
-- Test: `test/orchestration/resume_position_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/resume_position.dart`
+- 修改：`pubspec.yaml`
+- 测试：`test/orchestration/resume_position_test.dart`
 
-- [ ] **Step 1: Add explicit shared_preferences dep**
+- [ ] **步骤 1：显式声明 shared_preferences 依赖**
 
-Edit `pubspec.yaml`, under `dependencies:` (alphabetical):
+编辑 `pubspec.yaml`，在 `dependencies:` 下（按字母序）：
 
 ```yaml
   shared_preferences: ^2.2.0
 ```
 
-Run: `flutter pub get`
+执行：`flutter pub get`
 
-- [ ] **Step 2: Failing test**
+- [ ] **步骤 2：失败测试**
 
-Append to `test/orchestration/resume_position_test.dart`:
+在 `test/orchestration/resume_position_test.dart` 末尾追加：
 
 ```dart
 import 'package:shared_preferences/shared_preferences.dart';
@@ -875,14 +875,14 @@ test('SharedPreferencesResumeStorage round-trips via SharedPreferences', () asyn
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [ ] **步骤 3：跑测试确认失败**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: FAIL — `SharedPreferencesResumeStorage` not defined.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：失败 — `SharedPreferencesResumeStorage` 未定义。
 
-- [ ] **Step 4: Implement**
+- [ ] **步骤 4：实现**
 
-Append to `resume_position.dart`:
+在 `resume_position.dart` 末尾追加：
 
 ```dart
 import 'package:shared_preferences/shared_preferences.dart';
@@ -916,12 +916,12 @@ class SharedPreferencesResumeStorage extends ResumeStorage {
 }
 ```
 
-- [ ] **Step 5: Run tests**
+- [ ] **步骤 5：跑测试**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：通过。
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add pubspec.yaml lib/src/orchestration/resume_position.dart test/orchestration/resume_position_test.dart
@@ -930,13 +930,13 @@ git commit -m "feat(orchestration): SharedPreferencesResumeStorage default impl"
 
 ---
 
-## Task 10: ResumePolicy + ResumeBehaviour
+## Task 10：ResumePolicy + ResumeBehaviour
 
-**Files:**
-- Modify: `lib/src/orchestration/resume_position.dart`
-- Test: `test/orchestration/resume_position_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/resume_position.dart`
+- 测试：`test/orchestration/resume_position_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 test('ResumePolicy defaults', () {
@@ -953,16 +953,16 @@ test('ResumePolicy.defaultKeyOf hashes uri', () {
 });
 ```
 
-Add `import 'package:niuma_player/src/domain/data_source.dart';` at top if missing.
+如缺失，在文件顶部加 `import 'package:niuma_player/src/domain/data_source.dart';`。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: FAIL — `ResumePolicy`, `ResumeBehaviour`, `defaultResumeKey` not defined.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：失败 — `ResumePolicy` / `ResumeBehaviour` / `defaultResumeKey` 未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Append to `resume_position.dart`:
+在 `resume_position.dart` 末尾追加：
 
 ```dart
 import '../domain/data_source.dart';
@@ -997,14 +997,14 @@ class ResumePolicy {
 }
 ```
 
-Add `import 'package:flutter/foundation.dart';` if missing.
+如缺失，加 `import 'package:flutter/foundation.dart';`。
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/resume_position.dart test/orchestration/resume_position_test.dart
@@ -1013,13 +1013,13 @@ git commit -m "feat(orchestration): ResumePolicy + ResumeBehaviour + defaultResu
 
 ---
 
-## Task 11: RetryPolicy
+## Task 11：RetryPolicy
 
-**Files:**
-- Create: `lib/src/orchestration/retry_policy.dart`
-- Test: `test/orchestration/retry_policy_test.dart`
+**文件**：
+- 新建：`lib/src/orchestration/retry_policy.dart`
+- 测试：`test/orchestration/retry_policy_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 // test/orchestration/retry_policy_test.dart
@@ -1062,12 +1062,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/retry_policy_test.dart`
-Expected: FAIL — `retry_policy.dart` not defined.
+执行：`flutter test test/orchestration/retry_policy_test.dart`
+预期：失败 — `retry_policy.dart` 未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 ```dart
 // lib/src/orchestration/retry_policy.dart
@@ -1150,12 +1150,12 @@ class _NoRetry extends RetryPolicy {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/retry_policy_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/retry_policy_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/retry_policy.dart test/orchestration/retry_policy_test.dart
@@ -1164,13 +1164,13 @@ git commit -m "feat(orchestration): RetryPolicy.smart / exponential / none"
 
 ---
 
-## Task 12: FakeAnalyticsEmitter test double
+## Task 12：FakeAnalyticsEmitter 测试替身
 
-**Files:**
-- Create: `lib/src/testing/fake_analytics_emitter.dart`
-- Test: `test/testing/fake_analytics_emitter_test.dart`
+**文件**：
+- 新建：`lib/src/testing/fake_analytics_emitter.dart`
+- 测试：`test/testing/fake_analytics_emitter_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 // test/testing/fake_analytics_emitter_test.dart
@@ -1199,12 +1199,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/testing/fake_analytics_emitter_test.dart`
-Expected: FAIL.
+执行：`flutter test test/testing/fake_analytics_emitter_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 ```dart
 // lib/src/testing/fake_analytics_emitter.dart
@@ -1220,12 +1220,12 @@ class FakeAnalyticsEmitter {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/testing/fake_analytics_emitter_test.dart`
-Expected: PASS.
+执行：`flutter test test/testing/fake_analytics_emitter_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/testing/fake_analytics_emitter.dart test/testing/fake_analytics_emitter_test.dart
@@ -1234,30 +1234,30 @@ git commit -m "feat(testing): FakeAnalyticsEmitter capturing test double"
 
 ---
 
-## Task 13: lib/testing.dart public export
+## Task 13：lib/testing.dart 公开导出
 
-**Files:**
-- Create: `lib/testing.dart`
+**文件**：
+- 新建：`lib/testing.dart`
 
-- [ ] **Step 1: Create file**
+- [ ] **步骤 1：建文件**
 
 ```dart
 // lib/testing.dart
 
-/// Public test doubles for niuma_player consumers' widget tests.
-/// Import as `package:niuma_player/testing.dart`.
+/// 给 niuma_player 业务方在 widget 测试中使用的公开测试替身。
+/// 通过 `package:niuma_player/testing.dart` 导入。
 library;
 
 export 'src/testing/fake_resume_storage.dart';
 export 'src/testing/fake_analytics_emitter.dart';
 ```
 
-- [ ] **Step 2: Verify analyze**
+- [ ] **步骤 2：analyze 检查**
 
-Run: `flutter analyze lib/testing.dart`
-Expected: No issues.
+执行：`flutter analyze lib/testing.dart`
+预期：无 issue。
 
-- [ ] **Step 3: Commit**
+- [ ] **步骤 3：提交**
 
 ```bash
 git add lib/testing.dart
@@ -1266,13 +1266,13 @@ git commit -m "feat(testing): expose Fake* doubles via lib/testing.dart"
 
 ---
 
-## Task 14: AdCue + AdController abstract
+## Task 14：AdCue + AdController abstract
 
-**Files:**
-- Create: `lib/src/orchestration/ad_schedule.dart`
-- Test: `test/orchestration/ad_schedule_test.dart`
+**文件**：
+- 新建：`lib/src/orchestration/ad_schedule.dart`
+- 测试：`test/orchestration/ad_schedule_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 // test/orchestration/ad_schedule_test.dart
@@ -1290,12 +1290,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/ad_schedule_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/ad_schedule_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 ```dart
 // lib/src/orchestration/ad_schedule.dart
@@ -1303,11 +1303,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 abstract class AdController {
-  /// Closes the ad. Calls before [AdCue.minDisplayDuration] are silently
-  /// ignored in release builds and asserted in debug builds.
+  /// 关闭广告。在 [AdCue.minDisplayDuration] 之前调用：release 构建静默忽略，
+  /// debug 构建 assert。
   void dismiss();
 
-  /// How long the ad has been displayed.
+  /// 广告已展示了多久。
   Duration get elapsed;
   Stream<Duration> get elapsedStream;
 
@@ -1331,12 +1331,12 @@ class AdCue {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/ad_schedule_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/ad_schedule_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/ad_schedule.dart test/orchestration/ad_schedule_test.dart
@@ -1345,13 +1345,13 @@ git commit -m "feat(orchestration): AdCue + AdController abstract"
 
 ---
 
-## Task 15: NiumaAdSchedule + MidRollAd + enums
+## Task 15：NiumaAdSchedule + MidRollAd + enum
 
-**Files:**
-- Modify: `lib/src/orchestration/ad_schedule.dart`
-- Test: `test/orchestration/ad_schedule_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/ad_schedule.dart`
+- 测试：`test/orchestration/ad_schedule_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 test('NiumaAdSchedule defaults', () {
@@ -1373,14 +1373,14 @@ test('MidRollAd default skipPolicy is skipIfSeekedPast', () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/ad_schedule_test.dart`
-Expected: FAIL — types not defined.
+执行：`flutter test test/orchestration/ad_schedule_test.dart`
+预期：失败 — 类型未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Append to `ad_schedule.dart`:
+在 `ad_schedule.dart` 末尾追加：
 
 ```dart
 enum MidRollSkipPolicy {
@@ -1428,12 +1428,12 @@ class NiumaAdSchedule {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/ad_schedule_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/ad_schedule_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/ad_schedule.dart test/orchestration/ad_schedule_test.dart
@@ -1442,15 +1442,15 @@ git commit -m "feat(orchestration): NiumaAdSchedule + MidRollAd + ad enums"
 
 ---
 
-## Task 16: AdSchedulerOrchestrator — preRoll path
+## Task 16：AdSchedulerOrchestrator — preRoll 路径
 
-**Files:**
-- Create: `lib/src/orchestration/ad_scheduler.dart`
-- Test: `test/orchestration/ad_scheduler_test.dart`
+**文件**：
+- 新建：`lib/src/orchestration/ad_scheduler.dart`
+- 测试：`test/orchestration/ad_scheduler_test.dart`
 
-This task introduces the orchestrator with **only** preRoll handling. midRoll / pauseAd / postRoll come in subsequent tasks.
+本任务只引入 orchestrator 与 **preRoll** 处理。midRoll / pauseAd / postRoll 留给后续任务。
 
-- [ ] **Step 1: Set up test scaffolding + failing test**
+- [ ] **步骤 1：搭测试脚手架 + 失败测试**
 
 ```dart
 // test/orchestration/ad_scheduler_test.dart
@@ -1508,14 +1508,14 @@ void main() {
 }
 ```
 
-(Note: the test imports `AnalyticsEvent`; add `import 'package:niuma_player/src/observability/analytics_event.dart';` at top.)
+（注：测试 import `AnalyticsEvent`；在顶部加 `import 'package:niuma_player/src/observability/analytics_event.dart';`。）
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement (preRoll only)**
+- [ ] **步骤 3：实现（仅 preRoll）**
 
 ```dart
 // lib/src/orchestration/ad_scheduler.dart
@@ -1582,12 +1582,12 @@ class AdSchedulerOrchestrator {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/ad_scheduler.dart test/orchestration/ad_scheduler_test.dart
@@ -1596,15 +1596,15 @@ git commit -m "feat(orchestration): AdSchedulerOrchestrator with preRoll firing"
 
 ---
 
-## Task 17: AdSchedulerOrchestrator — midRoll path + skipIfSeekedPast
+## Task 17：AdSchedulerOrchestrator — midRoll 路径 + skipIfSeekedPast
 
-**Files:**
-- Modify: `lib/src/orchestration/ad_scheduler.dart`
-- Test: `test/orchestration/ad_scheduler_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/ad_scheduler.dart`
+- 测试：`test/orchestration/ad_scheduler_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
-Append:
+追加：
 
 ```dart
 test('midRoll fires when position naturally crosses .at', () {
@@ -1623,14 +1623,14 @@ test('midRoll fires when position naturally crosses .at', () {
     onPause: player.pause,
   )..attach();
 
-  // Initial playing at t=29s; no fire.
+  // 起始 t=29s 播放中；不触发。
   player.emit(NiumaPlayerValue.uninitialized().copyWith(
     phase: PlayerPhase.playing,
     position: const Duration(seconds: 29),
   ));
   expect(orch.activeCue.value, isNull);
 
-  // t=31s; fire.
+  // t=31s；触发。
   player.emit(NiumaPlayerValue.uninitialized().copyWith(
     phase: PlayerPhase.playing,
     position: const Duration(seconds: 31),
@@ -1656,12 +1656,12 @@ test('midRoll skipIfSeekedPast: jump from t=10 to t=40 does not fire midRoll@30'
     onPause: player.pause,
   )..attach();
 
-  // Establish baseline at t=10.
+  // 在 t=10 建立基线。
   player.emit(NiumaPlayerValue.uninitialized().copyWith(
     phase: PlayerPhase.playing,
     position: const Duration(seconds: 10),
   ));
-  // Big jump to t=40 (≥ 2s gap → treat as seek).
+  // 大跳到 t=40（≥ 2s 间隔 → 视作 seek）。
   player.emit(NiumaPlayerValue.uninitialized().copyWith(
     phase: PlayerPhase.playing,
     position: const Duration(seconds: 40),
@@ -1672,14 +1672,14 @@ test('midRoll skipIfSeekedPast: jump from t=10 to t=40 does not fire midRoll@30'
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: FAIL — midRoll not handled yet.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：失败 — midRoll 还没处理。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-In `ad_scheduler.dart`, replace `_onValue` and add tracking:
+在 `ad_scheduler.dart` 中替换 `_onValue` 并添加状态字段：
 
 ```dart
   Duration _lastPos = Duration.zero;
@@ -1716,7 +1716,7 @@ In `ad_scheduler.dart`, replace `_onValue` and add tracking:
           _fire(mr.cue, AdCueType.midRoll);
         case MidRollSkipPolicy.skipIfSeekedPast:
           if (isLikelySeek) {
-            _midRollFired.add(i); // mark fired to prevent later natural cross
+            _midRollFired.add(i); // 标记已 fired，防止后续自然跨越再触发
           } else {
             _midRollFired.add(i);
             _fire(mr.cue, AdCueType.midRoll);
@@ -1729,12 +1729,12 @@ In `ad_scheduler.dart`, replace `_onValue` and add tracking:
   }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/ad_scheduler.dart test/orchestration/ad_scheduler_test.dart
@@ -1743,13 +1743,13 @@ git commit -m "feat(orchestration): AdScheduler midRoll + skipIfSeekedPast"
 
 ---
 
-## Task 18: AdSchedulerOrchestrator — pauseAd + frequency policy
+## Task 18：AdSchedulerOrchestrator — pauseAd + 频次策略
 
-**Files:**
-- Modify: `lib/src/orchestration/ad_scheduler.dart`
-- Test: `test/orchestration/ad_scheduler_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/ad_scheduler.dart`
+- 测试：`test/orchestration/ad_scheduler_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 test('pauseAd fires on playing → paused (manual)', () {
@@ -1784,14 +1784,14 @@ test('PauseAdShowPolicy.oncePerSession suppresses second pause', () {
     onPause: player.pause,
   )..attach();
 
-  // First pause.
+  // 第一次暂停。
   player.emit(NiumaPlayerValue.uninitialized()
       .copyWith(phase: PlayerPhase.playing));
   player.emit(NiumaPlayerValue.uninitialized()
       .copyWith(phase: PlayerPhase.paused));
-  orch.activeCue.value = null; // simulate dismiss
+  orch.activeCue.value = null; // 模拟 dismiss
 
-  // Second pause — should NOT fire.
+  // 第二次暂停 — 不该触发。
   player.emit(NiumaPlayerValue.uninitialized()
       .copyWith(phase: PlayerPhase.playing));
   player.emit(NiumaPlayerValue.uninitialized()
@@ -1802,24 +1802,24 @@ test('PauseAdShowPolicy.oncePerSession suppresses second pause', () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Add fields to `AdSchedulerOrchestrator`:
+给 `AdSchedulerOrchestrator` 加字段：
 
 ```dart
   int _pauseAdShownCount = 0;
   DateTime? _pauseAdLastShownAt;
 ```
 
-Add to `_onValue`, after the midRoll block:
+在 `_onValue` 的 midRoll 处理之后追加：
 
 ```dart
-    // pauseAd: detect manual pause (playing → paused).
+    // pauseAd：检测手动暂停（playing → paused）。
     final justPaused = _lastPhase == PlayerPhase.playing &&
         phase == PlayerPhase.paused;
     if (justPaused && schedule.pauseAd != null && _shouldShowPauseAd()) {
@@ -1829,7 +1829,7 @@ Add to `_onValue`, after the midRoll block:
     }
 ```
 
-Add the helper:
+加上辅助方法：
 
 ```dart
   bool _shouldShowPauseAd() {
@@ -1846,12 +1846,12 @@ Add the helper:
   }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/ad_scheduler.dart test/orchestration/ad_scheduler_test.dart
@@ -1860,13 +1860,13 @@ git commit -m "feat(orchestration): AdScheduler pauseAd + frequency policies"
 
 ---
 
-## Task 19: AdSchedulerOrchestrator — postRoll + AdControllerImpl
+## Task 19：AdSchedulerOrchestrator — postRoll + AdControllerImpl
 
-**Files:**
-- Modify: `lib/src/orchestration/ad_scheduler.dart`
-- Test: `test/orchestration/ad_scheduler_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/ad_scheduler.dart`
+- 测试：`test/orchestration/ad_scheduler_test.dart`
 
-- [ ] **Step 1: Failing tests**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 test('postRoll fires on phase=ended', () {
@@ -1911,14 +1911,14 @@ test('AdController.dismiss after minDisplayDuration completes', () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Add `AdControllerImpl` class and postRoll handling:
+加 `AdControllerImpl` 类与 postRoll 处理：
 
 ```dart
 class AdControllerImpl implements AdController {
@@ -1964,7 +1964,7 @@ class AdControllerImpl implements AdController {
 }
 ```
 
-In `_onValue`, add:
+在 `_onValue` 中追加：
 
 ```dart
     if (_lastPhase != PlayerPhase.ended &&
@@ -1974,12 +1974,12 @@ In `_onValue`, add:
     }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/ad_scheduler_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/ad_scheduler_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/ad_scheduler.dart test/orchestration/ad_scheduler_test.dart
@@ -1988,13 +1988,13 @@ git commit -m "feat(orchestration): AdScheduler postRoll + AdControllerImpl with
 
 ---
 
-## Task 20: ResumeOrchestrator
+## Task 20：ResumeOrchestrator
 
-**Files:**
-- Modify: `lib/src/orchestration/resume_position.dart`
-- Test: `test/orchestration/resume_position_test.dart`
+**文件**：
+- 修改：`lib/src/orchestration/resume_position.dart`
+- 测试：`test/orchestration/resume_position_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 import 'package:fake_async/fake_async.dart';
@@ -2048,16 +2048,16 @@ test('ResumeOrchestrator does not write before minSavedPosition', () {
 });
 ```
 
-Add `import 'package:fake_async/fake_async.dart';` and `import 'package:niuma_player/src/domain/data_source.dart';` if missing.
+如缺失，加 `import 'package:fake_async/fake_async.dart';` 与 `import 'package:niuma_player/src/domain/data_source.dart';`。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: FAIL — `ResumeOrchestrator` not defined.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：失败 — `ResumeOrchestrator` 未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-Append to `resume_position.dart`:
+在 `resume_position.dart` 末尾追加：
 
 ```dart
 import 'dart:async';
@@ -2085,7 +2085,7 @@ class ResumeOrchestrator {
     if (policy.behaviour == ResumeBehaviour.auto) {
       await seekTo(saved);
     }
-    // askUser: caller is responsible for invoking onResumePrompt.
+    // askUser：调用方负责触发 onResumePrompt。
   }
 
   void startPeriodicSave() {
@@ -2113,12 +2113,12 @@ class ResumeOrchestrator {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/resume_position_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/resume_position_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/resume_position.dart test/orchestration/resume_position_test.dart
@@ -2127,13 +2127,13 @@ git commit -m "feat(orchestration): ResumeOrchestrator with periodic save + ende
 
 ---
 
-## Task 21: AutoFailoverOrchestrator
+## Task 21：AutoFailoverOrchestrator
 
-**Files:**
-- Create: `lib/src/orchestration/auto_failover.dart`
-- Test: `test/orchestration/auto_failover_test.dart`
+**文件**：
+- 新建：`lib/src/orchestration/auto_failover.dart`
+- 测试：`test/orchestration/auto_failover_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 // test/orchestration/auto_failover_test.dart
@@ -2196,12 +2196,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/orchestration/auto_failover_test.dart`
-Expected: FAIL.
+执行：`flutter test test/orchestration/auto_failover_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 ```dart
 // lib/src/orchestration/auto_failover.dart
@@ -2238,12 +2238,12 @@ class AutoFailoverOrchestrator {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test test/orchestration/auto_failover_test.dart`
-Expected: PASS.
+执行：`flutter test test/orchestration/auto_failover_test.dart`
+预期：通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/orchestration/auto_failover.dart test/orchestration/auto_failover_test.dart
@@ -2252,14 +2252,14 @@ git commit -m "feat(orchestration): AutoFailoverOrchestrator picks next priority
 
 ---
 
-## Task 22: New kernel events: LineSwitching / LineSwitched / LineSwitchFailed
+## Task 22：新 kernel 事件 LineSwitching / LineSwitched / LineSwitchFailed
 
-**Files:**
-- Modify: `lib/src/domain/player_state.dart`
+**文件**：
+- 修改：`lib/src/domain/player_state.dart`
 
-- [ ] **Step 1: Add the three event classes**
+- [ ] **步骤 1：加三个事件类**
 
-Append to `lib/src/domain/player_state.dart`, in the same sealed-class neighborhood as `BackendSelected` / `FallbackTriggered`:
+在 `lib/src/domain/player_state.dart` 中、`BackendSelected` / `FallbackTriggered` 等 sealed class 邻近位置追加：
 
 ```dart
 final class LineSwitching extends NiumaPlayerEvent {
@@ -2289,12 +2289,12 @@ final class LineSwitchFailed extends NiumaPlayerEvent {
 }
 ```
 
-- [ ] **Step 2: Verify analyze**
+- [ ] **步骤 2：analyze 检查**
 
-Run: `flutter analyze lib/src/domain/player_state.dart`
-Expected: No issues.
+执行：`flutter analyze lib/src/domain/player_state.dart`
+预期：无 issue。
 
-- [ ] **Step 3: Commit**
+- [ ] **步骤 3：提交**
 
 ```bash
 git add lib/src/domain/player_state.dart
@@ -2303,28 +2303,28 @@ git commit -m "feat(kernel): add LineSwitching/LineSwitched/LineSwitchFailed eve
 
 ---
 
-## Task 23: Migrate NiumaPlayerController to NiumaMediaSource (additive)
+## Task 23：把 NiumaPlayerController 迁移到 NiumaMediaSource（增量）
 
-**Files:**
-- Modify: `lib/src/presentation/niuma_player_controller.dart`
-- Modify: `test/state_machine_test.dart`
-- Modify: `example/lib/player_page.dart` (if it constructs `NiumaPlayerController` directly)
+**文件**：
+- 修改：`lib/src/presentation/niuma_player_controller.dart`
+- 修改：`test/state_machine_test.dart`
+- 修改：`example/lib/player_page.dart`（如果它直接 new `NiumaPlayerController`）
 
-The controller currently accepts `NiumaDataSource`. We make it accept `NiumaMediaSource` and provide a `.dataSource(NiumaDataSource)` factory for back-compat.
+controller 当前接受 `NiumaDataSource`。改为接受 `NiumaMediaSource`，并提供 `.dataSource(NiumaDataSource)` factory 兼容旧用法。
 
-- [ ] **Step 1: Read current controller signature**
+- [ ] **步骤 1：读当前 controller 签名**
 
-Run: `head -70 lib/src/presentation/niuma_player_controller.dart`
-Note the constructor + `dataSource` field.
+执行：`head -70 lib/src/presentation/niuma_player_controller.dart`
+注意构造函数与 `dataSource` 字段。
 
-- [ ] **Step 2: Modify the controller**
+- [ ] **步骤 2：修改 controller**
 
-Replace the relevant block with:
+把相关块替换为：
 
 ```dart
 import '../orchestration/multi_source.dart';
 
-// inside class NiumaPlayerController:
+// 在 class NiumaPlayerController 内：
 NiumaPlayerController(
   this.source, {
   NiumaPlayerOptions? options,
@@ -2350,42 +2350,42 @@ factory NiumaPlayerController.dataSource(
 
 final NiumaMediaSource source;
 
-/// Backwards-compatible accessor for callers that only use a single line.
+/// 仅使用单 line 的调用方的兼容 getter。
 NiumaDataSource get dataSource => source.currentLine.source;
 ```
 
-In `_runInitialize()` and `_initNative()`, change every reference to `dataSource` to `source.currentLine.source` if needed (or keep using the `dataSource` getter, since it returns `currentLine.source`).
+在 `_runInitialize()` 与 `_initNative()` 中，把对 `dataSource` 的引用改为 `source.currentLine.source`（或继续用 `dataSource` getter，因为它就返回 `currentLine.source`）。
 
-- [ ] **Step 3: Update existing tests**
+- [ ] **步骤 3：更新已有测试**
 
-In `test/state_machine_test.dart`, replace any:
+在 `test/state_machine_test.dart` 中，把所有：
 
 ```dart
 NiumaPlayerController(NiumaDataSource.network(...), ...)
 ```
 
-with:
+替换为：
 
 ```dart
 NiumaPlayerController.dataSource(NiumaDataSource.network(...), ...)
 ```
 
-Run: `flutter test test/state_machine_test.dart`
-Expected: PASS (no behaviour change).
+执行：`flutter test test/state_machine_test.dart`
+预期：通过（行为不变）。
 
-- [ ] **Step 4: Update example**
+- [ ] **步骤 4：更新 example**
 
-If `example/lib/player_page.dart` constructs the controller directly, switch to `.dataSource(...)` factory.
+如果 `example/lib/player_page.dart` 直接 new controller，改用 `.dataSource(...)` factory。
 
-Run: `cd example && flutter analyze`
-Expected: No issues.
+执行：`cd example && flutter analyze`
+预期：无 issue。
 
-- [ ] **Step 5: Verify global analyze + tests**
+- [ ] **步骤 5：跑全局 analyze + 测试**
 
-Run: `flutter analyze && flutter test`
-Expected: All clean / pass.
+执行：`flutter analyze && flutter test`
+预期：全 clean / pass。
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add lib/src/presentation/niuma_player_controller.dart test/state_machine_test.dart example/lib/player_page.dart
@@ -2394,15 +2394,15 @@ git commit -m "refactor(kernel): controller accepts NiumaMediaSource; .dataSourc
 
 ---
 
-## Task 24: Wire SourceMiddleware pipeline into controller.initialize()
+## Task 24：把 SourceMiddleware pipeline 接进 controller.initialize()
 
-**Files:**
-- Modify: `lib/src/presentation/niuma_player_controller.dart`
-- Modify: `test/state_machine_test.dart`
+**文件**：
+- 修改：`lib/src/presentation/niuma_player_controller.dart`
+- 修改：`test/state_machine_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
-Add to `test/state_machine_test.dart`:
+往 `test/state_machine_test.dart` 加：
 
 ```dart
 test('middleware pipeline runs before backend.initialize() — header injected',
@@ -2419,24 +2419,24 @@ test('middleware pipeline runs before backend.initialize() — header injected',
     backendFactory: fake,
   );
   await ctrl.initialize();
-  // FakeBackendFactory should record the source it was constructed with.
+  // FakeBackendFactory 应记录它被构造时拿到的 source。
   expect(fake.lastSourceFromMiddleware?.headers, {'X': '1', 'Y': '2'});
   ctrl.dispose();
 });
 ```
 
-(Add `import 'package:niuma_player/src/orchestration/source_middleware.dart';` and `import 'package:niuma_player/src/orchestration/multi_source.dart';` to the test file.)
+（在测试文件加上 `import 'package:niuma_player/src/orchestration/source_middleware.dart';` 与 `import 'package:niuma_player/src/orchestration/multi_source.dart';`。）
 
-Make sure `FakeBackendFactory` records the resolved `NiumaDataSource` it received in `createVideoPlayer`/`createNative`.
+确保 `FakeBackendFactory` 在 `createVideoPlayer` / `createNative` 中记录收到的 `NiumaDataSource`。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/state_machine_test.dart`
-Expected: FAIL.
+执行：`flutter test test/state_machine_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-In `niuma_player_controller.dart`:
+在 `niuma_player_controller.dart` 中：
 
 ```dart
 import '../orchestration/source_middleware.dart';
@@ -2444,7 +2444,7 @@ import '../orchestration/source_middleware.dart';
 NiumaPlayerController(
   this.source, {
   this.middlewares = const [],
-  // ... rest
+  // ...其它
 });
 
 final List<SourceMiddleware> middlewares;
@@ -2456,9 +2456,9 @@ Future<NiumaDataSource> _resolveSource() async {
 }
 ```
 
-Update `_runInitialize()` to call `_resolvedSource = await _resolveSource()` first, then pass `_resolvedSource` to the backend factory instead of `dataSource`.
+修改 `_runInitialize()`：先 `_resolvedSource = await _resolveSource()`，再把 `_resolvedSource` 而不是 `dataSource` 传给 backend factory。
 
-The backend factory signatures already accept `NiumaDataSource`, so update the call sites only:
+backend factory 的签名已经接受 `NiumaDataSource`，只需改调用点：
 
 ```dart
 await _attachBackend(_backendFactory.createVideoPlayer(_resolvedSource));
@@ -2466,12 +2466,12 @@ await _attachBackend(_backendFactory.createVideoPlayer(_resolvedSource));
 await _attachBackend(_backendFactory.createNative(_resolvedSource, forceIjk: forceIjk));
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test`
-Expected: All pass.
+执行：`flutter test`
+预期：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/presentation/niuma_player_controller.dart test/state_machine_test.dart
@@ -2480,13 +2480,13 @@ git commit -m "feat(kernel): controller runs SourceMiddleware pipeline before ba
 
 ---
 
-## Task 25: controller.switchLine(id)
+## Task 25：controller.switchLine(id)
 
-**Files:**
-- Modify: `lib/src/presentation/niuma_player_controller.dart`
-- Modify: `test/state_machine_test.dart`
+**文件**：
+- 修改：`lib/src/presentation/niuma_player_controller.dart`
+- 修改：`test/state_machine_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 test('switchLine: dispose old backend, init new at saved position', () async {
@@ -2521,14 +2521,14 @@ test('switchLine: dispose old backend, init new at saved position', () async {
 });
 ```
 
-(Augment `FakeBackendFactory` to expose `simulatePosition` and `lastSeekTarget`.)
+（给 `FakeBackendFactory` 加上 `simulatePosition` 与 `lastSeekTarget`。）
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/state_machine_test.dart`
-Expected: FAIL — `switchLine` not defined.
+执行：`flutter test test/state_machine_test.dart`
+预期：失败 — `switchLine` 未定义。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 ```dart
 Future<void> switchLine(String lineId) async {
@@ -2551,7 +2551,7 @@ Future<void> switchLine(String lineId) async {
     final resolved = await runSourceMiddlewares(target.source, middlewares);
     _resolvedSource = resolved;
 
-    // Build the right backend for this platform / forceIjk policy.
+    // 根据 platform / forceIjk 策略构建对应 backend。
     if (_platform.isIOS || _platform.isWeb) {
       await _attachBackend(_backendFactory.createVideoPlayer(resolved));
       await _backend!.initialize().timeout(options.initTimeout);
@@ -2575,14 +2575,14 @@ Future<void> switchLine(String lineId) async {
 String? _activeLineId;
 ```
 
-(Make sure `_initNative` no longer reads `dataSource` directly; use `_resolvedSource` consistently.)
+（确保 `_initNative` 不再直接读 `dataSource`，统一用 `_resolvedSource`。）
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test`
-Expected: All pass.
+执行：`flutter test`
+预期：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/presentation/niuma_player_controller.dart test/state_machine_test.dart
@@ -2591,13 +2591,13 @@ git commit -m "feat(kernel): controller.switchLine with seek-restore + line even
 
 ---
 
-## Task 26: Apply RetryPolicy on initialize() failure
+## Task 26：在 initialize() 失败时套用 RetryPolicy
 
-**Files:**
-- Modify: `lib/src/presentation/niuma_player_controller.dart`
-- Modify: `test/state_machine_test.dart`
+**文件**：
+- 修改：`lib/src/presentation/niuma_player_controller.dart`
+- 修改：`test/state_machine_test.dart`
 
-- [ ] **Step 1: Failing test**
+- [ ] **步骤 1：失败测试**
 
 ```dart
 test('RetryPolicy.smart retries network error twice then succeeds', () async {
@@ -2610,7 +2610,7 @@ test('RetryPolicy.smart retries network error twice then succeeds', () async {
   final ctrl = NiumaPlayerController(
     NiumaMediaSource.single(NiumaDataSource.network('https://x')),
     retryPolicy: const RetryPolicy.smart(maxAttempts: 3),
-    platform: FakePlatformBridge(isIOS: false), // Android route
+    platform: FakePlatformBridge(isIOS: false), // Android 路径
     backendFactory: fake,
   );
   await ctrl.initialize();
@@ -2627,20 +2627,20 @@ test('RetryPolicy does not retry codecUnsupported', () async {
     backendFactory: fake,
   );
   await expectLater(ctrl.initialize(), throwsA(anything));
-  expect(fake.nativeForceIjkArgs, hasLength(2)); // existing forceIjk fallback retry
+  expect(fake.nativeForceIjkArgs, hasLength(2)); // 已有的 forceIjk fallback retry
 });
 ```
 
-(`_Throw` and `_Succeed` are local helper classes that drive `FakeBackendFactory`'s programmed responses.)
+（`_Throw` / `_Succeed` 为本地 helper class，驱动 `FakeBackendFactory` 的预设响应。）
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **步骤 2：跑测试确认失败**
 
-Run: `flutter test test/state_machine_test.dart`
-Expected: FAIL.
+执行：`flutter test test/state_machine_test.dart`
+预期：失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
-In `niuma_player_controller.dart`:
+在 `niuma_player_controller.dart` 中：
 
 ```dart
 import '../orchestration/retry_policy.dart';
@@ -2655,7 +2655,7 @@ NiumaPlayerController(
 final RetryPolicy retryPolicy;
 ```
 
-Wrap the inner-most `await native.initialize()` (or `await _backend!.initialize()`) in a retry loop:
+把最内层的 `await native.initialize()`（或 `await _backend!.initialize()`）包进重试循环：
 
 ```dart
 Future<void> _initializeWithRetry(Future<void> Function() bringUp) async {
@@ -2675,20 +2675,20 @@ Future<void> _initializeWithRetry(Future<void> Function() bringUp) async {
 
 PlayerErrorCategory _categorize(Object e) {
   if (e is TimeoutException) return PlayerErrorCategory.network;
-  // Existing path: native errors propagate as PlatformException strings; we
-  // categorize known signatures here. Default to unknown.
+  // 已有路径：原生错误以 PlatformException 字符串形式向上传；这里
+  // 按已知 signature 分类。默认返回 unknown。
   return PlayerErrorCategory.unknown;
 }
 ```
 
-Use `_initializeWithRetry` to wrap the *single-line attempt* (NOT the existing forceIjk Try-Fail-Remember loop on Android — that stays). Keep both layers: retry first (transient/network), then if exhausted, the existing forceIjk fallback runs.
+用 `_initializeWithRetry` 包住 *单 line 尝试*（**不要**包住 Android 已有的 forceIjk Try-Fail-Remember loop —— 那一层保留）。两层并存：先 retry（transient/network），耗尽之后才走原有 forceIjk fallback。
 
-- [ ] **Step 4: Run tests**
+- [ ] **步骤 4：跑测试**
 
-Run: `flutter test`
-Expected: All pass.
+执行：`flutter test`
+预期：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add lib/src/presentation/niuma_player_controller.dart test/state_machine_test.dart
@@ -2697,14 +2697,14 @@ git commit -m "feat(kernel): apply RetryPolicy around backend.initialize"
 
 ---
 
-## Task 27: Public exports
+## Task 27：公开导出
 
-**Files:**
-- Modify: `lib/niuma_player.dart`
+**文件**：
+- 修改：`lib/niuma_player.dart`
 
-- [ ] **Step 1: Add exports**
+- [ ] **步骤 1：加导出**
 
-Replace existing exports with:
+把已有的 export 替换为：
 
 ```dart
 // kernel
@@ -2778,12 +2778,12 @@ export 'src/observability/analytics_event.dart'
 export 'src/observability/analytics_emitter.dart' show AnalyticsEmitter;
 ```
 
-- [ ] **Step 2: Verify analyze**
+- [ ] **步骤 2：analyze 检查**
 
-Run: `flutter analyze`
-Expected: No issues.
+执行：`flutter analyze`
+预期：无 issue。
 
-- [ ] **Step 3: Commit**
+- [ ] **步骤 3：提交**
 
 ```bash
 git add lib/niuma_player.dart
@@ -2792,14 +2792,14 @@ git commit -m "feat: export M7 orchestration + observability public API"
 
 ---
 
-## Task 28: Update CHANGELOG
+## Task 28：更新 CHANGELOG
 
-**Files:**
-- Modify: `CHANGELOG.md`
+**文件**：
+- 修改：`CHANGELOG.md`
 
-- [ ] **Step 1: Edit changelog**
+- [ ] **步骤 1：编辑 changelog**
 
-Replace `## [Unreleased]` block:
+替换 `## [Unreleased]` 段：
 
 ```markdown
 ## [Unreleased]
@@ -2820,7 +2820,7 @@ Replace `## [Unreleased]` block:
 - `NiumaPlayerController` first arg type: `NiumaDataSource` → `NiumaMediaSource`. Use `NiumaPlayerController.dataSource(ds)` factory for the single-source case (drop-in for old code).
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **步骤 2：提交**
 
 ```bash
 git add CHANGELOG.md
@@ -2829,75 +2829,71 @@ git commit -m "docs: log M7 orchestration + observability under [Unreleased]"
 
 ---
 
-## Task 29: Final sanity
+## Task 29：最终自检
 
-- [ ] **Step 1: Full analyze**
+- [ ] **步骤 1：全量 analyze**
 
-Run: `flutter analyze`
-Expected: 0 issues.
+执行：`flutter analyze`
+预期：0 issue。
 
-- [ ] **Step 2: Full test**
+- [ ] **步骤 2：全量测试**
 
-Run: `flutter test`
-Expected: All pass (kernel 14 + new orchestration tests).
+执行：`flutter test`
+预期：全部通过（kernel 14 个 + 新增 orchestration 测试）。
 
-- [ ] **Step 3: dartdoc dry run**
+- [ ] **步骤 3：dartdoc dry run**
 
-Run: `dart doc --dry-run`
-Expected: 0 warnings, 0 errors.
+执行：`dart doc --dry-run`
+预期：0 warning，0 error。
 
-- [ ] **Step 4: Pub publish dry run**
+- [ ] **步骤 4：pub publish dry run**
 
-Run: `flutter pub publish --dry-run 2>&1 | grep -B1 -A3 "^\*"`
-Expected: only the unavoidable "modified in git" warning.
+执行：`flutter pub publish --dry-run 2>&1 | grep -B1 -A3 "^\*"`
+预期：只剩无法避免的 "modified in git" warning。
 
-- [ ] **Step 5: Build smoke (Android debug + Web)**
+- [ ] **步骤 5：构建 smoke（Android debug + Web）**
 
-Run:
+执行：
 ```bash
 cd example
 flutter build apk --debug
 flutter build web
 ```
-Expected: Both succeed.
+预期：两个都成功。
 
-- [ ] **Step 6: Commit any remaining incidental fixes**
+- [ ] **步骤 6：把残留的零碎修复一并提交**
 
 ```bash
-git status   # should be clean or only stale .lock changes
+git status   # 应该是干净的，或仅有过期 .lock 改动
 ```
 
-If anything was changed during sanity step, commit it under a clear message.
+如果自检过程中改了什么，用清晰的 message 提交。
 
 ---
 
-## Self-Review
+## 自检对照
 
-Spec coverage check (Section ↔ Task):
+Spec 覆盖检查（章节 ↔ Task）：
 
-| Spec Section | Task(s) |
+| Spec 章节 | Task |
 |---|---|
-| 1. Layer architecture | files materialized in Task 1–21, `lib/testing.dart` Task 13 |
-| 2. Public API of NiumaVideoPlayer | **out of scope** (M9) |
-| 3. Gesture arbiter | **out of scope** (M8) |
-| 4. Lifecycle | **out of scope** (M8) |
-| 4.7 Background audio | **out of scope** (M6) |
-| 5. Ad cue system | Task 14 (types) + 15 (schedule) + 16–19 (scheduler) + 25 (analytics) |
-| 6.1 Multi-source | Task 5 + 6 + 7 (types) + 21 (failover) + 22 (events) + 25 (switchLine) |
-| 6.2 Resume | Task 8 + 9 + 10 (types) + 20 (orchestrator) |
-| 6.3 VTT thumbnail | **out of scope** (M8) |
-| 6.4 Source middleware | Task 2 + 3 + 4 (impl) + 24 (wire into kernel) |
-| 7.3 Test doubles | Task 8 + 12 + 13 |
-| Section 9 Out of Scope | excluded by intent |
+| 1. 架构分层 | 文件在 Task 1–21 落地，`lib/testing.dart` 在 Task 13 |
+| 2. NiumaVideoPlayer 公共 API | **超出范围**（M9） |
+| 3. 手势仲裁器 | **超出范围**（M8） |
+| 4. 生命周期 | **超出范围**（M8） |
+| 4.7 后台音频 | **超出范围**（M6） |
+| 5. 广告 cue 系统 | Task 14（类型）+ 15（schedule）+ 16–19（scheduler）+ 25（analytics） |
+| 6.1 多源 | Task 5 + 6 + 7（类型）+ 21（failover）+ 22（事件）+ 25（switchLine） |
+| 6.2 续播 | Task 8 + 9 + 10（类型）+ 20（orchestrator） |
+| 6.3 VTT 缩略图 | **超出范围**（M8） |
+| 6.4 Source middleware | Task 2 + 3 + 4（实现）+ 24（接进 kernel） |
+| 7.3 测试替身 | Task 8 + 12 + 13 |
+| 第 9 节 范围之外 | 按设计排除 |
 
-All M7-relevant spec sections have at least one task. Sections labelled out-of-scope are intentionally deferred to M8/M9/M6 plans.
+所有 M7 相关 spec 章节都至少有一个 Task。被标 out-of-scope 的章节按计划留给 M8/M9/M6。
 
-Placeholder scan: none. All steps have concrete code.
+占位符扫描：无。所有步骤都给出了具体代码。
 
-Type consistency:
-- `NiumaMediaSource.lineById` introduced in Task 6; used in Task 25 ✓
-- `AdControllerImpl.dismiss` defined in Task 19; AdSchedulerOrchestrator integrates in Task 25-pending — covered when wiring AnalyticsEmitter passes through `AdSchedulerOrchestrator.fire` (already accepts emitter in Task 16; midRoll/pauseAd/postRoll inherit it via the same `_fire`).
-- `RetryPolicy.delayFor` returns `Duration`, used by Task 26's retry loop ✓
-- `AutoFailoverOrchestrator.nextLine` returns `String?`; Task 25 wiring is M8-side, but the orchestrator is fully tested standalone in Task 21.
-
-No drift detected.
+类型一致性：
+- `NiumaMediaSource.lineById` 在 Task 6 引入；在 Task 25 中使用 ✓
+- `AdControllerImpl.dismiss` 在 Task 19 定义；AdSchedulerOrchestrator 接入挂在 Task 25-pending —— 通过 `AdSchedulerOrchestrator.fire` 接 AnalyticsEmitter（在 Task 16 已经接受 emitter；midRoll/pauseAd/postRoll 通过同一个 `_fire` 共享）。

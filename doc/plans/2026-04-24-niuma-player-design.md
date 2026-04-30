@@ -1,4 +1,4 @@
-# niuma_player Design
+# niuma_player 设计文档
 
 > 版本：v0.1（brainstorming 定稿）
 > 日期：2026-04-24
@@ -7,14 +7,14 @@
 
 ---
 
-## 1. Overview
+## 1. 概述
 
 `niuma_player` 是一个 Flutter plugin package，解决"华为/老设备 `video_player` 无法播放视频"的兼容性问题。
 
 - **iOS**：委托给官方 `video_player`，零额外体积
 - **Android**：默认使用 `video_player`；运行时检测到失败 → 无缝切换到内置 IJKPlayer；失败结果持久化，下次同设备直接走 IJK
 
-## 2. User Stories
+## 2. 用户故事
 
 - 作为普通用户（90%+ 设备正常），我打开 App 看视频，感觉和以前一样流畅（走系统原生）
 - 作为华为/老设备用户，我第一次看视频时感觉"缓冲了一下"，但最终能看到画面（video_player 失败 → IJK 接管）
@@ -26,14 +26,14 @@
 ```
 niuma_player/
 ├── lib/
-│   ├── niuma_player.dart                 ← export
+│   ├── niuma_player.dart                 ← 导出入口
 │   └── src/
 │       ├── domain/
 │       │   ├── player_backend.dart       ← abstract PlayerBackend
 │       │   ├── player_state.dart         ← freezed NiumaPlayerValue + NiumaPlayerEvent
 │       │   └── data_source.dart          ← NiumaDataSource
 │       ├── data/
-│       │   ├── video_player_backend.dart ← wrap package:video_player
+│       │   ├── video_player_backend.dart ← 包装 package:video_player
 │       │   ├── ijk_backend.dart          ← MethodChannel → Android IJK
 │       │   └── device_memory.dart        ← SharedPreferences 持久化失败记忆
 │       └── presentation/
@@ -121,7 +121,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
   Stream<NiumaPlayerEvent> get events;
   PlayerBackendKind get activeBackend;
-  int? get textureId; // null if backend doesn't use texture (video_player case)
+  int? get textureId; // backend 不用 texture 时为 null（video_player 场景）
 }
 
 enum PlayerBackendKind { videoPlayer, ijk }
@@ -166,8 +166,8 @@ class NiumaPlayerView extends StatelessWidget {
   final NiumaPlayerController controller;
   final double? aspectRatio;
   // 内部：
-  //   - activeBackend == videoPlayer: 委托 package:video_player 的 VideoPlayer widget
-  //   - activeBackend == ijk: 使用 Texture(textureId)
+  //   - activeBackend == videoPlayer：委托 package:video_player 的 VideoPlayer widget
+  //   - activeBackend == ijk：使用 Texture(textureId)
 }
 ```
 
@@ -190,7 +190,7 @@ initialize()
   │
   ├── onError 事件 ────────► 记忆失败 → dispose vp → new IjkBackend
   ├── initTimeout 到期      ─► 记忆失败 → dispose vp → new IjkBackend
-  └── 成功 initialized      ─► use VideoPlayerBackend (emit BackendSelected(vp, fromMemory: false))
+  └── 成功 initialized      ─► 用 VideoPlayerBackend (emit BackendSelected(vp, fromMemory: false))
 ```
 
 **设备指纹 key**：
@@ -199,7 +199,7 @@ sha1("${Build.MANUFACTURER}|${Build.MODEL}|${Build.VERSION.SDK_INT}")
 ```
 由 Android 原生侧通过 MethodChannel 提供给 Dart 层；Dart 层存 `SharedPreferences`，key = `niuma_player.ijk_needed.<fingerprint>`。
 
-## 6. Android Native 实现
+## 6. Android 原生实现
 
 ### 6.1 依赖
 
@@ -344,7 +344,7 @@ niuma_player/android/scripts/compile/
 
 | 风险 | 缓解 |
 |---|---|
-| MethodChannel 事件非 main 线程发出 → Dart race | Native 强制 `Handler(Looper.getMainLooper()).post` |
+| MethodChannel 事件非 main 线程发出 → Dart race | 原生侧强制 `Handler(Looper.getMainLooper()).post` |
 | TextureRegistry 后台失效 | 监听 `WidgetsBindingObserver`，onResume 重绑 Surface |
 | `libc++_shared.so` 符号冲突 | `packagingOptions { pickFirst 'lib/*/libc++_shared.so' }` |
 | HLS AES-128 加密流 | FFmpeg `--enable-openssl` 静链 1.1.1w |
@@ -353,7 +353,7 @@ niuma_player/android/scripts/compile/
 
 ## 11. 交付清单
 
-- [ ] Dart public API 实现
+- [ ] Dart 公共 API 实现
 - [ ] 状态机 + DeviceMemory 单测 100% pass
 - [ ] Android Plugin 源码 + MethodChannel 实现
 - [ ] `android/libs/` 下挂 debugly prebuilt `.aar`（v0.1）
