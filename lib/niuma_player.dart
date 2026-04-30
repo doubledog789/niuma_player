@@ -28,9 +28,13 @@ export 'src/presentation/niuma_thumbnail_view.dart' show NiumaThumbnailView;
 export 'src/presentation/niuma_player_theme.dart'
     show NiumaPlayerTheme, NiumaPlayerThemeData;
 
+// M9 缩略图悬浮预览
+export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;
+
 // M9 原子控件
 export 'src/presentation/controls/play_pause_button.dart'
     show PlayPauseButton;
+export 'src/presentation/controls/scrub_bar.dart' show ScrubBar;
 export 'src/presentation/controls/time_display.dart' show TimeDisplay;
 export 'src/presentation/controls/volume_button.dart' show VolumeButton;
 export 'src/presentation/controls/speed_selector.dart' show SpeedSelector;
