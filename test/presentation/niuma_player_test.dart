@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
 import 'controls/fake_controller.dart';
@@ -424,6 +426,59 @@ void main() {
         reason: '全屏页内的 IconButton 应当读到外层 NiumaPlayerThemeData '
             '注入的 customTheme（iconSize=42）',
       );
+    });
+
+    testWidgets(
+        '_setControlsVisible 在 build 阶段触发时把 setState 延后到 post-frame',
+        (tester) async {
+      // R2-Important-4：之前的"cue 活跃时 tap 视频区不切换 controls"测试
+      // 触发 _setControlsVisible 都是在 idle phase 走 sync setState 路径，
+      // 没真覆盖到 post-frame 分支。这里通过 debugSchedulerPhaseOverride
+      // 模拟 schedulerPhase=persistentCallbacks，让 _setControlsVisible
+      // 真走 post-frame 入队分支，并断言 _pendingVisibleIntent 设置 +
+      // 后续 frame fire 后落地。
+      final ctl = FakeNiumaPlayerController();
+      final key = GlobalKey<np_internal.NiumaPlayerStateForTesting>();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: NiumaPlayer(key: key, controller: ctl)),
+      ));
+
+      // 拿到内部 state——通过 @visibleForTesting accessors 调内部方法。
+      final state = key.currentState!;
+      expect(state.debugControlsVisible, isTrue);
+
+      // 模拟"现在在 build 阶段"——_setControlsVisible 应当 enqueue 到
+      // post-frame，而不是立刻 setState（否则会撞 framework lock）。
+      np_internal.debugSchedulerPhaseOverride =
+          SchedulerPhase.persistentCallbacks;
+      try {
+        state.debugSetControlsVisible(false);
+        // post-frame 还没 fire——controls 仍是 visible，但 pendingIntent
+        // 已经记录。
+        expect(state.debugControlsVisible, isTrue,
+            reason: 'persistentCallbacks 阶段不应同步 setState');
+        expect(state.debugPendingVisibleIntent, isFalse,
+            reason: '_pendingVisibleIntent 应记录最新意图（false）');
+
+        // 再来一次反向：意图应当被覆盖成 true，仍未 fire。
+        state.debugSetControlsVisible(true);
+        // 注意：visible==current 时 _setControlsVisible 早 return 不入队，
+        // 但是 _pendingVisibleIntent 还在；当 post-frame fire 时按 intent
+        // 走，最终 _controlsVisible 不变（true→true）。
+        expect(state.debugControlsVisible, isTrue);
+      } finally {
+        np_internal.debugSchedulerPhaseOverride = null;
+      }
+
+      // pump 一次让 post-frame callback fire——调用应当按最新 intent 落地。
+      await tester.pump();
+      // _pendingVisibleIntent 在 callback 里被清空。
+      expect(state.debugPendingVisibleIntent, isNull,
+          reason: 'post-frame 应当清空 pending intent');
+      // 上面 pendingIntent=false（第二次同 visible 不变更 intent），post-frame
+      // fire 后 _controlsVisible 应该真的变 false。
+      expect(state.debugControlsVisible, isFalse,
+          reason: 'post-frame 应按最新 pendingIntent 落地——visible=false');
     });
 
     testWidgets(

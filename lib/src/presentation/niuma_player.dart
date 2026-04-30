@@ -240,7 +240,10 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 读最新意图，避免连发两次反向切换时旧 callback 覆盖新意图。
   void _setControlsVisible(bool visible) {
     if (_controlsVisible == visible) return;
-    final phase = SchedulerBinding.instance.schedulerPhase;
+    // 测试时可以通过 [debugSchedulerPhaseOverride] 模拟特定 phase 触发；
+    // 生产代码读真实 [SchedulerBinding.schedulerPhase]。
+    final phase = debugSchedulerPhaseOverride ??
+        SchedulerBinding.instance.schedulerPhase;
     if (phase == SchedulerPhase.persistentCallbacks ||
         phase == SchedulerPhase.midFrameMicrotasks) {
       final hadPending = _pendingVisibleIntent != null;
@@ -264,6 +267,22 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       setState(() => _controlsVisible = visible);
     }
   }
+
+  // ───────────── @visibleForTesting accessors ─────────────
+  // 这一组 getter / wrapper 只供单测访问内部状态——日常代码不要用。
+
+  /// 测试用：当前 `_controlsVisible` 字段值。
+  @visibleForTesting
+  bool get debugControlsVisible => _controlsVisible;
+
+  /// 测试用：当前 `_pendingVisibleIntent` 字段值——`null` 表示无 pending。
+  @visibleForTesting
+  bool? get debugPendingVisibleIntent => _pendingVisibleIntent;
+
+  /// 测试用：直接调 [_setControlsVisible]——便于覆盖 build 阶段的
+  /// post-frame 入队分支。
+  @visibleForTesting
+  void debugSetControlsVisible(bool visible) => _setControlsVisible(visible);
 
   void _onTapVideo() {
     // 广告 cue 活跃时把 tap 让给 NiumaAdOverlay（它自己有 dismissOnTap
@@ -395,3 +414,16 @@ class NiumaPlayerConfigScope extends InheritedWidget {
 /// noop analytics emitter——用户不传 emitter 时把事件丢掉，避免广告
 /// overlay 内部 null 校验。
 void _noopEmitter(Object event) {}
+
+/// 测试用：当非 `null` 时覆盖 [SchedulerBinding.schedulerPhase] 的读取
+/// 结果，让测试能模拟"_setControlsVisible 在 build 阶段被调用"的场景。
+///
+/// 生产代码不要触碰本字段。
+@visibleForTesting
+SchedulerPhase? debugSchedulerPhaseOverride;
+
+/// 测试用类型别名——让单测拿 [GlobalKey<NiumaPlayerStateForTesting>] 后
+/// 通过 `currentState` 访问 `@visibleForTesting` accessors，而不必把
+/// 私有 [State] 类公开。
+@visibleForTesting
+typedef NiumaPlayerStateForTesting = _NiumaPlayerState;

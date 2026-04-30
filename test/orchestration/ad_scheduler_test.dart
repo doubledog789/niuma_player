@@ -595,5 +595,43 @@ void main() {
 
       orch.dispose();
     });
+
+    // R2-Important-3：测试真实的 _fire 路径——通过 @visibleForTesting
+    // 暴露的 debugFire 入口，连续两次 fire 同一 cue 实例，验证 listener
+    // 都能收到通知（依赖代码里"先 set null 再 set cue"的防御写法）。
+    test('debugFire 连续两次同 cue 仍各自触发 listener（_fire 防御性 set null）', () {
+      final player = _FakePlayer();
+      final cue = AdCue(builder: (_, __) => const SizedBox());
+      final orch = AdSchedulerOrchestrator(
+        schedule: const NiumaAdSchedule(),
+        playerValue: player,
+        onPlay: player.play,
+        onPause: player.pause,
+      )..attach();
+
+      var notifyCount = 0;
+      AdCue? lastSeen;
+      orch.activeCue.addListener(() {
+        notifyCount++;
+        lastSeen = orch.activeCue.value;
+      });
+
+      // 第一次 fire 同实例。
+      orch.debugFire(cue, AdCueType.preRoll);
+      // null → cue：notify 一次（cue 实例被 set 进 activeCue.value）。
+      expect(orch.activeCue.value, same(cue));
+      final firstNotifyCount = notifyCount;
+      expect(firstNotifyCount, greaterThan(0));
+
+      // 第二次 fire 同实例——_fire 内部"先 null 再 cue"应当让 listener 再触发。
+      orch.debugFire(cue, AdCueType.preRoll);
+      expect(orch.activeCue.value, same(cue));
+      // 第二次 fire 至少要再触发一次 listener（cue → null → cue）。
+      expect(notifyCount, greaterThan(firstNotifyCount),
+          reason: '_fire 防御性 set null 应让同实例 cue 仍触发 listener');
+      expect(lastSeen, same(cue));
+
+      orch.dispose();
+    });
   });
 }

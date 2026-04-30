@@ -179,6 +179,16 @@ class AdSchedulerOrchestrator {
     activeCueType.value = type;
     _analytics?.call(AnalyticsEvent.adScheduled(cueType: type));
   }
+
+  /// 测试用入口——直接调内部 [_fire]。
+  ///
+  /// 真实调用方因为 preRoll latches / midRoll Set / pauseAd policies 的
+  /// 关系，几乎不会出现"同一 cue 被同一 schedule 路径连续 fire 两次"
+  /// 的场景。但 [_fire] 自身有"先 set null 再 set cue"的防御写法，
+  /// 用来覆盖 ValueNotifier 同实例不通知 listener 的边缘场景。
+  /// 单测通过本入口直接验证那段防御写法。
+  @visibleForTesting
+  void debugFire(AdCue cue, AdCueType type) => _fire(cue, type);
 }
 
 /// 由 [AdSchedulerOrchestrator] 持有的 [AdController] 具体实现。
