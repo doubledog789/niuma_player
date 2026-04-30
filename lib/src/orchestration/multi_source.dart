@@ -81,8 +81,9 @@ class NiumaMediaSource {
   /// Use this when there is only one URL and no quality/CDN switching needed.
   ///
   /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
-  /// 若非 `null`，会立即用 [Uri.parse] 校验；非法 URL 会抛 [ArgumentError]，
-  /// 不会延后到 fetch 时静默吞掉（F5）。
+  /// 若非 `null`，会立即校验：必须是 http:// 或 https:// 且 host 非空。
+  /// 非法 URL（asset://、file://、data:、空 host 等）抛 [ArgumentError]，
+  /// 不会延后到 fetch 时静默吞掉（F5 / R2-I3）。
   factory NiumaMediaSource.single(
     NiumaDataSource source, {
     String? thumbnailVtt,
@@ -104,8 +105,9 @@ class NiumaMediaSource {
   /// Use this for multi-quality playlists or CDN failover configurations.
   ///
   /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
-  /// 若非 `null`，会立即用 [Uri.parse] 校验；非法 URL 会抛 [ArgumentError]，
-  /// 不会延后到 fetch 时静默吞掉（F5）。
+  /// 若非 `null`，会立即校验：必须是 http:// 或 https:// 且 host 非空。
+  /// 非法 URL（asset://、file://、data:、空 host 等）抛 [ArgumentError]，
+  /// 不会延后到 fetch 时静默吞掉（F5 / R2-I3）。
   factory NiumaMediaSource.lines({
     required List<MediaLine> lines,
     required String defaultLineId,
@@ -129,20 +131,43 @@ class NiumaMediaSource {
     );
   }
 
-  /// Throws an [ArgumentError] if [url] is non-null and not a syntactically
-  /// valid URL parseable by [Uri.parse]. Empty strings are also rejected.
+  /// Throws an [ArgumentError] if [url] is non-null and either:
+  ///   - parses to something that isn't `http://` or `https://`
+  ///     (e.g. `asset://`, `file://`, `data:`); or
+  ///   - has an empty host after parsing (e.g. `'http:///nohost'`,
+  ///     whitespace-only strings).
+  ///
+  /// Empty strings are also rejected. Anything that survives is guaranteed
+  /// to be a syntactically usable HTTP(S) URL — callers don't need to
+  /// re-validate downstream, and the default fetcher will not be asked to
+  /// chew on something it can't actually fetch.
   static void _validateThumbnailVtt(String? url) {
     if (url == null) return;
     if (url.isEmpty) {
       throw ArgumentError.value(url, 'thumbnailVtt', 'must not be empty');
     }
+    final Uri uri;
     try {
-      Uri.parse(url);
+      uri = Uri.parse(url);
     } on FormatException catch (e) {
       throw ArgumentError.value(
         url,
         'thumbnailVtt',
         'not a valid URL (${e.message})',
+      );
+    }
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      throw ArgumentError.value(
+        url,
+        'thumbnailVtt',
+        'must use http:// or https:// scheme (got "${uri.scheme}")',
+      );
+    }
+    if (uri.host.isEmpty) {
+      throw ArgumentError.value(
+        url,
+        'thumbnailVtt',
+        'must have a non-empty host',
       );
     }
   }

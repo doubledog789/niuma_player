@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -31,56 +33,80 @@ typedef ThumbnailFetcher = Future<String> Function(
   Map<String, String> headers,
 );
 
-/// Hard wall-clock cap on the default VTT fetch. Anything beyond this is
-/// treated as a hung server and the thumbnail track is silently disabled
-/// (failing-open—video keeps playing).
-const Duration kThumbnailFetchTimeout = Duration(seconds: 30);
-
-/// Hard cap on the VTT body size. A 5MB VTT would already imply tens of
-/// thousands of cues; anything past this is almost certainly a malicious
-/// or misconfigured server. Reject early so the VM doesn't unbounded-eat RAM.
-const int kThumbnailMaxBodyBytes = 5 * 1024 * 1024;
-
-Future<String> _defaultThumbnailFetcher(
-  Uri uri,
-  Map<String, String> headers,
-) =>
-    fetchThumbnailVtt(uri, headers, http.Client());
-
-/// Internal helper exposed for testing: fetches a VTT body using the given
-/// [client]. Honours the global [kThumbnailFetchTimeout] and
-/// [kThumbnailMaxBodyBytes] caps; throws [http.ClientException] on
-/// non-2xx, oversized body, or timeout.
+/// Internal helper exposed for testing: streams a VTT body using the given
+/// [client], honouring [timeout] (wall-clock) and [maxBytes] (body size cap).
 ///
-/// In production [_defaultThumbnailFetcher] passes a fresh `http.Client()`;
-/// tests can pass a `MockClient` to drive the size cap / timeout / error
-/// branches without touching the network.
+/// Implementation uses [http.Client.send] (not `client.get`) so the body is
+/// **not** fully buffered into memory before the size cap is checked. The
+/// flow is:
+///   1. open the response stream + apply [timeout] to the headers phase;
+///   2. reject non-2xx status codes;
+///   3. if the server declared `Content-Length` and it already exceeds
+///      [maxBytes], reject before touching the body;
+///   4. otherwise accumulate chunks and abort the moment running total
+///      exceeds [maxBytes] — a malicious server cannot trick the VM into
+///      buffering arbitrary bytes first.
+///
+/// On non-2xx, oversized body, or timeout, throws [http.ClientException].
+/// In production the controller's default fetcher (built by
+/// `_makeDefaultThumbnailFetcher`) passes a fresh `http.Client()`; tests
+/// can pass a `MockClient` to drive the size cap / timeout / error branches
+/// without touching the network.
 @visibleForTesting
 Future<String> fetchThumbnailVtt(
   Uri uri,
   Map<String, String> headers,
-  http.Client client,
-) async {
+  http.Client client, {
+  Duration timeout = const Duration(seconds: 30),
+  int maxBytes = 5 * 1024 * 1024,
+}) async {
   try {
-    final response =
-        await client.get(uri, headers: headers).timeout(kThumbnailFetchTimeout);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    final request = http.Request('GET', uri);
+    request.headers.addAll(headers);
+    final streamed = await client.send(request).timeout(timeout);
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
       throw http.ClientException(
-        'thumbnail VTT fetch failed: HTTP ${response.statusCode}',
+        'thumbnail VTT fetch failed: HTTP ${streamed.statusCode}',
         uri,
       );
     }
-    if (response.bodyBytes.length > kThumbnailMaxBodyBytes) {
+    // Honour Content-Length when the server is honest enough to declare it:
+    // we can refuse before reading any of the body.
+    final declared = streamed.contentLength;
+    if (declared != null && declared > maxBytes) {
       throw http.ClientException(
-        'thumbnail VTT body too large: '
-        '${response.bodyBytes.length} bytes (max $kThumbnailMaxBodyBytes)',
+        'thumbnail VTT body too large per Content-Length: '
+        '$declared (max $maxBytes)',
         uri,
       );
     }
-    return response.body;
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in streamed.stream) {
+      builder.add(chunk);
+      if (builder.length > maxBytes) {
+        throw http.ClientException(
+          'thumbnail VTT body exceeded $maxBytes bytes during streaming',
+          uri,
+        );
+      }
+    }
+    return utf8.decode(builder.toBytes());
   } finally {
     client.close();
   }
+}
+
+/// Builds the default [ThumbnailFetcher] closure used when callers don't
+/// inject their own. Captures the [options] so per-controller timeout / size
+/// cap settings flow through to [fetchThumbnailVtt].
+ThumbnailFetcher _makeDefaultThumbnailFetcher(NiumaPlayerOptions options) {
+  return (uri, headers) => fetchThumbnailVtt(
+        uri,
+        headers,
+        http.Client(),
+        timeout: options.thumbnailFetchTimeout,
+        maxBytes: options.thumbnailMaxBodyBytes,
+      );
 }
 
 /// Options for tuning [NiumaPlayerController] behaviour. All fields have
@@ -90,6 +116,8 @@ class NiumaPlayerOptions {
   const NiumaPlayerOptions({
     this.initTimeout = const Duration(seconds: 30),
     this.forceIjkOnAndroid = false,
+    this.thumbnailFetchTimeout = const Duration(seconds: 30),
+    this.thumbnailMaxBodyBytes = 5 * 1024 * 1024,
   });
 
   /// If the underlying backend hasn't reached "initialized" within this
@@ -103,6 +131,24 @@ class NiumaPlayerOptions {
   /// Useful for emergency overrides or A/B testing the rescue path. iOS
   /// and Web ignore this flag (they always use video_player).
   final bool forceIjkOnAndroid;
+
+  /// Hard wall-clock cap on the default VTT fetch. Anything beyond this is
+  /// treated as a hung server and the thumbnail track is silently disabled
+  /// (failing-open—video keeps playing).
+  ///
+  /// Only applies to the **default** [ThumbnailFetcher]. If a caller injects
+  /// their own fetcher via [NiumaPlayerController.thumbnailFetcher], they
+  /// own their own timeout policy.
+  final Duration thumbnailFetchTimeout;
+
+  /// Hard cap on the VTT body size, in bytes. The default fetcher streams
+  /// the response and aborts the moment running total exceeds this — a
+  /// malicious server cannot force the VM to first buffer the entire body
+  /// before being rejected.
+  ///
+  /// 5MB already implies tens of thousands of cues; typical thumbnail VTTs
+  /// are a few KB. Only applies to the default [ThumbnailFetcher].
+  final int thumbnailMaxBodyBytes;
 }
 
 /// Public controller users interact with.
@@ -147,7 +193,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   })  : options = options ?? const NiumaPlayerOptions(),
         _platform = platform ?? const DefaultPlatformBridge(),
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
-        _thumbnailFetcher = thumbnailFetcher ?? _defaultThumbnailFetcher,
+        _thumbnailFetcher = thumbnailFetcher ??
+            _makeDefaultThumbnailFetcher(options ?? const NiumaPlayerOptions()),
         _thumbnailLoadState = source.thumbnailVtt == null
             ? ThumbnailLoadState.none
             : ThumbnailLoadState.idle,

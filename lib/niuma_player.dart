@@ -19,7 +19,8 @@ export 'src/domain/player_state.dart'
         LineSwitching,
         LineSwitched,
         LineSwitchFailed;
-export 'src/presentation/niuma_player_controller.dart';
+export 'src/presentation/niuma_player_controller.dart'
+    show NiumaPlayerController, NiumaPlayerOptions, ThumbnailFetcher;
 export 'src/presentation/niuma_player_view.dart';
 export 'src/presentation/niuma_thumbnail_view.dart' show NiumaThumbnailView;
 

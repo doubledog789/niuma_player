@@ -7,6 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart' as http_testing;
 import 'package:niuma_player/niuma_player.dart';
+// `fetchThumbnailVtt` is `@visibleForTesting` and intentionally NOT exported
+// from the public surface (R2-S2 / R2-S5). Tests reach for it via the source
+// path so the public package surface stays minimal.
+import 'package:niuma_player/src/presentation/niuma_player_controller.dart'
+    show fetchThumbnailVtt;
 
 import 'helpers/fake_device_memory_channel.dart';
 
@@ -1079,11 +1084,12 @@ void main() {
       await controller.dispose();
     });
 
-    // I7: 默认 fetcher 必须有 5MB 大小上限，否则恶意服务器可以让 VM 吃光 RAM。
-    test('默认 fetcher 拒绝超过 5MB 的 body（I7 size cap）', () async {
-      // 6MB 的假 body：用全是 ASCII 字符（每个 1 byte）。
-      final oversize = Uint8List(kThumbnailMaxBodyBytes + 1024);
-      // 填一些 ASCII 数据（'a'）让 body 是合法的 UTF-8。
+    // I7 / R2-C1: 默认 fetcher 必须有大小上限，否则恶意服务器可以让 VM 吃光 RAM。
+    // 用一个小的 maxBytes 触发，避免在测试里真造一个 5MB 的 buffer。
+    test('默认 fetcher 拒绝超过 maxBytes 的 body — Content-Length 早拒（R2-C1）',
+        () async {
+      const cap = 1024; // 测试用的小上限
+      final oversize = Uint8List(cap + 256);
       for (var i = 0; i < oversize.length; i++) {
         oversize[i] = 0x61; // 'a'
       }
@@ -1097,13 +1103,58 @@ void main() {
           Uri.parse('https://x/thumbs.vtt'),
           const <String, String>{},
           mock,
+          maxBytes: cap,
         );
       } catch (e) {
         caught = e;
       }
       expect(caught, isA<http.ClientException>(),
           reason: 'oversized VTT body must be rejected');
-      expect(caught.toString(), contains('too large'));
+      expect(caught.toString(), contains('Content-Length'),
+          reason: '当 server 诚实声明 Content-Length 时，应在读 body 前就拒绝');
+    });
+
+    // R2-C1: 当服务器没声明 Content-Length（chunked），fetcher 必须流式中止，
+    // 不能等到全部 buffer 完才拒。用 MockClient.streaming + 不设
+    // contentLength 模拟 chunked。
+    test('默认 fetcher 在没 Content-Length 时仍流式中止（R2-C1 streaming abort）',
+        () async {
+      const cap = 1024;
+      // 构造 chunked stream：每片 256B，循环吐到超 cap。
+      Stream<List<int>> chunks() async* {
+        final chunk = Uint8List(256);
+        for (var i = 0; i < chunk.length; i++) {
+          chunk[i] = 0x61; // 'a'
+        }
+        // 吐 8 片 = 2048B 远超 cap=1024。
+        for (var i = 0; i < 8; i++) {
+          yield chunk;
+        }
+      }
+
+      final mock = http_testing.MockClient.streaming(
+        (req, body) async => http.StreamedResponse(
+          chunks(),
+          200,
+          // contentLength 故意保持 null，模拟 chunked。
+        ),
+      );
+
+      Object? caught;
+      try {
+        await fetchThumbnailVtt(
+          Uri.parse('https://x/thumbs.vtt'),
+          const <String, String>{},
+          mock,
+          maxBytes: cap,
+        );
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught, isA<http.ClientException>(),
+          reason: 'streaming body 超 cap 必须中止');
+      expect(caught.toString(), contains('exceeded'),
+          reason: '应触发的是流式累计检查（"exceeded"）而非 Content-Length 早拒');
     });
 
     // I7: 正常大小的 body 通过。
@@ -1120,6 +1171,22 @@ void main() {
         mock,
       );
       expect(result, contains('WEBVTT'));
+    });
+
+    // R2-S2 / R2-S5: NiumaPlayerOptions 暴露 thumbnailFetchTimeout /
+    // thumbnailMaxBodyBytes，默认值锁定。
+    test('NiumaPlayerOptions 暴露 thumbnail timeout / max body 字段（R2-S2/S5）',
+        () {
+      const o = NiumaPlayerOptions();
+      expect(o.thumbnailFetchTimeout, const Duration(seconds: 30));
+      expect(o.thumbnailMaxBodyBytes, 5 * 1024 * 1024);
+
+      const tuned = NiumaPlayerOptions(
+        thumbnailFetchTimeout: Duration(seconds: 5),
+        thumbnailMaxBodyBytes: 1024,
+      );
+      expect(tuned.thumbnailFetchTimeout, const Duration(seconds: 5));
+      expect(tuned.thumbnailMaxBodyBytes, 1024);
     });
 
     // F5: thumbnailVtt 必须在 NiumaMediaSource 构造时校验，
@@ -1380,52 +1447,52 @@ sprite.jpg#xywh=128,0,128,72
     });
   });
 
-  // TG8: asset:// URL 默认 fetcher 抛 → controller 进 failed，video 仍 ready。
-  group('asset:// thumbnailVtt（TG8）', () {
-    test('asset URL 走默认 fetcher 失败 → failed + video 不受影响', () async {
-      // NiumaMediaSource 校验 asset URL 不会抛（只校验 http/https 格式）；如果
-      // 它会在构造时抛，这个 test 就需要换思路。先看构造能否过：
-      late NiumaMediaSource src;
-      try {
-        src = NiumaMediaSource.single(
-          ds,
-          thumbnailVtt: 'asset:///foo.vtt',
-        );
-      } catch (e) {
-        // F5 校验可能拒绝 asset:// —— 那这个 case 不存在，标记跳过。
-        markTestSkipped(
-            'NiumaMediaSource 在构造时拒绝 asset:// URL（$e）—— TG8 不适用');
-        return;
-      }
-
-      final controller = NiumaPlayerController(
-        src,
-        platform: FakePlatformBridge(isIOS: true),
-        backendFactory: FakeBackendFactory(),
-        // 默认 fetcher 会抛（asset:// 不是 http）；这里直接模拟它的行为。
-        thumbnailFetcher: (uri, headers) async {
-          throw http.ClientException('asset:// not supported', uri);
-        },
+  // TG8 (R2-I3): asset:// URL 在 NiumaMediaSource 构造阶段就被拒——
+  // 不再延后到 fetch 时静默吞。
+  group('non-http(s) thumbnailVtt 立即拒（TG8 / R2-I3）', () {
+    test('asset:// 抛 ArgumentError', () {
+      expect(
+        () => NiumaMediaSource.single(ds, thumbnailVtt: 'asset:///foo.vtt'),
+        throwsA(isA<ArgumentError>()),
       );
-
-      final events = <NiumaPlayerEvent>[];
-      final sub = controller.events.listen(events.add);
-
-      await controller.initialize();
-      for (var i = 0; i < 5; i++) {
-        await Future<void>.delayed(Duration.zero);
-      }
-
-      // 缩略图侧 failed，thumbnailFor null
-      expect(controller.thumbnailLoadState, ThumbnailLoadState.failed);
-      expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
-      // 视频侧不受影响：BackendSelected + ready + initialized
-      expect(events.whereType<BackendSelected>(), isNotEmpty);
-      expect(controller.value.phase, PlayerPhase.ready);
-      expect(controller.value.initialized, isTrue);
-
-      await sub.cancel();
-      await controller.dispose();
+    });
+    test('file:// 抛 ArgumentError', () {
+      expect(
+        () => NiumaMediaSource.single(ds, thumbnailVtt: 'file:///x.vtt'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+    test('data: 抛 ArgumentError', () {
+      expect(
+        () => NiumaMediaSource.single(ds, thumbnailVtt: 'data:text/plain,'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+    test('http:///nohost（host 空）抛 ArgumentError', () {
+      expect(
+        () => NiumaMediaSource.single(ds, thumbnailVtt: 'http:///nohost'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+    test('纯空格（解析后 scheme/host 都空）抛 ArgumentError', () {
+      expect(
+        () => NiumaMediaSource.single(ds, thumbnailVtt: '   '),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+    test('合法 https URL 通过', () {
+      final src = NiumaMediaSource.single(
+        ds,
+        thumbnailVtt: 'https://valid.com/x.vtt',
+      );
+      expect(src.thumbnailVtt, 'https://valid.com/x.vtt');
+    });
+    test('合法 http URL 通过', () {
+      final src = NiumaMediaSource.single(
+        ds,
+        thumbnailVtt: 'http://valid.com/x.vtt',
+      );
+      expect(src.thumbnailVtt, 'http://valid.com/x.vtt');
     });
   });
 
