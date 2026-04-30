@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart' show ImageProvider;
 
 /// 一条 WebVTT thumbnail cue：起止时间 + sprite URL + 裁剪矩形。
 ///
-/// 通常只通过 [WebVttParser.parseThumbnails] 的返回值消费，手工构造主要
+/// 通常只通过 `WebVttParser.parseThumbnails` 的返回值消费，手工构造主要
 /// 用于测试 mock。直接 new 一个 cue 时调用方需要自行保证 `start < end`、
 /// region 内的坐标合法。
 @immutable
@@ -49,7 +49,7 @@ class WebVttCue {
 /// `controller.thumbnailFor(...)` 的返回值：图片提供者 + 在原图里的裁剪矩形。
 ///
 /// 两个 frame 相等当且仅当 `image` 是同一个 [ImageProvider] 实例（用 identity
-/// 比较——同 URL 同 cache，[ThumbnailCache] 保证 dedup）且 `region` 相等。
+/// 比较——同 URL 同 cache，`ThumbnailCache` 保证 dedup）且 `region` 相等。
 /// 用 identity 比较 image 而不是 ==，是因为 [NetworkImage] 自身的 == 走 url，
 /// 我们的 cache 已经按 URL 去重，identity 等价于 URL 等价但更便宜。
 @immutable
