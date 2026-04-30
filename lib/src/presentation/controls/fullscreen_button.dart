@@ -1,53 +1,58 @@
 import 'package:flutter/material.dart';
 
+import '../niuma_fullscreen_page.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
 
 /// 全屏切换按钮。
 ///
 /// 点击时按所处 route 决定行为：
-/// - 顶层（`ModalRoute.of(context)?.isFirst == true`）→ push 一个新的
-///   全屏 page；
-/// - 子 route（即"已经在全屏 page"）→ pop 回上一层。
+/// - 不在全屏 page 内（route name 不是 [NiumaFullscreenPage.routeName]）
+///   → push 一个 [NiumaFullscreenPage.route]（淡入 200ms）；
+/// - 已经在全屏 page 内 → [Navigator.pop] 回到上一层。
 ///
-/// **TODO(m9-task8)**：这里 push 的目标暂时是 placeholder MaterialPageRoute
-/// （Scaffold + 文字 "FullscreenPage placeholder"），等 Task 8 实装
-/// `NiumaFullscreenPage` 后改成它。这样做能让 Task 4 单独可 commit /
-/// 通过测试，而不需要先把 NiumaFullscreenPage 写完。
+/// 图标也根据当前 route 切换：顶层显示 `fullscreen`，子 route 显示
+/// `fullscreen_exit`。这样进入 / 退出全屏在同一按钮上视觉自洽。
 class FullscreenButton extends StatelessWidget {
   /// 创建一个 [FullscreenButton]。
   const FullscreenButton({super.key, required this.controller});
 
-  /// 在全屏 page 中要复用的 player controller。Task 8 实装时把它穿到
-  /// NiumaFullscreenPage。
+  /// 全屏 page 中要复用的 player controller。push 路由时穿给
+  /// [NiumaFullscreenPage]，进入 / 退出全屏不会重新 initialize。
   final NiumaPlayerController controller;
 
+  /// 判断当前 build context 是否处于 [NiumaFullscreenPage] 内。
+  ///
+  /// 优先看 route 的 `settings.name`——`NiumaFullscreenPage.route` 始终
+  /// 设置 [NiumaFullscreenPage.routeName]。若上层 host app 自己包装
+  /// [NiumaFullscreenPage] 而没穿透 settings，回退用 `isFirst` 判断
+  /// （顶层 route 一定不在全屏 page 内）。
+  bool _inFullscreenPage(BuildContext context) {
+    final route = ModalRoute.of(context);
+    if (route?.settings.name == NiumaFullscreenPage.routeName) return true;
+    return !(route?.isFirst ?? true);
+  }
+
   void _onPressed(BuildContext context) {
-    final isFirstRoute = ModalRoute.of(context)?.isFirst ?? true;
-    if (isFirstRoute) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const Scaffold(
-            // TODO(m9-task8): 替换为 NiumaFullscreenPage(controller: controller)
-            body: Center(child: Text('FullscreenPage placeholder')),
-          ),
-        ),
-      );
-    } else {
+    if (_inFullscreenPage(context)) {
       Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).push(
+        NiumaFullscreenPage.route(controller: controller),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
-    final isFirstRoute = ModalRoute.of(context)?.isFirst ?? true;
+    final inFullscreen = _inFullscreenPage(context);
     return IconButton(
       padding: EdgeInsets.zero,
       iconSize: theme.iconSize,
       color: theme.iconColor,
       icon: Icon(
-        isFirstRoute ? Icons.fullscreen : Icons.fullscreen_exit,
+        inFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
       ),
       onPressed: () => _onPressed(context),
     );
