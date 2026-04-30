@@ -11,7 +11,7 @@
 - `controller.thumbnailFor(Duration)` 公共 API
 - 复用 M7 `SourceMiddleware`（VTT URL 也走签名 / header 流水线）
 
-**技术栈**：纯 Dart，依赖现有 `package:flutter` `ImageProvider` + `NetworkImage`。`http` 走 `flutter` 自带 `dart:io HttpClient`，无新增第三方依赖。
+**技术栈**：纯 Dart，依赖现有 `package:flutter` `ImageProvider` + `NetworkImage`。`package:http ^1.0.0` 是新加的依赖（仅 VTT fetch 用），轻量、Dart 团队官方维护，跨平台（VM 走 `dart:io`，web 自动走 `XMLHttpRequest`）。
 
 ---
 

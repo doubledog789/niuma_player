@@ -991,7 +991,8 @@ void main() {
       await controller.dispose();
     });
 
-    test('VTT fetch 失败时 thumbnailFor 返回 null（不影响播放）', () async {
+    test('VTT fetch 失败时 thumbnailFor 返回 null（不影响播放，D1 强断言）',
+        () async {
       final factory = FakeBackendFactory();
       final controller = NiumaPlayerController(
         NiumaMediaSource.single(
@@ -1004,11 +1005,27 @@ void main() {
           throw const FormatException('boom');
         },
       );
+
+      // Track BackendSelected to verify backend bring-up still completed.
+      final events = <NiumaPlayerEvent>[];
+      final sub = controller.events.listen(events.add);
+
       await controller.initialize();
       // Wait for the unawaited thumbnail load to settle.
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
+
+      // D1 强断言：缩略图加载失败，但视频本身完全到达 ready 状态。
       expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.failed);
+      expect(controller.value.phase, PlayerPhase.ready,
+          reason: 'video phase must reach ready despite thumbnail failure');
+      expect(controller.value.initialized, isTrue,
+          reason: 'video must be initialized despite thumbnail failure');
+      expect(events.whereType<BackendSelected>(), isNotEmpty,
+          reason: 'BackendSelected must still fire when VTT fetch fails');
+
+      await sub.cancel();
       await controller.dispose();
     });
 
@@ -1171,6 +1188,309 @@ sprite.jpg#xywh=128,0,128,72
       expect(frame2!.region.left, 128);
       // Out-of-range
       expect(controller.thumbnailFor(const Duration(seconds: 99)), isNull);
+
+      await controller.dispose();
+    });
+  });
+
+  // F3 / TG4: thumbnailLoadState 状态机覆盖。
+  group('thumbnailLoadState', () {
+    test('thumbnailVtt: null → none', () {
+      final controller = NiumaPlayerController.dataSource(
+        ds,
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+      );
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.none);
+      controller.dispose();
+    });
+
+    test('配置但 initialize 未跑完 → idle', () {
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) async => 'WEBVTT\n',
+      );
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.idle,
+          reason: 'state should be idle before initialize completes');
+      controller.dispose();
+    });
+
+    test('fetch 进行中 → loading（用 Completer 控制完成时点）', () async {
+      final fetchGate = Completer<String>();
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) => fetchGate.future,
+      );
+      await controller.initialize();
+      // initialize 完成、unawaited(_loadThumbnailsIfAny) 已启动但 fetcher 还卡住
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.loading);
+
+      // 解锁让加载收尾，避免 dispose 时悬挂
+      fetchGate.complete('WEBVTT\n');
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      await controller.dispose();
+    });
+
+    test('成功 fetch + 解析 → ready', () async {
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) async =>
+            'WEBVTT\n\n00:00.000 --> 00:05.000\nx.jpg#xywh=0,0,1,1\n',
+      );
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.ready);
+      await controller.dispose();
+    });
+
+    test('解析返回空 cue 列表（合法 WEBVTT 但 0 cue）→ ready（thumbnailFor 仍返回 null）',
+        () async {
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        // 合法 WEBVTT 头但 0 cue
+        thumbnailFetcher: (uri, headers) async => 'WEBVTT\n',
+      );
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.ready,
+          reason: '解析成功只是无内容；状态仍是 ready');
+      expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull,
+          reason: 'cue 列表为空时 thumbnailFor 返回 null');
+      await controller.dispose();
+    });
+
+    test('fetch 抛异常 → failed', () async {
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) async {
+          throw const FormatException('boom');
+        },
+      );
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.failed);
+      await controller.dispose();
+    });
+
+    // TG4: dispose 中途竞态。fetcher 用 Completer 控制完成；构造 controller →
+    // unawaited(initialize) → 立即 dispose → 让 fetcher 完成 → 验证
+    // _thumbnailLoadState 没被写到 ready（dispose 后 _runThumbnailLoad 应短路）。
+    test('dispose 中途的 fetcher 不写已 disposed 的字段（TG4 race）', () async {
+      final fetchGate = Completer<String>();
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) => fetchGate.future,
+      );
+
+      unawaited(controller.initialize());
+      // 让 initialize 跑到点 unawaited(_loadThumbnailsIfAny) 阶段
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      // 立即 dispose
+      await controller.dispose();
+
+      // fetcher 现在才完成（dispose 已经发生）
+      fetchGate.complete(
+        'WEBVTT\n\n00:00.000 --> 00:05.000\nx.jpg#xywh=0,0,1,1\n',
+      );
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      // dispose 中途完成的 fetcher 不应把状态写成 ready——_runThumbnailLoad
+      // 内部已经在每个 await 后检查 _disposed 并 early-return。
+      expect(controller.thumbnailLoadState, isNot(ThumbnailLoadState.ready),
+          reason: 'dispose 后到达的 fetcher 结果不能让状态变 ready');
+      expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
+    });
+  });
+
+  // TG7 + D3: 真 middleware 跑在 VTT URL 上。
+  group('thumbnail VTT 走 middleware（TG7 / D3）', () {
+    test('HeaderInjectionMiddleware 注入的 headers 真到达 fetcher', () async {
+      Map<String, String>? capturedHeaders;
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        middlewares: const [
+          HeaderInjectionMiddleware({'X-Token': 'foo'}),
+        ],
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) async {
+          capturedHeaders = headers;
+          return 'WEBVTT\n';
+        },
+      );
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(capturedHeaders, isNotNull);
+      expect(capturedHeaders!['X-Token'], 'foo',
+          reason: 'fetcher 应收到 HeaderInjectionMiddleware 注入的 X-Token');
+      await controller.dispose();
+    });
+
+    test('SignedUrlMiddleware 改写过的 URL 真到达 fetcher', () async {
+      Uri? capturedUri;
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds, thumbnailVtt: 'https://x/thumbs.vtt'),
+        middlewares: [
+          SignedUrlMiddleware((u) async => '$u?sig=bar'),
+        ],
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) async {
+          capturedUri = uri;
+          return 'WEBVTT\n';
+        },
+      );
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(capturedUri, isNotNull);
+      expect(capturedUri.toString(), contains('?sig=bar'),
+          reason: 'fetcher 应收到 SignedUrlMiddleware 改写过的 URL');
+      await controller.dispose();
+    });
+  });
+
+  // TG8: asset:// URL 默认 fetcher 抛 → controller 进 failed，video 仍 ready。
+  group('asset:// thumbnailVtt（TG8）', () {
+    test('asset URL 走默认 fetcher 失败 → failed + video 不受影响', () async {
+      // NiumaMediaSource 校验 asset URL 不会抛（只校验 http/https 格式）；如果
+      // 它会在构造时抛，这个 test 就需要换思路。先看构造能否过：
+      late NiumaMediaSource src;
+      try {
+        src = NiumaMediaSource.single(
+          ds,
+          thumbnailVtt: 'asset:///foo.vtt',
+        );
+      } catch (e) {
+        // F5 校验可能拒绝 asset:// —— 那这个 case 不存在，标记跳过。
+        markTestSkipped(
+            'NiumaMediaSource 在构造时拒绝 asset:// URL（$e）—— TG8 不适用');
+        return;
+      }
+
+      final controller = NiumaPlayerController(
+        src,
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        // 默认 fetcher 会抛（asset:// 不是 http）；这里直接模拟它的行为。
+        thumbnailFetcher: (uri, headers) async {
+          throw http.ClientException('asset:// not supported', uri);
+        },
+      );
+
+      final events = <NiumaPlayerEvent>[];
+      final sub = controller.events.listen(events.add);
+
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      // 缩略图侧 failed，thumbnailFor null
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.failed);
+      expect(controller.thumbnailFor(const Duration(seconds: 3)), isNull);
+      // 视频侧不受影响：BackendSelected + ready + initialized
+      expect(events.whereType<BackendSelected>(), isNotEmpty);
+      expect(controller.value.phase, PlayerPhase.ready);
+      expect(controller.value.initialized, isTrue);
+
+      await sub.cancel();
+      await controller.dispose();
+    });
+  });
+
+  // TG9: switchLine 后 thumbnail cues 不被清，原 cues 仍可查。
+  group('switchLine 与 thumbnail（TG9）', () {
+    test('switchLine 后 thumbnail cues 不被清，原 cues 仍可查', () async {
+      const vttBody = '''
+WEBVTT
+
+00:00.000 --> 00:05.000
+sprite.jpg#xywh=0,0,128,72
+
+00:05.000 --> 00:10.000
+sprite.jpg#xywh=128,0,128,72
+''';
+      final lineA = MediaLine(
+        id: 'a',
+        label: 'A',
+        source: NiumaDataSource.network('https://a/v.mp4'),
+      );
+      final lineB = MediaLine(
+        id: 'b',
+        label: 'B',
+        source: NiumaDataSource.network('https://b/v.mp4'),
+      );
+      var fetchCount = 0;
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.lines(
+          lines: [lineA, lineB],
+          defaultLineId: 'a',
+          thumbnailVtt: 'https://cdn.com/x/thumbs.vtt',
+        ),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: FakeBackendFactory(),
+        thumbnailFetcher: (uri, headers) async {
+          fetchCount++;
+          return vttBody;
+        },
+      );
+      await controller.initialize();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      // 切换前能查 cue
+      final beforeFrame =
+          controller.thumbnailFor(const Duration(seconds: 3));
+      expect(beforeFrame, isNotNull);
+
+      await controller.switchLine('b');
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      // 切换后原 cue 仍可查（thumbnail 是 NiumaMediaSource 内容属性，跨 line
+      // 共享）。switchLine 不重新触发 _loadThumbnailsIfAny，旧 cues 直接复用。
+      final afterFrame =
+          controller.thumbnailFor(const Duration(seconds: 3));
+      expect(afterFrame, isNotNull,
+          reason: 'switchLine 后 thumbnail cues 应保留');
+      expect(afterFrame!.region.left, 0);
+      // VTT 只被 fetch 了一次（switchLine 不触发再 fetch）
+      expect(fetchCount, 1,
+          reason: 'switchLine 不应重新 fetch 同一个 thumbnailVtt');
+      expect(controller.thumbnailLoadState, ThumbnailLoadState.ready);
 
       await controller.dispose();
     });

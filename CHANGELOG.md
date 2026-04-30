@@ -7,17 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-30
+
 ### Added (M8 — 缩略图 VTT)
 - `NiumaMediaSource.thumbnailVtt` 可选字段，传入 WebVTT thumbnail track URL。
 - `controller.thumbnailFor(Duration position) → ThumbnailFrame?` —— 按播放位置查
-  对应缩略图（sprite 图引用 + 裁剪矩形）。
+  对应缩略图（sprite 图引用 + 裁剪矩形）。复杂度 O(log n)（二分查找）。
+- `controller.thumbnailLoadState` getter + `ThumbnailLoadState`
+  enum（`none / idle / loading / ready / failed`），让 UI 区分加载阶段。
+- `NiumaThumbnailView` 助手 widget —— 一行渲染 `ThumbnailFrame`（封装
+  `ImageStream` 同步触发防御 + sprite crop），上层不再需要重写 30 行
+  ImageStream listener boilerplate。
 - 内置 `WebVttParser.parseThumbnails`：支持 MM:SS.mmm / HH:MM:SS.mmm 时间格式
   和 `sprite.jpg#xywh=x,y,w,h` 引用语法；单条 cue 解析失败会跳过不影响整体。
-- `ThumbnailCache`：sprite URL 去重 + LRU 淘汰（默认 8 张上限）。
-- 公共类型导出：`ThumbnailFrame`、`WebVttCue`（其他实现细节内部化）。
+- `ThumbnailCache`：sprite URL 去重 + LRU 淘汰（默认 32 张上限，覆盖长视频
+  典型 sprite 数）。
+- 公共类型导出：`ThumbnailFrame`、`WebVttCue`、`ThumbnailLoadState`、
+  `NiumaThumbnailView`（其他实现细节内部化）。
 - VTT URL 走 `SourceMiddleware` 流水线（跟视频 URL 同样的签名 / header 规则）。
 - VTT 加载失败静默降级：不抛异常，只 log 一条，`thumbnailFor` 返回 null，
   视频播放完全不受影响。
+- `controller.dispose()` 时清空 controller-local 引用并 `evict` 全局
+  `PaintingBinding.imageCache` 中已解码的位图，sprite 像素不会长期占住 RAM。
 - 新增依赖 `package:http ^1.0.0`，跨平台 VTT fetch（VM 走 `dart:io`，web 自动
   走 `XMLHttpRequest`；CORS 由调用方保证）。
 
@@ -96,6 +107,7 @@ First public release.
 - 14 unit tests covering iOS / Web / Android happy path, retry success,
   retry failure, wall-clock timeout, plus `DeviceMemory` persistence.
 
-[Unreleased]: https://github.com/axin789/niuma_player/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/axin789/niuma_player/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/axin789/niuma_player/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/axin789/niuma_player/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niuma/niuma_player/releases/tag/v0.1.0

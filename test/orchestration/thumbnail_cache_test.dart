@@ -77,8 +77,50 @@ void main() {
       expect(cache.contains('https://x/a.jpg'), isFalse);
     });
 
-    // TG6 (commit 4 锁定 default)；提前补在 commit 2 也方便后续 commit。
-    // 不破坏既有 API；现在还是 8，commit 3 再调 32。这里先放占位。
+    // TG6: 锁定 maxEntries 默认值，防止后续不小心改回 8。
+    test('maxEntries 默认 32（TG6 default 锁定）', () {
+      expect(ThumbnailCache().maxEntries, 32);
+    });
+
+    // TG5: clear 后再次填到容量上限，淘汰的应该是 clear 之后插入的最老条目，
+    // 不是 clear 之前的。验证内部 LRU 链在 clear 后干净复位。
+    test('clear() 后重新填到上限：淘汰的是 clear 之后插入的最老条目（TG5）', () {
+      final cache = ThumbnailCache(maxEntries: 3);
+      // 先填到容量上限
+      cache.getOrCreate('old-a.jpg');
+      cache.getOrCreate('old-b.jpg');
+      cache.getOrCreate('old-c.jpg');
+      expect(cache.contains('old-a.jpg'), isTrue);
+
+      cache.clear();
+      expect(cache.contains('old-a.jpg'), isFalse);
+      expect(cache.contains('old-b.jpg'), isFalse);
+      expect(cache.contains('old-c.jpg'), isFalse);
+
+      // 再填 cap-1 = 2 条
+      final newA = cache.getOrCreate('new-a.jpg');
+      cache.getOrCreate('new-b.jpg');
+      // 第 cap = 3 条
+      cache.getOrCreate('new-c.jpg');
+      // 第 cap+1 = 4 条 → 应该把 new-a 挤掉（它是 clear 之后最老的）
+      cache.getOrCreate('new-d.jpg');
+
+      expect(cache.contains('new-a.jpg'), isFalse,
+          reason: 'clear 后最老的 new-a 应被淘汰');
+      expect(cache.contains('new-b.jpg'), isTrue);
+      expect(cache.contains('new-c.jpg'), isTrue);
+      expect(cache.contains('new-d.jpg'), isTrue);
+
+      // clear 之前的 old-* 完全不应再出现，哪怕它们之前曾占住过 LRU 链。
+      expect(cache.contains('old-a.jpg'), isFalse);
+      expect(cache.contains('old-b.jpg'), isFalse);
+      expect(cache.contains('old-c.jpg'), isFalse);
+
+      // newA 已被淘汰；再次 getOrCreate 应返回**新实例**。
+      final newARefetched = cache.getOrCreate('new-a.jpg');
+      expect(identical(newARefetched, newA), isFalse,
+          reason: 'newA 已被淘汰，再次 getOrCreate 应是新实例');
+    });
   });
 }
 

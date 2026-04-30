@@ -34,7 +34,13 @@ abstract class ThumbnailResolver {
   }
 
   /// 二分查找包含 [position] 的 cue。前提：[cues] 按 [WebVttCue.start] 升序，
-  /// cue 之间不重叠（典型 VTT thumbnail track 满足）。复杂度 O(log n)。
+  /// cue 之间不重叠（典型 VTT thumbnail track 满足，[WebVttParser.parseThumbnails]
+  /// 也保留了 VTT 文件里的顺序）。复杂度 O(log n)。
+  ///
+  /// **传入无序 / 重叠 cues 的行为是未定义的**：可能命中错误的 cue，也可能漏掉
+  /// 应当命中的 cue。出于性能考虑这里**不做** runtime assert——thousands-of-cue
+  /// 场景下每次 resolve 都跑 O(n) 校验等于把二分查找的收益吞掉。调用方手工
+  /// 构造 cue 时需要自行保证有序（TG3）。
   ///
   /// 半开区间语义 `[start, end)`：`position == cue.start` 命中，
   /// `position == cue.end` 不命中（落入下一 cue 或返回 null）。

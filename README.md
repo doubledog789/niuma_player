@@ -126,9 +126,14 @@ sprite.jpg#xywh=0,0,128,72
 
 特性：
 - 自动 fetch + 解析；失败静默降级（视频不受影响）
-- Sprite 图按 URL 去重 + LRU（默认 8 张上限）
+- Sprite 图按 URL 去重 + LRU（默认 32 张上限，覆盖长视频典型 sprite 数）
 - VTT URL 同样走 `SourceMiddleware`（HeaderInjection / SignedUrl）
-- 不提供 UI 组件 —— 数据层为 M9 overlay 准备
+- `controller.dispose()` 时清空 controller-local 引用并 `evict` 全局
+  `PaintingBinding.imageCache` 中已解码的位图，避免 sprite 像素长期占住 RAM
+- `NiumaThumbnailView(frame: ...)` 助手 widget：一行渲染缩略图（封装
+  `ImageStream` 同步触发防御 + sprite crop）
+- 不提供完整 hover 组件 —— `NiumaThumbnailView` 是渲染原子，进度条联动 hover
+  / overlay 留给 M9
 
 ## Listening to backend selection
 
