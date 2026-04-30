@@ -25,6 +25,7 @@ migrate_working_dir/
 
 # Internal planning / spec docs (kept local only, not for public repo)
 /doc/plans/
+/.superpowers/
 
 # Flutter/Dart/Pub related
 # Libraries should not include pubspec.lock, per https://dart.dev/guides/libraries/private-files#pubspeclock.
