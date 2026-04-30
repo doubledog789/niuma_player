@@ -1,29 +1,28 @@
 ---
-name: Feature request
-about: Suggest a new capability for niuma_player
+name: 功能请求
+about: 为 niuma_player 提议一个新能力
 title: '[feat] '
 labels: enhancement
 ---
 
-## Problem
+## 问题
 
-<!-- What can't you do today, or what's painful? -->
+<!-- 你今天做不到什么事，或者哪里用得难受？ -->
 
-## Proposed solution
+## 建议方案
 
-<!-- What would the ideal API or behaviour look like? Sketch a Dart snippet
-     if it helps. -->
+<!-- 理想的 API 或行为应该长什么样？方便的话画一段 Dart 代码。 -->
 
 ```dart
-// Example desired API
-controller.preload(uri); // or whatever
+// 期望的 API 示例
+controller.preload(uri); // 或者其他形式
 ```
 
-## Alternatives considered
+## 已尝试的替代方案
 
-<!-- What else did you try? Why didn't it work? -->
+<!-- 你还试过什么？为什么不行？ -->
 
-## Platform scope
+## 平台范围
 
 - [ ] iOS
 - [ ] Android

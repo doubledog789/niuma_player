@@ -1,9 +1,9 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+本项目所有显著变更都会记录在本文件中。
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
+版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
 ## [Unreleased]
 
@@ -78,34 +78,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-04-27
 
-First public release.
+首次公开发布。
 
 ### Added
-- `NiumaPlayerController` — unified Dart-side controller for iOS, Web, and Android.
-- `NiumaPlayerView` — drop-in widget that picks the right rendering primitive
-  for the active backend.
-- `NiumaPlayerValue` snapshot with phase-exclusive state machine
-  (`idle / opening / ready / playing / paused / buffering / ended / error`).
-- Structured error model: `PlayerError` + `PlayerErrorCategory`
-  (`transient / codecUnsupported / network / terminal / unknown`).
-- Backend selection events: `BackendSelected`, `FallbackTriggered`.
-- iOS / Web routing through `package:video_player` (AVPlayer / `<video>`).
-- Android native plugin with two backends:
-  - `ExoPlayerSession` — default hardware-accelerated path
-    (androidx.media3 1.4.1, including HLS).
-  - `IjkSession` — FFmpeg-based rescue path for devices without working
-    hardware decoders.
-- Try-Fail-Remember on Android: native side persistently marks devices
-  that can't run ExoPlayer in `DeviceMemoryStore` (SharedPreferences) and
-  goes straight to IJK on subsequent launches. Dart side does a single
-  retry with `forceIjk: true` on first-attempt failure.
-- `NiumaPlayerController.clearDeviceMemory()` for "reset cache" UI flows.
-- Loop without `phase=ended` flicker — native restarts on completion
-  while staying in `playing`.
-- Dependency-injected `BackendFactory` + `PlatformBridge` for pure-Dart
-  state-machine tests (no platform channels).
-- 14 unit tests covering iOS / Web / Android happy path, retry success,
-  retry failure, wall-clock timeout, plus `DeviceMemory` persistence.
+- `NiumaPlayerController` —— 跨 iOS、Web、Android 的统一 Dart 侧 controller。
+- `NiumaPlayerView` —— 开箱即用的 widget，会根据当前后端选择正确的渲染原语。
+- `NiumaPlayerValue` 快照，自带互斥状态机
+  （`idle / opening / ready / playing / paused / buffering / ended / error`）。
+- 结构化错误模型：`PlayerError` + `PlayerErrorCategory`
+  （`transient / codecUnsupported / network / terminal / unknown`）。
+- 后端选择事件：`BackendSelected`、`FallbackTriggered`。
+- iOS / Web 通过 `package:video_player` 路由（AVPlayer / `<video>`）。
+- Android 原生插件，自带两种后端：
+  - `ExoPlayerSession` —— 默认硬件加速路径
+    （androidx.media3 1.4.1，含 HLS）。
+  - `IjkSession` —— 基于 FFmpeg 的兜底路径，针对硬解码器不可用的设备。
+- Android 上的 Try-Fail-Remember：原生侧把跑不动 ExoPlayer 的设备
+  持久化标记到 `DeviceMemoryStore`（SharedPreferences），后续启动直接走 IJK。
+  Dart 侧首次失败时会以 `forceIjk: true` 重试一次。
+- `NiumaPlayerController.clearDeviceMemory()`，供"重置缓存"类 UI 调用。
+- 循环不出现 `phase=ended` 闪烁 —— 原生侧在播完时直接重启，期间始终保持
+  `playing` 状态。
+- 依赖注入的 `BackendFactory` + `PlatformBridge`，支持纯 Dart 状态机测试
+  （不需要 platform channel）。
+- 14 个单元测试，覆盖 iOS / Web / Android happy path、retry success、
+  retry failure、wall-clock 超时，以及 `DeviceMemory` 持久化。
 
 [Unreleased]: https://github.com/axin789/niuma_player/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/axin789/niuma_player/compare/v0.2.0...v0.3.0
