@@ -190,7 +190,12 @@ void main() {
       builder: (_, __) => const SizedBox(),
       minDisplayDuration: const Duration(seconds: 5),
     );
-    final ctl = AdControllerImpl(cue: cue, onDismiss: () {});
+    final ctl = AdControllerImpl(
+      cue: cue,
+      cueType: AdCueType.preRoll,
+      emitter: FakeAnalyticsEmitter().call,
+      onDismissRequested: () {},
+    );
     ctl.dismiss(); // 0s elapsed
     expect(ctl.dismissed, isFalse, reason: 'release builds silently ignore');
   });
@@ -201,9 +206,14 @@ void main() {
       minDisplayDuration: const Duration(seconds: 5),
     );
     var dismissed = false;
-    final ctl = AdControllerImpl(cue: cue, onDismiss: () {
-      dismissed = true;
-    });
+    final ctl = AdControllerImpl(
+      cue: cue,
+      cueType: AdCueType.preRoll,
+      emitter: FakeAnalyticsEmitter().call,
+      onDismissRequested: () {
+        dismissed = true;
+      },
+    );
     ctl.simulateElapsed(const Duration(seconds: 6));
     ctl.dismiss();
     expect(dismissed, isTrue);
@@ -397,5 +407,114 @@ void main() {
     expect(orch.activeCue.value, isNull);
     expect(orch.activeCueType.value, isNull);
     orch.dispose();
+  });
+
+  // ─────────── M9 Task 2: AdControllerImpl emitter / dismiss 路由 ───────────
+
+  group('AdControllerImpl emitter / dismiss', () {
+    test('reportImpression 重复调用幂等——只 emit 一次 AdImpression', () {
+      final analytics = FakeAnalyticsEmitter();
+      final cue = AdCue(builder: (_, __) => const SizedBox());
+      final ctl = AdControllerImpl(
+        cue: cue,
+        cueType: AdCueType.preRoll,
+        emitter: analytics.call,
+        onDismissRequested: () {},
+      );
+
+      ctl.reportImpression();
+      ctl.reportImpression();
+      ctl.reportImpression();
+
+      final impressions = analytics.events.whereType<AdImpression>().toList();
+      expect(impressions, hasLength(1));
+      expect(impressions.first.cueType, AdCueType.preRoll);
+    });
+
+    test('reportClick 可重复调用——每次都 emit AdClick', () {
+      final analytics = FakeAnalyticsEmitter();
+      final cue = AdCue(builder: (_, __) => const SizedBox());
+      final ctl = AdControllerImpl(
+        cue: cue,
+        cueType: AdCueType.midRoll,
+        emitter: analytics.call,
+        onDismissRequested: () {},
+      );
+
+      ctl.reportClick();
+      ctl.reportClick();
+
+      final clicks = analytics.events.whereType<AdClick>().toList();
+      expect(clicks, hasLength(2));
+      expect(clicks.every((c) => c.cueType == AdCueType.midRoll), isTrue);
+    });
+
+    test('dismiss 在 minDisplayDuration 内静默拒绝——不 emit、不 callback', () {
+      final analytics = FakeAnalyticsEmitter();
+      var dismissCalled = false;
+      final cue = AdCue(
+        builder: (_, __) => const SizedBox(),
+        minDisplayDuration: const Duration(seconds: 5),
+      );
+      final ctl = AdControllerImpl(
+        cue: cue,
+        cueType: AdCueType.preRoll,
+        emitter: analytics.call,
+        onDismissRequested: () => dismissCalled = true,
+      );
+
+      ctl.dismiss(); // 0s elapsed
+
+      expect(analytics.events.whereType<AdDismissed>(), isEmpty);
+      expect(dismissCalled, isFalse);
+    });
+
+    test(
+        'dismiss 超过 minDisplayDuration 后 emit AdDismissed(userSkip) + 调 onDismissRequested',
+        () {
+      final analytics = FakeAnalyticsEmitter();
+      var dismissCalled = false;
+      final cue = AdCue(
+        builder: (_, __) => const SizedBox(),
+        minDisplayDuration: const Duration(seconds: 5),
+      );
+      final ctl = AdControllerImpl(
+        cue: cue,
+        cueType: AdCueType.pauseAd,
+        emitter: analytics.call,
+        onDismissRequested: () => dismissCalled = true,
+      );
+      ctl.simulateElapsed(const Duration(seconds: 6));
+
+      ctl.dismiss();
+
+      final dismissed = analytics.events.whereType<AdDismissed>().toList();
+      expect(dismissed, hasLength(1));
+      expect(dismissed.first.cueType, AdCueType.pauseAd);
+      expect(dismissed.first.reason, AdDismissReason.userSkip);
+      expect(dismissCalled, isTrue);
+    });
+
+    test('dismiss 调用一次后再调被忽略——onDismissRequested 仅触发一次', () {
+      final analytics = FakeAnalyticsEmitter();
+      var dismissCount = 0;
+      final cue = AdCue(
+        builder: (_, __) => const SizedBox(),
+        minDisplayDuration: const Duration(seconds: 5),
+      );
+      final ctl = AdControllerImpl(
+        cue: cue,
+        cueType: AdCueType.preRoll,
+        emitter: analytics.call,
+        onDismissRequested: () => dismissCount++,
+      );
+      ctl.simulateElapsed(const Duration(seconds: 6));
+
+      ctl.dismiss();
+      ctl.dismiss();
+
+      expect(analytics.events.whereType<AdDismissed>(), hasLength(1));
+      expect(dismissCount, 1);
+    });
   });
 }

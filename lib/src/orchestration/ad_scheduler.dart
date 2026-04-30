@@ -181,22 +181,48 @@ class AdSchedulerOrchestrator {
 /// 在允许 dismiss 之前强制满足 [AdCue.minDisplayDuration]：来得过早的
 /// [dismiss] 调用会被静默忽略，避免有 bug 的广告 widget 崩掉播放器。
 /// 暴露 [simulateElapsed] 钩子是为了让单元测试不必等待 wall-clock 时间。
+///
+/// M9 起把 impression / click / dismiss 三类事件路由到调用方提供的
+/// [AnalyticsEmitter]：宿主 overlay（[NiumaAdOverlay] 等）在每次 cue
+/// 激活时构造一个新的 [AdControllerImpl]，把当前 [AdCueType] 与共享
+/// emitter 注入进来；这个 controller 再把广告 widget 调出来的事件
+/// 标注上正确的 cue 类型。
 class AdControllerImpl implements AdController {
   /// 创建一个 [AdControllerImpl]。
   ///
-  /// [cue] 是本 controller 管理的 cue；[onDismiss] 在成功 dismiss 后
-  /// 精确触发一次。
-  AdControllerImpl({required this.cue, required this.onDismiss});
+  /// - [cue]：本 controller 管理的 cue；
+  /// - [cueType]：本 cue 的位置类别，用来标注 emit 出的事件；
+  /// - [emitter]：分析事件的 sink（通常由调用方传入的同一个
+  ///   `AnalyticsEmitter` 复用）；
+  /// - [onDismissRequested]：合法的 [dismiss] 调用之后触发——视图层
+  ///   据此清空 `activeCue` 并恢复底层视频播放。
+  AdControllerImpl({
+    required this.cue,
+    required this.cueType,
+    required this.emitter,
+    required this.onDismissRequested,
+  });
 
   /// 本 controller 管理的 cue。
   final AdCue cue;
 
-  /// 当 [dismiss] 被允许并成功执行时触发一次。
-  final VoidCallback onDismiss;
+  /// 本 cue 的位置类别——emit 出的所有事件都用它标注。
+  final AdCueType cueType;
+
+  /// 分析事件的 sink。
+  ///
+  /// [reportImpression] / [reportClick] 与成功的 [dismiss] 路径都通过
+  /// 这个 emitter 上报事件，调用方可在此把它转发给自家 analytics SDK。
+  final AnalyticsEmitter emitter;
+
+  /// 一次允许的 [dismiss] 之后触发——视图层据此清空 activeCue / 恢复
+  /// 视频播放。仅触发一次，重复 dismiss 调用不会重复触发。
+  final VoidCallback onDismissRequested;
 
   final _elapsedCtrl = StreamController<Duration>.broadcast();
   final _start = DateTime.now();
   Duration? _simulatedElapsed;
+  bool _impressionReported = false;
 
   /// 本 controller 是否已被成功 dismiss。
   ///
@@ -225,19 +251,29 @@ class AdControllerImpl implements AdController {
     if (elapsed < cue.minDisplayDuration) return;
     if (dismissed) return;
     dismissed = true;
-    onDismiss();
+    emitter(AnalyticsEvent.adDismissed(
+      cueType: cueType,
+      reason: AdDismissReason.userSkip,
+    ));
+    onDismissRequested();
     _elapsedCtrl.close();
   }
 
   @override
   void reportImpression() {
-    // TODO(m9): 一旦宿主 overlay 通过 cue.builder 把 AdControllerImpl
-    // 接通，就转发给 AnalyticsEmitter。
+    // 重复调用幂等：广告 widget 在每次 rebuild 都尝试上报 impression
+    // 是常见错误，这里收口确保 analytics 只看到一次。
+    if (_impressionReported) return;
+    _impressionReported = true;
+    emitter(AnalyticsEvent.adImpression(
+      cueType: cueType,
+      durationShown: elapsed,
+    ));
   }
 
   @override
   void reportClick() {
-    // TODO(m9): 一旦宿主 overlay 通过 cue.builder 把 AdControllerImpl
-    // 接通，就转发给 AnalyticsEmitter。
+    // click 不去重：观众可能反复点击 CTA 区域，每次都是有意义的信号。
+    emitter(AnalyticsEvent.adClick(cueType: cueType));
   }
 }
