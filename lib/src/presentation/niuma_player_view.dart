@@ -6,17 +6,17 @@ import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
 import 'niuma_player_controller.dart';
 
-/// Renders the currently active backend for a [NiumaPlayerController].
+/// 渲染 [NiumaPlayerController] 当前激活的 backend。
 ///
-/// Automatically rebuilds when the backend swaps (e.g. fallback to IJK) so
-/// callers can just drop this into their widget tree.
+/// backend 切换（例如回退到 IJK）时自动 rebuild，调用方直接把它丢
+/// 进 widget tree 即可。
 class NiumaPlayerView extends StatelessWidget {
   const NiumaPlayerView(this.controller, {super.key, this.aspectRatio});
 
   final NiumaPlayerController controller;
 
-  /// If null, we fall back to `controller.value.size`. If both are
-  /// unavailable we render a 16:9 box so layout stays stable.
+  /// 为 null 时回落到 `controller.value.size`。两者都不可用时渲染
+  /// 16:9 占位框以保持布局稳定。
   final double? aspectRatio;
 
   @override

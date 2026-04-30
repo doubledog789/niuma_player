@@ -1,16 +1,14 @@
-/// Thin indirection over `dart:io` Platform / `kIsWeb` and the native device
-/// fingerprint lookup. Exists so tests can inject fakes without dragging in
-/// dart:io.
+/// 对 `dart:io` Platform / `kIsWeb` 和 native 设备指纹查询的薄间接层。
+/// 存在的目的是让测试不引入 dart:io 也能注入 fake。
 abstract class PlatformBridge {
-  /// True on iOS. Drives "use video_player → AVPlayer" routing.
+  /// iOS 上为 true。驱动 "走 video_player → AVPlayer" 的路由。
   bool get isIOS;
 
-  /// True when running in a browser. Drives "use video_player → <video>"
-  /// routing (with hls.js dropped in by `video_player_web_hls` for HLS).
+  /// 在浏览器中运行时为 true。驱动 "走 video_player → <video>" 的路由
+  /// （HLS 由 `video_player_web_hls` 注入 hls.js）。
   bool get isWeb;
 
-  /// SHA-1 fingerprint of the current device. Identical hardware/software
-  /// shape returns the same fingerprint, so it can be used as a key in
-  /// `DeviceMemoryStore`.
+  /// 当前设备的 SHA-1 指纹。硬件 / 软件形态完全一致的设备返回相同的
+  /// 指纹，可作为 `DeviceMemoryStore` 的 key。
   Future<String> deviceFingerprint();
 }

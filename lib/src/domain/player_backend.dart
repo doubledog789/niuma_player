@@ -1,43 +1,41 @@
 import 'player_state.dart';
 
-/// Which Dart-side backend is currently powering a [NiumaPlayerController].
+/// 当前驱动 [NiumaPlayerController] 的 Dart 侧 backend 是哪个。
 ///
-/// Note that `native` covers both ExoPlayer and IJK — those are sub-variants
-/// chosen *inside* the Android plugin, not visible at this layer. Use
-/// `NiumaPlayerValue.openingStage` / events log for that detail.
+/// 注意 `native` 覆盖 ExoPlayer 和 IJK——那是 Android 插件*内部*选择的
+/// 子变体，本层看不到。需要这层细节请看
+/// `NiumaPlayerValue.openingStage` / 事件日志。
 enum PlayerBackendKind {
-  /// `package:video_player`. Used on iOS (AVPlayer) and Web (`<video>`).
+  /// `package:video_player`。iOS（AVPlayer）和 Web（`<video>`）使用。
   videoPlayer,
 
-  /// niuma_player's own native plugin. Used on Android. Internally selects
-  /// between ExoPlayer (default fast path) and IJK (software-decode rescue);
-  /// the choice is opaque to the Dart side except via the `selectedVariant`
-  /// field on the backend implementation, surfaced through
-  /// [BackendSelected.fromMemory] events for app-level logging.
+  /// niuma_player 自己的 native 插件。Android 使用。内部在 ExoPlayer
+  /// （默认快路径）和 IJK（软解兜底）之间选择；从 Dart 侧看是不透明的，
+  /// 只能通过 backend 实现上的 `selectedVariant` 字段（经由
+  /// [BackendSelected.fromMemory] 事件抛出供 app 级日志）感知。
   native,
 }
 
-/// Internal contract every backend (video_player / IJK / test doubles) must
-/// implement. [NiumaPlayerController] is written against this abstraction so
-/// that fallback is a matter of disposing one instance and constructing the
-/// other.
+/// 每个 backend（video_player / IJK / 测试替身）都必须实现的内部契约。
+/// [NiumaPlayerController] 针对该抽象编写，因此回退就只是 dispose 一个
+/// 实例、构造另一个。
 abstract class PlayerBackend {
-  /// Identifies which backend this is. Used by the view and by events.
+  /// 标识本 backend 的类型。视图和事件中会用到。
   PlayerBackendKind get kind;
 
-  /// The native texture id, or null if the backend does not expose one (e.g.
-  /// video_player on iOS uses its own widget).
+  /// native texture id；如果 backend 不暴露 texture（例如 iOS 上的
+  /// video_player 用自己的 widget）则为 null。
   int? get textureId;
 
-  /// Current state snapshot. Updated in lockstep with [valueStream].
+  /// 当前状态快照。与 [valueStream] 同步更新。
   NiumaPlayerValue get value;
 
-  /// Stream of value snapshots. Must emit the initial value on subscription
-  /// for convenience (implementations should use broadcast + replay-latest).
+  /// 状态快照流。订阅时为方便起见必须立即发出当前值
+  /// （实现应使用 broadcast + replay-latest）。
   Stream<NiumaPlayerValue> get valueStream;
 
-  /// Backend-level events (currently only errors; controller-level events
-  /// such as `BackendSelected` live on the controller, not here).
+  /// backend 级事件（目前只有错误；像 `BackendSelected` 这种 controller
+  /// 级事件挂在 controller 上，不放这里）。
   Stream<NiumaPlayerEvent> get eventStream;
 
   Future<void> initialize();

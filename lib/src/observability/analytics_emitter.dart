@@ -1,6 +1,6 @@
 // lib/src/observability/analytics_emitter.dart
 import 'analytics_event.dart';
 
-/// User-supplied hook. niuma_player calls this on every internal event;
-/// app forwards to its own analytics SDK (Sensors / GIO / Bugly / ...).
+/// 调用方提供的钩子。niuma_player 在每个内部事件上调用它；
+/// 应用将事件转发给自家的 analytics SDK（Sensors / GIO / Bugly / ...）。
 typedef AnalyticsEmitter = void Function(AnalyticsEvent event);

@@ -1,55 +1,52 @@
 // lib/src/orchestration/ad_schedule.dart
 import 'package:flutter/widgets.dart';
 
-/// Contract between an ad widget and the ad system.
+/// 广告 widget 与广告系统之间的契约。
 ///
-/// Business widgets receive an [AdController] instance through the
-/// [AdCue.builder] callback and use it to control their own dismissal and
-/// to report telemetry events (impressions, clicks).  The concrete
-/// implementation — `AdControllerImpl` (Task 19 plus follow-up wiring task)
-/// — currently the orchestrator only signals `activeCue`; the host overlay
-/// is responsible for instantiating an `AdControllerImpl` and threading it
-/// into [AdCue.builder]. This will be moved into the orchestrator in M9.
+/// 业务 widget 通过 [AdCue.builder] 回调拿到 [AdController] 实例，
+/// 用它控制自身的关闭以及上报埋点事件（impression、click）。具体
+/// 实现是 `AdControllerImpl`（Task 19 + 后续接线任务）——目前
+/// 编排器只负责发出 `activeCue`，宿主 overlay 自行实例化
+/// `AdControllerImpl` 并把它接到 [AdCue.builder] 中。M9 会把这部分
+/// 收回到编排器内。
 abstract class AdController {
-  /// Closes the ad. Calls before [AdCue.minDisplayDuration] are silently
-  /// ignored in release builds and asserted in debug builds.
+  /// 关闭广告。在 [AdCue.minDisplayDuration] 之前的调用，在 release
+  /// 构建中静默忽略，在 debug 构建中 assert。
   void dismiss();
 
-  /// The instantaneous amount of time the ad has been displayed.
+  /// 广告当前已展示的累计时长。
   Duration get elapsed;
 
-  /// A broadcast stream that emits updated [elapsed] values on every tick.
+  /// 每个 tick 都广播一次最新 [elapsed] 值的 broadcast stream。
   ///
-  /// Typical use case: driving a countdown timer in the ad widget so the
-  /// viewer can see how long until they are allowed to dismiss the overlay.
+  /// 典型用途：在广告 widget 中驱动倒计时，让观众看到还有多久才能
+  /// 关闭 overlay。
   Stream<Duration> get elapsedStream;
 
-  /// Fires a fire-and-forget impression event.
+  /// 触发 fire-and-forget 的 impression 事件。
   ///
-  /// The [AdSchedulerOrchestrator] forwards this to [AnalyticsEmitter].
-  /// Callers should invoke this once, as soon as the ad is visible.
+  /// [AdSchedulerOrchestrator] 会将其转发给 [AnalyticsEmitter]。
+  /// 调用方应在广告变可见时调用一次。
   void reportImpression();
 
-  /// Fires a fire-and-forget click event.
+  /// 触发 fire-and-forget 的 click 事件。
   ///
-  /// The [AdSchedulerOrchestrator] forwards this to [AnalyticsEmitter].
-  /// Callers should invoke this when the viewer interacts with the ad's
-  /// call-to-action.
+  /// [AdSchedulerOrchestrator] 会将其转发给 [AnalyticsEmitter]。
+  /// 调用方应在观众与广告 call-to-action 交互时调用。
   void reportClick();
 }
 
-/// One displayable ad payload.
+/// 一个可展示的广告载荷。
 ///
-/// An [AdCue] is payload-agnostic: the actual widget is produced on demand by
-/// [builder], which receives both a [BuildContext] and an [AdController].
-/// Scheduling metadata ([minDisplayDuration], [timeout], [dismissOnTap]) is
-/// declared alongside the builder so the ad system can enforce timing rules
-/// without inspecting the widget tree.
+/// [AdCue] 不绑定具体载荷：实际 widget 由 [builder] 按需生产，回调
+/// 接收 [BuildContext] 和 [AdController]。
+/// 排播元数据（[minDisplayDuration]、[timeout]、[dismissOnTap]）与
+/// builder 并列声明，让广告系统无需检查 widget tree 即可执行时序规则。
 @immutable
 class AdCue {
-  /// Creates an [AdCue].
+  /// 创建一个 [AdCue]。
   ///
-  /// Only [builder] is required; all timing fields have sensible defaults.
+  /// 只有 [builder] 必填；所有时序字段都有合理默认值。
   const AdCue({
     required this.builder,
     this.minDisplayDuration = const Duration(seconds: 5),
@@ -57,111 +54,104 @@ class AdCue {
     this.dismissOnTap = false,
   });
 
-  /// The widget render function for this ad.
+  /// 本广告的 widget 渲染函数。
   ///
-  /// Receives a [BuildContext] and an [AdController].  The controller lets
-  /// the widget dismiss itself and report telemetry events; use it instead of
-  /// navigating or calling system-level pop operations directly.
+  /// 接收 [BuildContext] 和 [AdController]。controller 让 widget 自己
+  /// 关闭并上报埋点；使用它而不是直接 navigate 或调用系统级 pop。
   final Widget Function(BuildContext, AdController) builder;
 
-  /// The minimum amount of time the ad must be shown before it can be
-  /// dismissed.
+  /// 广告必须先展示的最短时长，未到该时长不允许关闭。
   ///
-  /// Calls to [AdController.dismiss] that arrive before this duration has
-  /// elapsed are silently ignored in release builds and trigger an assertion
-  /// failure in debug builds.  Defaults to five seconds.
+  /// 在该时长之前的 [AdController.dismiss] 调用，在 release 构建中
+  /// 静默忽略，在 debug 构建中触发 assertion 失败。默认 5 秒。
   final Duration minDisplayDuration;
 
-  /// Optional maximum display duration after which the ad is auto-dismissed.
+  /// 可选的最长展示时长，超过则自动关闭。
   ///
-  /// When [timeout] is non-null and the ad has been visible for this duration,
-  /// the [AdSchedulerOrchestrator] dismisses it automatically.  A value of
-  /// `null` (the default) means the ad never times out on its own.
+  /// 当 [timeout] 非 null 且广告可见时长达到该值，
+  /// [AdSchedulerOrchestrator] 会自动关闭它。`null`（默认）意味着
+  /// 广告自身永远不会超时。
   final Duration? timeout;
 
-  /// Whether tapping anywhere on the ad overlay dismisses it.
+  /// 点击广告 overlay 任意位置是否会关闭它。
   ///
-  /// When `true`, the host ad overlay (rendered by `NiumaVideoPlayer` in M9)
-  /// wraps the ad in a gesture detector that swallows taps and calls
-  /// [AdController.dismiss]. When `false` (the default), taps pass through to
-  /// whatever the [builder] renders — most ads provide their own close button.
+  /// `true` 时，宿主广告 overlay（M9 由 `NiumaVideoPlayer` 渲染）
+  /// 会用一个吞掉点击事件并调用 [AdController.dismiss] 的 gesture
+  /// detector 包住广告。`false`（默认）时，点击事件透传给 [builder]
+  /// 渲染的内容——大多数广告会自带关闭按钮。
   final bool dismissOnTap;
 }
 
-/// Controls how a mid-roll cue behaves when the viewer seeks or loops.
+/// 控制 mid-roll cue 在 seek 或循环播放时的行为。
 ///
-/// Passed as [MidRollAd.skipPolicy] to configure whether playback seeking
-/// past the cue's [MidRollAd.at] position should suppress the ad.
+/// 作为 [MidRollAd.skipPolicy] 传入，用以配置 seek 跳过 cue 的
+/// [MidRollAd.at] 位置时是否抑制该广告。
 enum MidRollSkipPolicy {
-  /// Once the ad has been shown, it is never shown again — even after a
-  /// rewind or loop.
+  /// 一旦广告被展示过，就再也不会展示——即使是回放或循环。
   fireOnce,
 
-  /// The ad fires every time playback crosses [MidRollAd.at], including
-  /// after rewinds and in looping content.
+  /// 每次播放跨过 [MidRollAd.at] 都触发，包括回放后以及循环内容。
   fireEachPass,
 
-  /// If the viewer seeks past [MidRollAd.at] without crossing it through
-  /// normal playback, the ad is suppressed for that seek.  This is the
-  /// default and matches the behaviour of 抖音 / B 站 / 优酷.
+  /// 如果观众通过 seek 跳过 [MidRollAd.at] 而非正常播放跨过它，则
+  /// 该次 seek 中抑制广告。这是默认值，匹配抖音 / B 站 / 优酷的行为。
   skipIfSeekedPast,
 }
 
-/// Controls how often the pause-ad is shown when the viewer manually pauses.
+/// 控制观众手动暂停时 pause 广告的展示频率。
 ///
-/// Assigned to [NiumaAdSchedule.pauseAdShowPolicy].
+/// 赋给 [NiumaAdSchedule.pauseAdShowPolicy]。
 enum PauseAdShowPolicy {
-  /// The pause ad is shown on every manual pause.
+  /// 每次手动暂停都展示 pause 广告。
   always,
 
-  /// The pause ad is shown at most once per playback session (default).
+  /// 每个播放会话最多展示一次 pause 广告（默认）。
   oncePerSession,
 
-  /// The pause ad is shown at most once per [NiumaAdSchedule.pauseAdCooldown]
-  /// window.  The cooldown resets each time the ad is actually displayed.
+  /// 每个 [NiumaAdSchedule.pauseAdCooldown] 窗口内最多展示一次。
+  /// 每次实际展示都会重置 cooldown。
   cooldown,
 }
 
-/// A mid-roll ad cue anchored to a specific timeline position.
+/// 锚定到时间轴特定位置的 mid-roll 广告 cue。
 ///
-/// [MidRollAd] pairs an [AdCue] payload with a playback [at] offset and a
-/// [skipPolicy] that governs whether the ad fires when seeking jumps past it.
-/// Instances are collected in [NiumaAdSchedule.midRolls], which must be sorted
-/// by [at] in ascending order (caller responsibility).
+/// [MidRollAd] 把 [AdCue] 载荷与播放偏移 [at]、决定 seek 跳过时是否
+/// 触发的 [skipPolicy] 绑在一起。实例放在 [NiumaAdSchedule.midRolls]
+/// 中，由调用方负责按 [at] 升序排序。
 @immutable
 class MidRollAd {
-  /// Creates a [MidRollAd].
+  /// 创建一个 [MidRollAd]。
   ///
-  /// [at] and [cue] are required; [skipPolicy] defaults to
-  /// [MidRollSkipPolicy.skipIfSeekedPast].
+  /// [at] 和 [cue] 必填；[skipPolicy] 默认
+  /// [MidRollSkipPolicy.skipIfSeekedPast]。
   const MidRollAd({
     required this.at,
     required this.cue,
     this.skipPolicy = MidRollSkipPolicy.skipIfSeekedPast,
   });
 
-  /// The playback position at which this ad fires.
+  /// 触发本广告的播放位置。
   ///
-  /// The orchestrator compares the current position against [at] on each
-  /// position tick.  Must be a positive, finite duration.
+  /// 编排器在每次 position tick 上比较当前 position 与 [at]。必须是
+  /// 正的有限 duration。
   final Duration at;
 
-  /// The ad payload to display when playback reaches [at].
+  /// 播放到 [at] 时要展示的广告载荷。
   final AdCue cue;
 
-  /// Governs whether a seek past [at] suppresses the ad for that seek.
+  /// 控制 seek 跳过 [at] 时是否抑制该次广告。
   ///
-  /// Defaults to [MidRollSkipPolicy.skipIfSeekedPast].
+  /// 默认 [MidRollSkipPolicy.skipIfSeekedPast]。
   final MidRollSkipPolicy skipPolicy;
 }
 
-/// Declares all ad slots and pause-ad frequency for a single playback session.
+/// 声明单次播放会话的所有广告槽位以及 pause 广告频率。
 ///
-/// [NiumaAdSchedule] is a pure data bag consumed by [AdSchedulerOrchestrator]
-/// (Task 19).  It covers four distinct ad slots — pre-roll, mid-rolls, pause
-/// and post-roll — plus a policy that limits how often the pause ad appears.
+/// [NiumaAdSchedule] 是一个纯数据袋，由 [AdSchedulerOrchestrator]
+/// （Task 19）消费。它涵盖四个不同的广告槽位——pre-roll、mid-rolls、
+/// pause、post-roll——外加一个限制 pause 广告出现频率的策略。
 ///
-/// Example:
+/// 示例：
 /// ```dart
 /// NiumaAdSchedule(
 ///   preRoll: AdCue(builder: (ctx, ctrl) => MyPreRollWidget(ctrl)),
@@ -174,9 +164,9 @@ class MidRollAd {
 /// ```
 @immutable
 class NiumaAdSchedule {
-  /// Creates a [NiumaAdSchedule].
+  /// 创建一个 [NiumaAdSchedule]。
   ///
-  /// All fields are optional; omitting them produces a schedule with no ads.
+  /// 所有字段都是可选的；都不传得到的就是没有任何广告的排期。
   const NiumaAdSchedule({
     this.preRoll,
     this.midRolls = const <MidRollAd>[],
@@ -186,35 +176,33 @@ class NiumaAdSchedule {
     this.pauseAdCooldown = const Duration(minutes: 1),
   });
 
-  /// Ad that fires on the first transition to `phase=ready`, before playback
-  /// begins.  `null` means no pre-roll.
+  /// 在首次进入 `phase=ready` 时（播放开始前）触发的广告。`null`
+  /// 表示无 pre-roll。
   final AdCue? preRoll;
 
-  /// Timeline-anchored mid-roll cues.
+  /// 锚定到时间轴的 mid-roll cue。
   ///
-  /// **Must be sorted by [MidRollAd.at] in ascending order** — this is the
-  /// caller's responsibility.  The orchestrator performs a linear scan and
-  /// relies on sort order for efficiency.  Defaults to an empty list.
+  /// **必须按 [MidRollAd.at] 升序排序**——由调用方负责。
+  /// 编排器做线性扫描，依赖排序保证效率。默认空列表。
   final List<MidRollAd> midRolls;
 
-  /// Ad that fires when the viewer manually pauses playback.
+  /// 观众手动暂停时触发的广告。
   ///
-  /// Display frequency is controlled by [pauseAdShowPolicy].  `null` means
-  /// no pause ad.
+  /// 展示频率由 [pauseAdShowPolicy] 控制。`null` 表示无 pause 广告。
   final AdCue? pauseAd;
 
-  /// Ad that fires when `phase=ended` (playback reaches the end of content).
-  /// `null` means no post-roll.
+  /// `phase=ended` 时（内容播放到尾）触发的广告。`null` 表示无
+  /// post-roll。
   final AdCue? postRoll;
 
-  /// Frequency policy governing how often [pauseAd] is shown.
+  /// 控制 [pauseAd] 展示频率的策略。
   ///
-  /// Defaults to [PauseAdShowPolicy.oncePerSession].
+  /// 默认 [PauseAdShowPolicy.oncePerSession]。
   final PauseAdShowPolicy pauseAdShowPolicy;
 
-  /// Minimum gap between two consecutive pause-ad displays.
+  /// 两次相邻 pause 广告展示之间的最小间隔。
   ///
-  /// Only consulted when [pauseAdShowPolicy] is [PauseAdShowPolicy.cooldown].
-  /// Defaults to one minute.
+  /// 仅在 [pauseAdShowPolicy] 为 [PauseAdShowPolicy.cooldown] 时
+  /// 生效。默认 1 分钟。
   final Duration pauseAdCooldown;
 }

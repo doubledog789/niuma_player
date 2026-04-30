@@ -1,20 +1,20 @@
 import 'package:flutter/foundation.dart';
 import '../domain/data_source.dart';
 
-/// Technical metadata describing the quality of a media stream.
+/// 描述媒体流画质的技术性元数据。
 ///
-/// Used to compare or label variants in a multi-quality playlist.
+/// 用于在多码率播放列表中比较或标注变体。
 @immutable
 class MediaQuality {
   const MediaQuality({this.heightPx, this.bitrate, this.codec});
 
-  /// Vertical resolution of the stream, in pixels (e.g. 720, 1080).
+  /// 流的垂直分辨率，单位像素（例如 720、1080）。
   final int? heightPx;
 
-  /// Target bitrate of the stream, in bits-per-second (e.g. 1500000).
+  /// 流的目标码率，单位 bits-per-second（例如 1500000）。
   final int? bitrate;
 
-  /// Codec identifier string (e.g. 'h264', 'h265', 'av1').
+  /// 编码器标识符字符串（例如 'h264'、'h265'、'av1'）。
   final String? codec;
 
   @override
@@ -29,11 +29,10 @@ class MediaQuality {
   int get hashCode => Object.hash(heightPx, bitrate, codec);
 }
 
-/// One switchable playback line — a quality variant or a backup CDN entry.
+/// 一条可切换的播放线路——画质变体或备用 CDN 入口。
 ///
-/// A collection of [MediaLine]s makes up the menu that
-/// [AutoFailoverOrchestrator] and quality-selector UI operate on.
-/// Callers identify lines by [id]; equality is intentionally not overridden.
+/// 多个 [MediaLine] 共同构成 [AutoFailoverOrchestrator] 与画质选择 UI
+/// 操作的菜单。调用方通过 [id] 标识线路；该类有意不重写 equality。
 @immutable
 class MediaLine {
   const MediaLine({
@@ -44,57 +43,74 @@ class MediaLine {
     this.priority = 0,
   });
 
-  /// Stable unique identifier for this line (e.g. 'cdn-a-720').
+  /// 本线路的稳定唯一标识符（例如 'cdn-a-720'）。
   final String id;
 
-  /// Human-readable label shown in quality-picker UI (e.g. '720P').
+  /// 画质选择 UI 中显示的可读标签（例如 '720P'）。
   final String label;
 
-  /// The [NiumaDataSource] that backs this line.
+  /// 本线路对应的 [NiumaDataSource]。
   final NiumaDataSource source;
 
-  /// Optional quality metadata describing this stream's technical properties.
+  /// 可选的画质元数据，描述本流的技术属性。
   final MediaQuality? quality;
 
-  /// Selection weight; lower value tried first by AutoFailoverOrchestrator
-  /// (priority 0 is the primary line, higher numbers are fallbacks).
+  /// 选择权重；AutoFailoverOrchestrator 会优先尝试值更小的线路
+  /// （priority 0 是主线路，数字越大越靠后作为 fallback）。
   final int priority;
 }
 
-/// A media source descriptor that may carry multiple switchable lines
-/// (CDN mirrors, quality variants, or failover backups).
+/// 可携带多条可切换线路的媒体源描述符（CDN 镜像、画质变体或 failover
+/// 备份）。
 ///
-/// Use [NiumaMediaSource.single] for simple single-URL playback, or
-/// [NiumaMediaSource.lines] when offering quality selection or CDN failover.
-/// The line identified by [defaultLineId] is used on first playback.
+/// 简单单 URL 播放用 [NiumaMediaSource.single]；提供画质选择或 CDN
+/// failover 时用 [NiumaMediaSource.lines]。首次播放使用 [defaultLineId]
+/// 标识的线路。
 @immutable
 class NiumaMediaSource {
   const NiumaMediaSource._({
     required this.lines,
     required this.defaultLineId,
+    this.thumbnailVtt,
   });
 
-  /// Creates a [NiumaMediaSource] backed by a single [NiumaDataSource].
+  /// 用单个 [NiumaDataSource] 创建 [NiumaMediaSource]。
   ///
-  /// The resulting source has one [MediaLine] with id `'default'`.
-  /// Use this when there is only one URL and no quality/CDN switching needed.
-  factory NiumaMediaSource.single(NiumaDataSource source) {
+  /// 结果只有一条 id 为 `'default'` 的 [MediaLine]。
+  /// 在只有一个 URL 且无需画质 / CDN 切换时使用。
+  ///
+  /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
+  /// 若非 `null`，会立即校验：必须是 http:// 或 https:// 且 host 非空。
+  /// 非法 URL（asset://、file://、data:、空 host 等）抛 [ArgumentError]，
+  /// 不会延后到 fetch 时静默吞掉（F5 / R2-I3）。
+  factory NiumaMediaSource.single(
+    NiumaDataSource source, {
+    String? thumbnailVtt,
+  }) {
+    _validateThumbnailVtt(thumbnailVtt);
     return NiumaMediaSource._(
       lines: [
         MediaLine(id: 'default', label: 'default', source: source),
       ],
       defaultLineId: 'default',
+      thumbnailVtt: thumbnailVtt,
     );
   }
 
-  /// Creates a [NiumaMediaSource] from an explicit list of [MediaLine]s.
+  /// 从显式的 [MediaLine] 列表创建 [NiumaMediaSource]。
   ///
-  /// [lines] must be non-empty. [defaultLineId] must match the [MediaLine.id]
-  /// of exactly one entry in [lines]; an [ArgumentError] is thrown otherwise.
-  /// Use this for multi-quality playlists or CDN failover configurations.
+  /// [lines] 必须非空。[defaultLineId] 必须与 [lines] 中**恰好一条**的
+  /// [MediaLine.id] 匹配，否则抛 [ArgumentError]。
+  /// 用于多画质播放列表或 CDN failover 配置。
+  ///
+  /// 可选参数 [thumbnailVtt] 见 [NiumaMediaSource.thumbnailVtt]。
+  /// 若非 `null`，会立即校验：必须是 http:// 或 https:// 且 host 非空。
+  /// 非法 URL（asset://、file://、data:、空 host 等）抛 [ArgumentError]，
+  /// 不会延后到 fetch 时静默吞掉（F5 / R2-I3）。
   factory NiumaMediaSource.lines({
     required List<MediaLine> lines,
     required String defaultLineId,
+    String? thumbnailVtt,
   }) {
     if (lines.isEmpty) {
       throw ArgumentError.value(lines, 'lines', 'must not be empty');
@@ -106,27 +122,79 @@ class NiumaMediaSource {
         'is not the id of any provided line',
       );
     }
-    return NiumaMediaSource._(lines: lines, defaultLineId: defaultLineId);
+    _validateThumbnailVtt(thumbnailVtt);
+    return NiumaMediaSource._(
+      lines: lines,
+      defaultLineId: defaultLineId,
+      thumbnailVtt: thumbnailVtt,
+    );
   }
 
-  /// The ordered list of playback lines available for this source.
+  /// 当 [url] 非 null 且出现以下任一情况时抛 [ArgumentError]：
+  ///   - 解析出的 scheme 不是 `http://` 或 `https://`（例如
+  ///     `asset://`、`file://`、`data:`）；
+  ///   - 解析后 host 为空（例如 `'http:///nohost'`、纯空白字符串）。
   ///
-  /// Each entry is a [MediaLine] identified by its [MediaLine.id].
-  /// Do not confuse with the [NiumaMediaSource.lines] factory constructor.
+  /// 空字符串同样会被拒绝。能通过校验的 URL 保证是语法上可用的 HTTP(S)
+  /// URL——下游调用方无需再次校验，默认 fetcher 也不会拿到它本来就
+  /// fetch 不了的东西。
+  static void _validateThumbnailVtt(String? url) {
+    if (url == null) return;
+    if (url.isEmpty) {
+      throw ArgumentError.value(url, 'thumbnailVtt', 'must not be empty');
+    }
+    final Uri uri;
+    try {
+      uri = Uri.parse(url);
+    } on FormatException catch (e) {
+      throw ArgumentError.value(
+        url,
+        'thumbnailVtt',
+        'not a valid URL (${e.message})',
+      );
+    }
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      throw ArgumentError.value(
+        url,
+        'thumbnailVtt',
+        'must use http:// or https:// scheme (got "${uri.scheme}")',
+      );
+    }
+    if (uri.host.isEmpty) {
+      throw ArgumentError.value(
+        url,
+        'thumbnailVtt',
+        'must have a non-empty host',
+      );
+    }
+  }
+
+  /// 本 source 可用的有序播放线路列表。
+  ///
+  /// 每个元素是一条 [MediaLine]，由其 [MediaLine.id] 标识。
+  /// 不要与 [NiumaMediaSource.lines] 这个工厂构造函数混淆。
   final List<MediaLine> lines;
 
-  /// The [MediaLine.id] of the line that is active by default.
+  /// 默认激活线路对应的 [MediaLine.id]。
   ///
-  /// Guaranteed to match one entry in [lines] by construction.
+  /// 由构造时校验保证一定能在 [lines] 中找到对应条目。
   final String defaultLineId;
 
-  /// Returns the [MediaLine] whose [MediaLine.id] equals [defaultLineId].
+  /// 可选的 WebVTT 缩略图轨道 URL。
   ///
-  /// Safe to call without null-check: the factories enforce that
-  /// [defaultLineId] always refers to an existing line.
+  /// 为 `null` 时表示不启用缩略图功能。Controller 启动后若不为 `null`，
+  /// 会异步走 `SourceMiddleware` 流水线 + fetch + 解析；解析失败静默降级。
+  ///
+  /// 不区分清晰度——thumbnail 是内容属性，所有 [lines] 共享一份。
+  final String? thumbnailVtt;
+
+  /// 返回 [MediaLine.id] 等于 [defaultLineId] 的那条 [MediaLine]。
+  ///
+  /// 调用时无需做 null 检查：工厂函数保证 [defaultLineId] 一定指向某条
+  /// 现存的线路。
   MediaLine get currentLine => lines.firstWhere((l) => l.id == defaultLineId);
 
-  /// Returns the [MediaLine] with the given [id], or `null` if not found.
+  /// 返回 id 等于 [id] 的 [MediaLine]；找不到返回 `null`。
   MediaLine? lineById(String id) {
     for (final line in lines) {
       if (line.id == id) return line;
@@ -135,16 +203,14 @@ class NiumaMediaSource {
   }
 }
 
-/// Controls whether the next priority line is tried automatically when a
-/// source fails to initialise.
+/// 控制 source 初始化失败时是否自动尝试下一条优先级线路。
 ///
-/// Used by [AutoFailoverOrchestrator] (a standalone helper in M7) to advance
-/// through priority-ordered [MediaLine]s after init failure. The controller
-/// itself does NOT consume this policy in M7 — wiring is deferred to a
-/// follow-up milestone.
+/// 由 [AutoFailoverOrchestrator]（M7 中的独立 helper）用于在 init 失败
+/// 后按优先级顺序推进 [MediaLine]。M7 中 controller 自身**不**消费本
+/// policy——接线推迟到后续 milestone。
 ///
-/// Use [MultiSourcePolicy.manual] when you want errors to propagate directly
-/// to the UI without any automatic retry.
+/// 当希望错误直接抛到 UI、不做任何自动重试时使用
+/// [MultiSourcePolicy.manual]。
 @immutable
 class MultiSourcePolicy {
   const MultiSourcePolicy._({
@@ -152,27 +218,26 @@ class MultiSourcePolicy {
     required this.maxAttempts,
   });
 
-  /// The default policy: automatically try the next line on failure.
+  /// 默认策略：失败后自动尝试下一条线路。
   ///
-  /// [maxAttempts] is the number of additional lines to attempt after the
-  /// first failure (defaults to `1`, meaning one extra line is tried before
-  /// giving up).
+  /// [maxAttempts] 表示在首次失败之后额外尝试的线路条数（默认 `1`，
+  /// 即在放弃前再尝试一条）。
   const factory MultiSourcePolicy.autoFailover({int maxAttempts}) =
       _AutoFailover;
 
-  /// Disables automatic failover; init errors propagate directly to the UI.
+  /// 关闭自动 failover；init 错误直接抛到 UI。
   const factory MultiSourcePolicy.manual() = _Manual;
 
-  /// Whether automatic failover is active.
+  /// 是否启用自动 failover。
   ///
-  /// `true` for [MultiSourcePolicy.autoFailover], `false` for
-  /// [MultiSourcePolicy.manual].
+  /// [MultiSourcePolicy.autoFailover] 时为 `true`，
+  /// [MultiSourcePolicy.manual] 时为 `false`。
   final bool enabled;
 
-  /// Maximum number of additional lines to attempt after the first failure.
+  /// 首次失败后额外尝试的最大线路条数。
   ///
-  /// Only meaningful when [enabled] is `true`; always `0` for
-  /// [MultiSourcePolicy.manual].
+  /// 仅在 [enabled] 为 `true` 时有意义；对
+  /// [MultiSourcePolicy.manual] 永远为 `0`。
   final int maxAttempts;
 }
 

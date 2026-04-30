@@ -4,39 +4,39 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/flutter-%E2%89%A53.10-blue)](https://flutter.dev)
 
-Production-grade Flutter video player with a unified `controller.value` API across iOS, Android, and Web — and an automatic ExoPlayer → IJK fallback path on Android so older / Huawei devices that can't hardware-decode still play.
+生产级 Flutter 视频播放器，提供跨 iOS / Android / Web 三端统一的 `controller.value` API，并在 Android 上内置 ExoPlayer → IJK 自动回退路径，让那些无法硬解的旧机型 / 华为机型也能正常播放。
 
-## Why
+## 为什么造这个轮子
 
-`package:video_player` is the obvious starting point, but on Android it has two well-known failure modes that bite enterprise apps:
+`package:video_player` 是显而易见的起点，但在 Android 上有两个广为人知的问题会卡到企业级应用：
 
-1. **Hardware decoder gaps on older / Huawei devices** — black screen, no error, no playback.
-2. **HLS in restrictive networks** — ExoPlayer's HLS impl can stall on certain CDNs, and the only practical rescue is an FFmpeg-based player like IJK.
+1. **旧机型 / 华为机型硬解码器缺位** —— 黑屏，无报错，无法播放。
+2. **受限网络下的 HLS** —— ExoPlayer 的 HLS 实现在某些 CDN 上会卡住，唯一切实可行的兜底方案是基于 FFmpeg 的播放器，比如 IJK。
 
-`niuma_player` fixes both transparently. On Android the native plugin tries ExoPlayer first; if it fails before the first frame, it switches to IJK, **remembers** the device fingerprint in persistent storage (`SharedPreferences`), and goes straight to IJK on every subsequent launch — no more "the app worked yesterday" mystery.
+`niuma_player` 透明地解决了这两个问题。Android 上原生插件优先尝试 ExoPlayer；如果在第一帧之前失败，就切换到 IJK，并把设备指纹**记录**到持久化存储（`SharedPreferences`），后续每次启动都直接走 IJK —— 再也没有"昨天还能用今天就坏了"的玄学。
 
-iOS uses AVFoundation through `package:video_player`. Web uses the browser's `<video>` element through `package:video_player`. **Same Dart API on all three.**
+iOS 通过 `package:video_player` 走 AVFoundation。Web 通过 `package:video_player` 走浏览器的 `<video>` 元素。**三端共用同一套 Dart API。**
 
-## Features
+## 特性
 
-- **One controller, three platforms** — `NiumaPlayerController` exposes the same `value`, events, and command surface everywhere.
-- **Phase-exclusive state machine** — `playing`, `paused`, `buffering`, `ended`, `error` are mutually exclusive; no more reconciling `isBuffering && !isPlaying && !isCompleted` flicker.
-- **Structured errors** — `PlayerErrorCategory` (`transient` / `codecUnsupported` / `network` / `terminal` / `unknown`) instead of regex-matching error strings.
-- **Try-Fail-Remember on Android** — automatic ExoPlayer → IJK fallback, persistent per-device, with a public `clearDeviceMemory()` for "reset cache" UI flows.
-- **Loop without flicker** — native side restarts on completion without exposing `phase=ended`, so `setLooping(true)` videos stay visually continuous.
-- **Drop-in widget** — `NiumaPlayerView(controller)` picks the right rendering primitive (`VideoPlayer` / `Texture`) for the active backend.
-- **Fully testable** — dependency-injected `BackendFactory` + `PlatformBridge` let the state machine run in pure Dart unit tests, no platform channels needed.
+- **一个 controller，三端通吃** —— `NiumaPlayerController` 在所有平台暴露相同的 `value`、事件和命令接口。
+- **互斥的状态机** —— `playing`、`paused`、`buffering`、`ended`、`error` 互斥，不再需要靠 `isBuffering && !isPlaying && !isCompleted` 拼凑判断导致 UI 闪烁。
+- **结构化错误** —— `PlayerErrorCategory`（`transient` / `codecUnsupported` / `network` / `terminal` / `unknown`），不需要正则匹配错误字符串。
+- **Android 上 Try-Fail-Remember** —— 自动 ExoPlayer → IJK 回退，按设备持久化记忆，公开 `clearDeviceMemory()` 供"重置缓存"类 UI 调用。
+- **循环不闪烁** —— 原生侧在播完时直接重启，不暴露 `phase=ended`，开了 `setLooping(true)` 的视频视觉上完全连续。
+- **开箱即用的 widget** —— `NiumaPlayerView(controller)` 会根据当前后端自动选择正确的渲染原语（`VideoPlayer` / `Texture`）。
+- **完全可测试** —— 依赖注入的 `BackendFactory` + `PlatformBridge` 让状态机可以在纯 Dart 单元测试里跑，不需要 platform channel。
 
-## Platform support
+## 平台支持
 
-| Platform | Backend | HLS support |
+| 平台 | 后端 | HLS 支持 |
 |---|---|---|
-| iOS | AVPlayer (via `video_player`) | Native (AVFoundation) |
-| Android | ExoPlayer ↔ IJK (own native plugin) | Native (HLS via media3-exoplayer-hls; IJK via FFmpeg) |
-| Web (Safari) | `<video>` (via `video_player`) | Native |
-| Web (Chrome / Firefox / Edge) | `<video>` (via `video_player`) | **Not built-in** — add `video_player_web_hls` if needed |
+| iOS | AVPlayer（通过 `video_player`） | 原生（AVFoundation） |
+| Android | ExoPlayer ↔ IJK（自家原生插件） | 原生（HLS 走 media3-exoplayer-hls；IJK 走 FFmpeg） |
+| Web (Safari) | `<video>`（通过 `video_player`） | 原生 |
+| Web (Chrome / Firefox / Edge) | `<video>`（通过 `video_player`） | **不内置** —— 如有需要请额外引入 `video_player_web_hls` |
 
-## Install
+## 安装
 
 ```yaml
 dependencies:
@@ -46,9 +46,9 @@ dependencies:
       ref: main
 ```
 
-> When published on pub.dev, replace with `niuma_player: ^0.1.0`.
+> 发布到 pub.dev 后，替换为 `niuma_player: ^0.1.0`。
 
-## 5-line quick start
+## 5 行快速上手
 
 ```dart
 final controller = NiumaPlayerController.dataSource(
@@ -56,16 +56,15 @@ final controller = NiumaPlayerController.dataSource(
 );
 await controller.initialize();
 controller.play();
-// In your widget tree:
+// 在你的 widget 树里：
 NiumaPlayerView(controller);
 ```
 
-That's the whole API for the happy path. The Try-Fail-Remember mechanism, error categorization, and backend selection events are all opt-in extras you don't need to touch.
+happy path 的全部 API 就这些。Try-Fail-Remember 机制、错误分类、后端选择事件都是可选的额外能力，你不需要主动碰它们。
 
-## M7 features (multi-line, middleware, retry)
+## M7 特性（多线路、中间件、重试）
 
-Wrap multiple CDN mirrors or quality variants into one controller via
-`NiumaMediaSource.lines(...)` and switch between them with `switchLine`:
+通过 `NiumaMediaSource.lines(...)` 把多个 CDN 镜像或不同清晰度的源装进一个 controller，再用 `switchLine` 在它们之间切换：
 
 ```dart
 final controller = NiumaPlayerController(
@@ -85,16 +84,54 @@ final controller = NiumaPlayerController(
   retryPolicy: const RetryPolicy.smart(),
 );
 await controller.initialize();
-// later — switch CDNs while preserving position + play state:
+// 切换 CDN，位置和播放状态保留：
 await controller.switchLine('cdn-b');
 ```
 
-`SourceMiddleware` runs before every backend bring-up — initial init,
-`switchLine`, and every retry attempt — so signed URLs stay fresh.
-See [`example/lib/multi_line_page.dart`](example/lib/multi_line_page.dart)
-for an end-to-end demo.
+`SourceMiddleware` 在每次 backend 启动前都会跑——首次 initialize、`switchLine`、每次 retry——签名 URL 永远是新的。完整 demo 见 [`example/lib/multi_line_page.dart`](example/lib/multi_line_page.dart)。
 
-## Listening to backend selection
+## M8 特性（缩略图 VTT）
+
+支持 WebVTT thumbnail track，让你给进度条悬浮预览图层取数。
+
+```dart
+final controller = NiumaPlayerController(
+  NiumaMediaSource.single(
+    NiumaDataSource.network('https://cdn.com/video.mp4'),
+    thumbnailVtt: 'https://cdn.com/thumbnails.vtt',
+  ),
+);
+await controller.initialize();
+
+// 在进度条 hover 时调用
+final frame = controller.thumbnailFor(const Duration(seconds: 30));
+if (frame != null) {
+  // frame.image 是 ImageProvider，frame.region 是 sprite 内裁剪 rect
+  // 用 RawImage / Image + custom paint 渲染即可
+}
+```
+
+支持的 VTT 格式（thumbnail 变种）：
+
+```
+WEBVTT
+
+00:00.000 --> 00:05.000
+sprite.jpg#xywh=0,0,128,72
+```
+
+特性：
+- 自动 fetch + 解析；失败静默降级（视频不受影响）
+- Sprite 图按 URL 去重 + LRU（默认 32 张上限，覆盖长视频典型 sprite 数）
+- VTT URL 同样走 `SourceMiddleware`（HeaderInjection / SignedUrl）
+- `controller.dispose()` 时清空 controller-local 引用并 `evict` 全局
+  `PaintingBinding.imageCache` 中已解码的位图，避免 sprite 像素长期占住 RAM
+- `NiumaThumbnailView(frame: ...)` 助手 widget：一行渲染缩略图（封装
+  `ImageStream` 同步触发防御 + sprite crop）
+- 不提供完整 hover 组件 —— `NiumaThumbnailView` 是渲染原子，进度条联动 hover
+  / overlay 留给 M9
+
+## 监听后端选择
 
 ```dart
 controller.events.listen((event) {
@@ -107,7 +144,7 @@ controller.events.listen((event) {
 });
 ```
 
-## Driving UI from the value
+## 用 value 驱动 UI
 
 ```dart
 ValueListenableBuilder<NiumaPlayerValue>(
@@ -120,16 +157,16 @@ ValueListenableBuilder<NiumaPlayerValue>(
 );
 ```
 
-Use `value.effectivelyPlaying` for the play / pause icon — it stays `true` during `buffering`, so the icon doesn't flicker mid-playback.
+播放 / 暂停图标用 `value.effectivelyPlaying` —— 它在 `buffering` 期间仍为 `true`，所以图标不会在播放中途闪烁。
 
-## Reading / clearing device memory
+## 读取 / 清除设备记忆
 
 ```dart
-// Wipe the "this device needs IJK" memory. Call from "reset cache" flows.
+// 清除"该设备需要走 IJK"的记忆。在"重置缓存"流程里调用。
 await NiumaPlayerController.clearDeviceMemory();
 ```
 
-## Architecture
+## 架构
 
 ```
 NiumaPlayerController  (Dart, single public façade)
@@ -145,52 +182,53 @@ NiumaPlayerController  (Dart, single public façade)
                           retries with `forceIjk: true` on first failure.
 ```
 
-See [`doc/plans/2026-04-24-niuma-player-design.md`](doc/plans/2026-04-24-niuma-player-design.md) for the full design.
+完整设计参见 [`doc/plans/2026-04-24-niuma-player-design.md`](doc/plans/2026-04-24-niuma-player-design.md)。
 
-## Example app
+## 示例 app
 
-The `example/` directory has an end-to-end demo with seven scenarios — happy path, force-IJK, looping, error path, etc. Run it with:
+`example/` 目录提供了端到端的演示，覆盖七种场景 —— happy path、强制 IJK、循环、错误路径等。运行方式：
 
 ```bash
 cd example
 flutter run -d <device>
 ```
 
-## Testing
+## 测试
 
 ```bash
 flutter test
 ```
 
-The Dart-side state machine has 100% branch coverage in `test/state_machine_test.dart` (iOS / Web / Android happy path / Android retry-success / Android retry-fails / wall-clock timeout). The Kotlin side is verified through the example app's diagnostics page.
+Dart 侧状态机在 `test/state_machine_test.dart` 中达到 100% 分支覆盖（iOS / Web / Android happy path / Android retry-success / Android retry-fails / wall-clock 超时）。Kotlin 侧通过示例 app 的诊断页验证。
 
 ## FAQ
 
-**Q: Will I get the IJK fallback for free on iOS?**
-No — iOS uses AVPlayer exclusively. AVPlayer handles every codec iOS can decode, and we have no need to ship FFmpeg there. The fallback story is Android-only.
+**Q: iOS 上能免费拿到 IJK 回退吗？**
+不行 —— iOS 完全使用 AVPlayer。AVPlayer 能处理 iOS 能解的所有编码，没必要在那里塞一份 FFmpeg。回退方案仅限 Android。
 
-**Q: Why doesn't HLS play in Chrome / Firefox?**
-Those browsers don't natively support HLS. Safari does. If you need broad-browser HLS, add [`video_player_web_hls`](https://pub.dev/packages/video_player_web_hls) — it'll auto-register and handle m3u8 sources via hls.js. We don't bundle it by default because hls.js adds ~250KB to the web bundle.
+**Q: 为什么 HLS 在 Chrome / Firefox 里播不了？**
+这些浏览器原生不支持 HLS，只有 Safari 支持。如果你需要广泛覆盖浏览器的 HLS，请引入 [`video_player_web_hls`](https://pub.dev/packages/video_player_web_hls) —— 它会自动注册并通过 hls.js 处理 m3u8。我们没有默认打包它，因为 hls.js 会让 web bundle 增大约 250KB。
 
-**Q: Can I force IJK on a specific device for testing?**
-Yes — pass `NiumaPlayerOptions(forceIjkOnAndroid: true)` to the controller.
+**Q: 测试时能不能在指定设备上强制走 IJK？**
+可以 —— 给 controller 传 `NiumaPlayerOptions(forceIjkOnAndroid: true)` 即可。
 
-**Q: Does the device memory persist across app reinstalls?**
-No, it's in `SharedPreferences`, which is wiped on uninstall. This is intentional — a fresh install should re-probe.
+**Q: 设备记忆能跨 app 重装保留吗？**
+不能，它存在 `SharedPreferences`，卸载会被清掉。这是有意为之 —— 全新安装应该重新探测。
 
-## Roadmap
+## 路线图
 
-- **M4** — Optional disk cache layer (replays hit cache; Android via `SimpleCache`, iOS via AVAssetResourceLoader)
-- **M5** — Preload pool for short-video reels (N parallel pre-warmed controllers + LRU)
-- **M7** ✅ — Orchestration layer (multi-line + `switchLine`, source middleware, resume position, retry policy, ad scheduler, analytics)
-- **M8** — Tracks: WebVTT subtitle tracks (multi-language) + thumbnail-VTT scrub preview (sprite-based)
-- **M9** — UI / overlay layer: fullscreen, picture-in-picture, custom controls, ad overlay
-- Built-in `video_player_web_hls` opt-in flag
+- **M4** —— 可选磁盘缓存层（重放命中缓存；Android 走 `SimpleCache`，iOS 走 AVAssetResourceLoader）
+- **M5** —— 短视频 reels 用的预加载池（N 个并行预热的 controller + LRU）
+- **M7** ✅ —— 编排层（multi-line + `switchLine`、source middleware、续播位置、retry policy、广告调度、analytics）
+- **M8** ✅ —— 缩略图 VTT scrub preview（sprite 解析 + ImageProvider 暴露）
+- **M9** —— UI overlay：fullscreen / picture-in-picture / 自定义控件 / 广告 overlay / 缩略图 hover 组件
+- **Backlog** —— 字幕 track 选择（WebVTT 多语言字幕 + sidecar / HLS 内嵌都支持）
+- 内置 `video_player_web_hls` opt-in 开关
 
-## Contributing
+## 贡献
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome — please run `flutter analyze && flutter test` before submitting.
+参见 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎 PR —— 提交前请先跑 `flutter analyze && flutter test`。
 
-## License
+## 许可证
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0。参见 [LICENSE](LICENSE)。

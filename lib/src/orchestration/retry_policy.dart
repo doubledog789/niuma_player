@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 
 import '../domain/player_state.dart';
 
-/// Controls whether and when to retry player initialisation failures.
+/// 控制播放器初始化失败时是否重试以及何时重试。
 ///
-/// Three ready-made policies are available via named constructors:
-/// [RetryPolicy.smart], [RetryPolicy.exponential], and [RetryPolicy.none].
-/// All instances are immutable and const-constructible.
+/// 通过命名构造提供三种现成策略：[RetryPolicy.smart]、
+/// [RetryPolicy.exponential]、[RetryPolicy.none]。
+/// 所有实例都不可变且支持 const 构造。
 @immutable
 class RetryPolicy {
   const RetryPolicy._({
@@ -18,54 +18,53 @@ class RetryPolicy {
     required this.retryCategories,
   });
 
-  /// The default policy for most apps.
+  /// 大多数 app 的默认策略。
   ///
-  /// Retries [PlayerErrorCategory.network] and [PlayerErrorCategory.transient]
-  /// errors up to [maxAttempts] times (default 3), using an exponential
-  /// back-off starting at 1 s and capped at 10 s.
+  /// 对 [PlayerErrorCategory.network] 与 [PlayerErrorCategory.transient]
+  /// 错误最多重试 [maxAttempts] 次（默认 3），使用从 1 秒开始、上限
+  /// 10 秒的指数退避。
   const factory RetryPolicy.smart({int maxAttempts}) = _SmartRetry;
 
-  /// Like [RetryPolicy.smart] but allows the caller to tune [base], [max], and
-  /// [maxAttempts].
+  /// 与 [RetryPolicy.smart] 类似，但允许调用方自定义 [base]、[max] 和
+  /// [maxAttempts]。
   ///
-  /// Retries network and transient errors only.
+  /// 仅重试 network 与 transient 错误。
   const factory RetryPolicy.exponential({
     Duration base,
     Duration max,
     int maxAttempts,
   }) = _ExponentialRetry;
 
-  /// Disables retry entirely — [shouldRetry] always returns `false`.
+  /// 完全禁用重试——[shouldRetry] 永远返回 `false`。
   const factory RetryPolicy.none() = _NoRetry;
 
-  /// Maximum number of retry attempts before giving up.
+  /// 放弃前的最大重试次数。
   ///
-  /// [shouldRetry] returns `false` when `attempt > maxAttempts`.
+  /// 当 `attempt > maxAttempts` 时 [shouldRetry] 返回 `false`。
   final int maxAttempts;
 
-  /// Delay for the first retry; subsequent delays double from this value.
+  /// 第一次重试的延迟；后续延迟在此基础上翻倍。
   final Duration base;
 
-  /// Upper bound on the exponential growth computed by [delayFor].
+  /// [delayFor] 指数增长的上限。
   final Duration max;
 
-  /// The set of [PlayerErrorCategory] values that are eligible for retry.
+  /// 允许重试的 [PlayerErrorCategory] 集合。
   ///
-  /// Categories absent from this set cause [shouldRetry] to return `false`
-  /// regardless of the attempt count.
+  /// 不在该集合中的 category 会让 [shouldRetry] 返回 `false`，
+  /// 无论 attempt 多少。
   final Set<PlayerErrorCategory> retryCategories;
 
-  /// Returns `true` when [category] is retryable and [attempt] has not
-  /// exceeded [maxAttempts].
+  /// 当 [category] 可重试且 [attempt] 未超过 [maxAttempts] 时返回
+  /// `true`。
   bool shouldRetry(PlayerErrorCategory category, {required int attempt}) {
     if (attempt > maxAttempts) return false;
     return retryCategories.contains(category);
   }
 
-  /// Computes the back-off delay for the given [attempt] number (1-based).
+  /// 计算给定 [attempt]（从 1 开始）的退避延迟。
   ///
-  /// The delay doubles with each attempt (`base * 2^(attempt-1)`) and is
-  /// capped at [max].
+  /// 每次 attempt 翻倍（`base * 2^(attempt-1)`），上限 [max]。
   Duration delayFor(int attempt) {
     final exp = base * pow(2, attempt - 1).toInt();
     return exp > max ? max : exp;

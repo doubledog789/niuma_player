@@ -7,16 +7,15 @@ import '../observability/analytics_emitter.dart';
 import '../observability/analytics_event.dart';
 import 'ad_schedule.dart';
 
-/// Orchestrates ad-cue firing based on changes to a [ValueListenable<NiumaPlayerValue>].
+/// 基于 [ValueListenable<NiumaPlayerValue>] 的状态变化编排广告 cue 的触发。
 ///
-/// Currently handles **only** the preRoll slot: fires [AdCue] exactly once on
-/// the first `phase == ready` transition. midRoll, pauseAd, and postRoll
-/// handling are added in subsequent tasks (17, 18, 19).
+/// 目前**仅**处理 preRoll 槽位：在首次进入 `phase == ready` 时触发一次
+/// [AdCue]。midRoll、pauseAd、postRoll 的处理由后续任务（17、18、19）补齐。
 class AdSchedulerOrchestrator {
-  /// Creates an [AdSchedulerOrchestrator].
+  /// 创建一个 [AdSchedulerOrchestrator]。
   ///
-  /// [schedule], [playerValue], [onPlay], and [onPause] are required.
-  /// [analytics] is optional — pass a [FakeAnalyticsEmitter] in tests.
+  /// [schedule]、[playerValue]、[onPlay]、[onPause] 必填。
+  /// [analytics] 可选——测试中传入 [FakeAnalyticsEmitter]。
   AdSchedulerOrchestrator({
     required this.schedule,
     required this.playerValue,
@@ -25,51 +24,49 @@ class AdSchedulerOrchestrator {
     AnalyticsEmitter? analytics,
   }) : _analytics = analytics;
 
-  /// The ad schedule this orchestrator watches for cues to fire.
+  /// 编排器所观察的、用于触发 cue 的广告排期。
   final NiumaAdSchedule schedule;
 
-  /// The value source the orchestrator listens to for player state changes.
+  /// 编排器监听播放器状态变化的 value source。
   final ValueListenable<NiumaPlayerValue> playerValue;
 
-  /// Callback invoked to resume the underlying player after an ad finishes.
+  /// 广告结束后用于恢复底层播放器播放的回调。
   final void Function() onPlay;
 
-  /// Callback invoked to pause the underlying player before showing an ad.
+  /// 展示广告前用于暂停底层播放器的回调。
   final void Function() onPause;
 
   final AnalyticsEmitter? _analytics;
 
-  /// Observable notifier for the currently active ad cue.
+  /// 当前激活的广告 cue 的可观察通知器。
   ///
-  /// The widget layer subscribes to this notifier to render or dismiss the
-  /// ad overlay. `null` means no ad is currently scheduled.
+  /// 视图层订阅本通知器来渲染或关闭广告 overlay。`null` 表示当前
+  /// 没有广告排播。
   final ValueNotifier<AdCue?> activeCue = ValueNotifier(null);
 
   PlayerPhase? _lastPhase;
   bool _preRollFired = false;
   Duration _lastPos = Duration.zero;
 
-  /// Whether the orchestrator has observed at least one position tick.
+  /// 编排器是否已经观测到至少一个 position tick。
   ///
-  /// Eliminates the cold-start false-positive: on the very first tick we
-  /// have no baseline, so the jump from `Duration.zero` to e.g. `t=10s`
-  /// (a mid-stream resume) is misread as a seek by the
-  /// `delta > 2s || delta < 0` heuristic. We skip the seek-detection
-  /// branch on the first tick and just record `_lastPos`.
+  /// 用于消除冷启动的误判：第一次 tick 时还没有基线，因此从
+  /// `Duration.zero` 跳到例如 `t=10s`（中途断点续播）会被
+  /// `delta > 2s || delta < 0` 启发式误识别为 seek。我们在第一次
+  /// tick 上跳过 seek 检测分支，只记录 `_lastPos`。
   bool _haveSeenFirstPos = false;
   final Set<int> _midRollFired = {};
   int _pauseAdShownCount = 0;
   DateTime? _pauseAdLastShownAt;
 
-  /// Starts listening to [playerValue] for phase changes.
+  /// 开始监听 [playerValue] 的 phase 变化。
   ///
-  /// Must be called once after construction. Not idempotent — calling twice
-  /// adds a second listener.
+  /// 必须在构造之后调用一次。非幂等——调用两次会注册两个 listener。
   void attach() {
     playerValue.addListener(_onValue);
   }
 
-  /// Stops listening to [playerValue] and disposes the [activeCue] notifier.
+  /// 停止监听 [playerValue] 并 dispose [activeCue] 通知器。
   void dispose() {
     playerValue.removeListener(_onValue);
     activeCue.dispose();
@@ -86,9 +83,9 @@ class AdSchedulerOrchestrator {
       _fire(schedule.preRoll!, AdCueType.preRoll);
     }
 
-    // midRoll. Skip seek-detection entirely on the first tick — there is
-    // no baseline yet, so e.g. a mid-stream resume at t=10s would be
-    // misread as a seek-past and incorrectly consume any cue at t < 10s.
+    // midRoll。第一次 tick 时完全跳过 seek 检测——还没有基线，否则
+    // 例如 t=10s 的中途续播会被误判为 seek-past，把 t < 10s 的 cue
+    // 错误地标记为已消费。
     final pos = v.position;
     if (_haveSeenFirstPos) {
       final delta = pos - _lastPos;
@@ -109,7 +106,7 @@ class AdSchedulerOrchestrator {
             _fire(mr.cue, AdCueType.midRoll);
           case MidRollSkipPolicy.skipIfSeekedPast:
             if (isLikelySeek) {
-              _midRollFired.add(i); // mark fired to prevent later natural cross
+              _midRollFired.add(i); // 标记为已触发，避免后续自然跨过时再触发
             } else {
               _midRollFired.add(i);
               _fire(mr.cue, AdCueType.midRoll);
@@ -118,7 +115,7 @@ class AdSchedulerOrchestrator {
       }
     }
 
-    // pauseAd: detect manual pause (playing → paused).
+    // pauseAd：检测手动暂停（playing → paused）。
     final justPaused = _lastPhase == PlayerPhase.playing &&
         phase == PlayerPhase.paused;
     if (justPaused && schedule.pauseAd != null && _shouldShowPauseAd()) {
@@ -158,33 +155,32 @@ class AdSchedulerOrchestrator {
   }
 }
 
-/// Concrete implementation of [AdController] owned by [AdSchedulerOrchestrator].
+/// 由 [AdSchedulerOrchestrator] 持有的 [AdController] 具体实现。
 ///
-/// Enforces [AdCue.minDisplayDuration] before allowing dismissal: calls to
-/// [dismiss] that arrive too early are silently ignored so a buggy ad widget
-/// cannot crash playback.  The [simulateElapsed] hook is exposed for tests so
-/// wall-clock timing does not have to be awaited in unit tests.
+/// 在允许 dismiss 之前强制满足 [AdCue.minDisplayDuration]：来得过早的
+/// [dismiss] 调用会被静默忽略，避免有 bug 的广告 widget 崩掉播放器。
+/// 暴露 [simulateElapsed] 钩子是为了让单元测试不必等待 wall-clock 时间。
 class AdControllerImpl implements AdController {
-  /// Creates an [AdControllerImpl].
+  /// 创建一个 [AdControllerImpl]。
   ///
-  /// [cue] is the cue this controller manages; [onDismiss] fires exactly once
-  /// after a successful dismiss.
+  /// [cue] 是本 controller 管理的 cue；[onDismiss] 在成功 dismiss 后
+  /// 精确触发一次。
   AdControllerImpl({required this.cue, required this.onDismiss});
 
-  /// The cue this controller is managing.
+  /// 本 controller 管理的 cue。
   final AdCue cue;
 
-  /// Fires once when [dismiss] is allowed and succeeds.
+  /// 当 [dismiss] 被允许并成功执行时触发一次。
   final VoidCallback onDismiss;
 
   final _elapsedCtrl = StreamController<Duration>.broadcast();
   final _start = DateTime.now();
   Duration? _simulatedElapsed;
 
-  /// Whether this controller has been successfully dismissed.
+  /// 本 controller 是否已被成功 dismiss。
   ///
-  /// Flips to `true` exactly once after a successful [dismiss] call.
-  /// Exposed as a public field for test assertions.
+  /// 在一次成功的 [dismiss] 调用后翻转为 `true`，仅一次。
+  /// 作为 public 字段暴露，便于测试断言。
   bool dismissed = false;
 
   @override
@@ -194,17 +190,17 @@ class AdControllerImpl implements AdController {
   @override
   Stream<Duration> get elapsedStream => _elapsedCtrl.stream;
 
-  /// Overrides the wall-clock elapsed value for test purposes.
+  /// 出于测试目的覆盖 wall-clock 计算的 elapsed 值。
   ///
-  /// Once set (to any value, including [Duration.zero]), [elapsed] returns
-  /// this value instead of computing a real wall-clock difference.
+  /// 一旦设置（任意值，包括 [Duration.zero]），[elapsed] 返回该值，
+  /// 不再计算真实的 wall-clock 差值。
   @visibleForTesting
   void simulateElapsed(Duration d) => _simulatedElapsed = d;
 
   @override
   void dismiss() {
-    // Silently ignore (rather than throw / assert) so a buggy ad widget
-    // doesn't crash playback.
+    // 静默忽略（而不是 throw / assert），避免有 bug 的广告 widget
+    // 把播放器搞崩。
     if (elapsed < cue.minDisplayDuration) return;
     if (dismissed) return;
     dismissed = true;
@@ -214,13 +210,13 @@ class AdControllerImpl implements AdController {
 
   @override
   void reportImpression() {
-    // TODO(m9): forward to AnalyticsEmitter once the host overlay wires
-    // AdControllerImpl through cue.builder.
+    // TODO(m9): 一旦宿主 overlay 通过 cue.builder 把 AdControllerImpl
+    // 接通，就转发给 AnalyticsEmitter。
   }
 
   @override
   void reportClick() {
-    // TODO(m9): forward to AnalyticsEmitter once the host overlay wires
-    // AdControllerImpl through cue.builder.
+    // TODO(m9): 一旦宿主 overlay 通过 cue.builder 把 AdControllerImpl
+    // 接通，就转发给 AnalyticsEmitter。
   }
 }

@@ -4,8 +4,7 @@ import '../domain/player_backend.dart';
 import 'native_backend.dart';
 import 'video_player_backend.dart';
 
-/// Production implementation — constructs real video_player / niuma native
-/// backends.
+/// 生产实现——构造真实的 video_player / niuma native 后端。
 class DefaultBackendFactory implements BackendFactory {
   const DefaultBackendFactory();
 

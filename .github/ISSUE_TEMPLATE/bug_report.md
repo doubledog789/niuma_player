@@ -1,25 +1,25 @@
 ---
-name: Bug report
-about: Something doesn't work as expected
+name: Bug 报告
+about: 出现了不符合预期的行为
 title: '[bug] '
 labels: bug
 ---
 
-## Summary
+## 概述
 
-<!-- One-line description of the problem. -->
+<!-- 用一行话描述问题。 -->
 
-## Environment
+## 环境
 
-- niuma_player version:
-- Flutter version (`flutter --version`):
-- Platform: <!-- iOS / Android / Web -->
-- OS version:
-- Device model: <!-- Android: `adb shell getprop ro.product.model` -->
+- niuma_player 版本：
+- Flutter 版本（`flutter --version`）：
+- 平台：<!-- iOS / Android / Web -->
+- 操作系统版本：
+- 设备型号：<!-- Android: `adb shell getprop ro.product.model` -->
 
-## Reproduction
+## 复现步骤
 
-<!-- Smallest piece of code or steps that triggers the bug. -->
+<!-- 触发该 bug 的最小代码片段或步骤。 -->
 
 ```dart
 final controller = NiumaPlayerController(
@@ -28,15 +28,15 @@ final controller = NiumaPlayerController(
 await controller.initialize();
 ```
 
-## Expected vs. actual
+## 预期行为 vs 实际行为
 
-- **Expected**:
-- **Actual**:
+- **预期**：
+- **实际**：
 
-## Logs
+## 日志
 
-<!-- Paste BackendSelected / FallbackTriggered events from controller.events,
-     and any stack trace. -->
+<!-- 贴出 controller.events 中的 BackendSelected / FallbackTriggered 事件，
+     以及任何堆栈信息。 -->
 
 ```
 [niuma_player] ...

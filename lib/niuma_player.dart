@@ -1,4 +1,4 @@
-// kernel
+// 内核
 export 'src/data/default_backend_factory.dart' show DefaultBackendFactory;
 export 'src/data/default_platform_bridge.dart' show DefaultPlatformBridge;
 export 'src/data/device_memory.dart';
@@ -19,12 +19,16 @@ export 'src/domain/player_state.dart'
         LineSwitching,
         LineSwitched,
         LineSwitchFailed;
-export 'src/presentation/niuma_player_controller.dart';
+export 'src/presentation/niuma_player_controller.dart'
+    show NiumaPlayerController, NiumaPlayerOptions, ThumbnailFetcher;
 export 'src/presentation/niuma_player_view.dart';
+export 'src/presentation/niuma_thumbnail_view.dart' show NiumaThumbnailView;
 
-// orchestration
+// 编排
 export 'src/orchestration/multi_source.dart'
     show MediaQuality, MediaLine, NiumaMediaSource, MultiSourcePolicy;
+export 'src/orchestration/thumbnail_track.dart'
+    show ThumbnailFrame, WebVttCue, ThumbnailLoadState;
 export 'src/orchestration/source_middleware.dart'
     show
         SourceMiddleware,
@@ -52,7 +56,7 @@ export 'src/orchestration/ad_schedule.dart'
 export 'src/orchestration/ad_scheduler.dart' show AdSchedulerOrchestrator;
 export 'src/orchestration/auto_failover.dart' show AutoFailoverOrchestrator;
 
-// observability
+// 可观测性
 export 'src/observability/analytics_event.dart'
     show
         AnalyticsEvent,

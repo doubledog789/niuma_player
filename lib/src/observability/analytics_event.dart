@@ -1,34 +1,34 @@
 import 'package:flutter/foundation.dart';
 
-/// Categorizes the placement of an ad within the content timeline.
+/// 标识广告在内容时间轴上的播放位置。
 enum AdCueType {
-  /// Ad shown before content begins.
+  /// 内容开始前播放的广告。
   preRoll,
 
-  /// Ad shown at a scheduled mid-content position.
+  /// 内容中间预定位置播放的广告。
   midRoll,
 
-  /// Ad triggered when the user pauses playback (not a pause action of an ad).
+  /// 用户暂停播放时触发的广告（不是广告自身的暂停行为）。
   pauseAd,
 
-  /// Ad shown after content ends.
+  /// 内容结束后播放的广告。
   postRoll,
 }
 
-/// Reason an ad was dismissed before its natural end.
+/// 广告被提前关闭的原因。
 enum AdDismissReason {
-  /// User tapped the skip control.
+  /// 用户点击了跳过控件。
   userSkip,
 
-  /// Ad dismissed automatically after its display duration elapsed.
+  /// 展示时长达到上限后自动关闭。
   timeout,
 
-  /// Ad dismissed because the user tapped outside / on the dismiss area.
+  /// 用户点击了广告外部 / 关闭区域而被关闭。
   dismissOnTap,
 }
 
-/// Structured event type emitted by niuma_player internals; consumed by a
-/// user-supplied [AnalyticsEmitter].
+/// niuma_player 内部发出的结构化事件类型；由调用方传入的
+/// [AnalyticsEmitter] 消费。
 @immutable
 sealed class AnalyticsEvent {
   const AnalyticsEvent();
@@ -53,16 +53,15 @@ sealed class AnalyticsEvent {
   }) = AdDismissed;
 }
 
-/// Emitted when the orchestrator activates a cue (at-show, before any
-/// impression has been counted).
+/// 编排器激活某个 cue 时发出（at-show，尚未计 impression）。
 final class AdScheduled extends AnalyticsEvent {
   const AdScheduled({required this.cueType, this.at});
 
-  /// The placement category of the scheduled ad.
+  /// 该次排播广告的位置类别。
   final AdCueType cueType;
 
-  /// Offset from the start of content at which the ad is scheduled; null for
-  /// non-timeline placements such as [AdCueType.pauseAd].
+  /// 广告排播时距内容起点的偏移；对于非时间轴类位置（如
+  /// [AdCueType.pauseAd]）为 null。
   final Duration? at;
 
   @override
@@ -74,14 +73,14 @@ final class AdScheduled extends AnalyticsEvent {
   int get hashCode => Object.hash(cueType, at);
 }
 
-/// Fired when an ad becomes visible and begins its impression window.
+/// 广告变为可见并开启 impression 计时窗口时触发。
 final class AdImpression extends AnalyticsEvent {
   const AdImpression({required this.cueType, required this.durationShown});
 
-  /// The placement category of the ad that was shown.
+  /// 被展示广告的位置类别。
   final AdCueType cueType;
 
-  /// How long the ad was visible before this event was emitted.
+  /// 触发本事件前广告已可见的时长。
   final Duration durationShown;
 
   @override
@@ -95,11 +94,11 @@ final class AdImpression extends AnalyticsEvent {
   int get hashCode => Object.hash(cueType, durationShown);
 }
 
-/// Fired when the user taps the ad's interactive (click-through) area.
+/// 用户点击广告的可交互（click-through）区域时触发。
 final class AdClick extends AnalyticsEvent {
   const AdClick({required this.cueType});
 
-  /// The placement category of the ad that was clicked.
+  /// 被点击广告的位置类别。
   final AdCueType cueType;
 
   @override
@@ -110,14 +109,14 @@ final class AdClick extends AnalyticsEvent {
   int get hashCode => cueType.hashCode;
 }
 
-/// Fired when an ad is dismissed, either by user action or automatically.
+/// 广告被关闭时触发，可能由用户操作或自动关闭引起。
 final class AdDismissed extends AnalyticsEvent {
   const AdDismissed({required this.cueType, required this.reason});
 
-  /// The placement category of the ad that was dismissed.
+  /// 被关闭广告的位置类别。
   final AdCueType cueType;
 
-  /// The reason the ad was dismissed.
+  /// 广告关闭原因。
   final AdDismissReason reason;
 
   @override

@@ -6,44 +6,42 @@ import '../domain/data_source.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
 
-/// Global channel used for texture creation and device fingerprint lookup.
+/// 用于 texture 创建和设备指纹查询的全局 channel。
 const MethodChannel _globalChannel = MethodChannel('cn.niuma/player');
 
-/// [PlayerBackend] backed by niuma_player's own Android plugin.
+/// 由 niuma_player 自家 Android 插件支撑的 [PlayerBackend]。
 ///
-/// The Dart side is intentionally agnostic about which concrete native
-/// player is running underneath — that choice (ExoPlayer for hardware
-/// decode, IJK for software-decode rescue) is made by `NiumaPlayerPlugin`
-/// based on the `forceIjk` flag and the persistent `DeviceMemoryStore`.
+/// Dart 这一侧故意对底层具体跑哪个 native player 不做假设——这个选择
+/// （硬解走 ExoPlayer，软解兜底走 IJK）由 `NiumaPlayerPlugin` 根据
+/// `forceIjk` 标志和持久化的 `DeviceMemoryStore` 决定。
 ///
-/// After [initialize] completes, [selectedVariant] reports which variant
-/// was actually chosen ("exo" or "ijk"), and [fromMemory] reports whether
-/// the choice was driven by past failure memory rather than a fresh try.
+/// [initialize] 完成后，[selectedVariant] 报告实际选中的变体（"exo"
+/// 或 "ijk"），[fromMemory] 报告本次选择是否由过去的失败记忆推动，
+/// 而不是新一次的尝试。
 ///
-/// Wire protocol:
-///   - `cn.niuma/player`                       (global: create / fingerprint)
-///   - `cn.niuma/player/<textureId>`           (per-instance: play/pause/...)
-///   - `cn.niuma/player/events/<textureId>`    (per-instance state stream)
+/// 通讯协议：
+///   - `cn.niuma/player`                       （全局：create / fingerprint）
+///   - `cn.niuma/player/<textureId>`           （每个实例：play/pause/...）
+///   - `cn.niuma/player/events/<textureId>`    （每个实例的状态流）
 class NativeBackend implements PlayerBackend {
   NativeBackend(this._dataSource, {this.forceIjk = false});
 
   final NiumaDataSource _dataSource;
 
-  /// When true, the native side is asked to use IJK directly without
-  /// trying ExoPlayer. The Dart-side controller passes this on its retry
-  /// after an Exo failure.
+  /// 为 true 时，要求 native 侧直接用 IJK，不再尝试 ExoPlayer。
+  /// Dart 侧 controller 在 Exo 失败后的重试中会传 true。
   final bool forceIjk;
 
   int? _textureId;
   String? _fingerprint;
 
-  /// Which variant the native side actually instantiated for this session
-  /// (`"exo"` or `"ijk"`). Populated by [initialize].
+  /// native 侧本次会话实际实例化的变体（`"exo"` 或 `"ijk"`）。
+  /// 由 [initialize] 填充。
   String? _selectedVariant;
   String? get selectedVariant => _selectedVariant;
 
-  /// True when the native side picked IJK because [DeviceMemoryStore] said
-  /// this device has previously needed it. Populated by [initialize].
+  /// 当 native 选 IJK 是因为 [DeviceMemoryStore] 说本设备过去需要它时，
+  /// 此值为 true。由 [initialize] 填充。
   bool _fromMemory = false;
   bool get fromMemory => _fromMemory;
 
@@ -57,26 +55,24 @@ class NativeBackend implements PlayerBackend {
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast();
 
-  /// Resolves once the native side has left `phase=opening` (i.e. either
-  /// reached `ready` / `playing` etc., or transitioned to `error`).
+  /// 当 native 离开 `phase=opening`（即进入 `ready` / `playing` 等，
+  /// 或转到 `error`）时 resolve。
   final Completer<void> _preparedCompleter = Completer<void>();
 
   bool _disposed = false;
 
-  /// How long we'll wait with zero native progress events before calling
-  /// prepare a failure. Progress-based (not absolute wall-clock) so a slow
-  /// device that *is* making progress isn't killed for taking a long total
-  /// time, while a truly stuck native side still fails fast.
+  /// 在没有任何 native 进度事件的情况下等待多久后判定 prepare 失败。
+  /// 基于进度（而非绝对 wall-clock）：慢设备只要*在*进步就不会被误杀，
+  /// 真正卡住的 native 侧仍能快速失败。
   static const Duration _prepareNoProgressTimeout = Duration(seconds: 20);
 
   Timer? _prepareWatchdog;
 
-  /// Most recent native opening stage (`openInput`, `findStreamInfo`, …).
-  /// Used in the timeout error message to pinpoint where prepare gave up.
+  /// 最近一次 native opening 阶段（`openInput`、`findStreamInfo` 等）。
+  /// 用于在 timeout 错误信息里指明 prepare 卡在哪一步。
   String? _lastOpeningStage;
 
-  /// Wall-clock instant when we started waiting for prepare. Used only to
-  /// decorate the timeout error message.
+  /// 开始等待 prepare 的 wall-clock 时刻。仅用于装饰 timeout 错误信息。
   DateTime? _prepareStartedAt;
 
   @override
@@ -85,7 +81,7 @@ class NativeBackend implements PlayerBackend {
   @override
   int? get textureId => _textureId;
 
-  /// The device fingerprint returned by the native side during [initialize].
+  /// [initialize] 期间由 native 侧返回的设备指纹。
   String? get fingerprint => _fingerprint;
 
   @override
@@ -234,7 +230,7 @@ class NativeBackend implements PlayerBackend {
     );
     _updateValue(next);
 
-    // Settle the prepare completer once native leaves the opening phase.
+    // 一旦 native 离开 opening 阶段就 settle prepare completer。
     if (!_preparedCompleter.isCompleted) {
       if (phase == PlayerPhase.error) {
         _preparedCompleter.completeError(
@@ -248,8 +244,8 @@ class NativeBackend implements PlayerBackend {
       }
     }
 
-    // Surface terminal errors so [NiumaPlayerController] can decide whether
-    // to retry / fall back.
+    // 把 terminal 错误冒泡出去，让 [NiumaPlayerController] 决定是否
+    // 重试 / 回退。
     if (phase == PlayerPhase.error && !_eventController.isClosed) {
       _eventController.add(
         FallbackTriggered(
@@ -347,16 +343,16 @@ class NativeBackend implements PlayerBackend {
           <String, dynamic>{'textureId': tid},
         );
       } catch (_) {
-        // Best-effort: swallow native dispose errors so we always free Dart
-        // resources.
+        // 尽力而为：吞掉 native dispose 错误，保证 Dart 资源始终被
+        // 释放。
       }
     }
     await _valueController.close();
     await _eventController.close();
   }
 
-  /// Convenience helper used by [NiumaPlayerController] to fetch the device
-  /// fingerprint before any texture has been created.
+  /// 便捷 helper，供 [NiumaPlayerController] 在创建任何 texture 之前
+  /// 取设备指纹。
   static Future<String?> fetchDeviceFingerprint() async {
     final result = await _globalChannel.invokeMapMethod<String, dynamic>(
       'deviceFingerprint',

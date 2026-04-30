@@ -7,7 +7,7 @@ import '../domain/data_source.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
 
-/// [PlayerBackend] implementation wrapping `package:video_player`.
+/// 包装 `package:video_player` 的 [PlayerBackend] 实现。
 class VideoPlayerBackend implements PlayerBackend {
   VideoPlayerBackend(this._dataSource);
 
@@ -23,8 +23,8 @@ class VideoPlayerBackend implements PlayerBackend {
 
   bool _disposed = false;
 
-  /// The underlying controller, exposed so that [NiumaPlayerView] can hand it
-  /// to `package:video_player`'s `VideoPlayer` widget.
+  /// 底层 controller。对外暴露以便 [NiumaPlayerView] 把它交给
+  /// `package:video_player` 的 `VideoPlayer` widget。
   VideoPlayerController get innerController => _inner;
 
   VideoPlayerController _buildController() {
@@ -63,20 +63,20 @@ class VideoPlayerBackend implements PlayerBackend {
     await _inner.initialize();
   }
 
-  /// Derive [PlayerPhase] from a [VideoPlayerValue].
+  /// 从 [VideoPlayerValue] 推导 [PlayerPhase]。
   ///
-  /// Priority is `error → opening → ended → buffering → playing → paused/ready`.
-  /// `isCompleted` only fires on video_player when looping is OFF, so we can
-  /// trust it as the authoritative end-of-media signal here.
+  /// 优先级：`error → opening → ended → buffering → playing → paused/ready`。
+  /// video_player 仅在 looping 为 OFF 时才会触发 `isCompleted`，所以这里
+  /// 可以把它当作权威的 end-of-media 信号来用。
   PlayerPhase _derivePhase(VideoPlayerValue v) {
     if (v.hasError) return PlayerPhase.error;
     if (!v.isInitialized) return PlayerPhase.opening;
     if (v.isCompleted) return PlayerPhase.ended;
     if (v.isBuffering) return PlayerPhase.buffering;
     if (v.isPlaying) return PlayerPhase.playing;
-    // Initialized, not playing, not buffering, not ended:
-    //   - position == 0  → ready (just opened, never started)
-    //   - position > 0   → paused (was playing)
+    // 已初始化、未播放、未 buffering、未结束：
+    //   - position == 0  → ready（刚打开，从未播过）
+    //   - position > 0   → paused（之前播过）
     if (v.position == Duration.zero) return PlayerPhase.ready;
     return PlayerPhase.paused;
   }
@@ -84,17 +84,16 @@ class VideoPlayerBackend implements PlayerBackend {
   void _onInnerChanged() {
     if (_disposed) return;
     final v = _inner.value;
-    // video_player reports buffered as a list of DurationRange segments; the
-    // UI cares about "how far have we preloaded" which is the tail of the
-    // last segment. Empty list → no buffer info yet.
+    // video_player 把已缓冲段以 DurationRange 列表形式上报；UI 关心的是
+    // "已预加载到哪儿"，也就是最后一段的尾端。空列表 → 还没有 buffer
+    // 信息。
     final buffered =
         v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
     final phase = _derivePhase(v);
-    // video_player only gives us a free-form `errorDescription` — no error
-    // codes, no categorisation. Wrap it as `unknown` so consumers still get
-    // a structured [PlayerError] object; switching to IJK is the only real
-    // recovery path so detail beyond "yes there was an error" doesn't add
-    // value here.
+    // video_player 只给出自由格式的 `errorDescription`——没有错误码，
+    // 没有分类。包成 `unknown` 让消费方仍能拿到结构化的 [PlayerError]
+    // 对象；切到 IJK 是唯一真正的恢复路径，因此除了"是的，出错了"
+    // 之外的细节在这里也没什么价值。
     final PlayerError? playerError = v.hasError
         ? PlayerError(
             category: PlayerErrorCategory.unknown,
@@ -116,8 +115,8 @@ class VideoPlayerBackend implements PlayerBackend {
       }
     }
     if (v.hasError && !_eventController.isClosed) {
-      // video_player surfaces errors through `value.errorDescription`; we
-      // re-emit as a `FallbackTriggered` so the controller can react.
+      // video_player 通过 `value.errorDescription` 暴露错误；我们重新
+      // 以 `FallbackTriggered` 发出，让 controller 可以响应。
       _eventController.add(
         FallbackTriggered(
           FallbackReason.error,

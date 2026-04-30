@@ -3,7 +3,7 @@ description: >-
   Production-grade Flutter video player with a unified API across iOS, Android,
   and Web, plus an automatic ExoPlayer → IJK fallback path on Android for
   devices without working hardware decoders.
-version: 0.2.0
+version: 0.3.0
 homepage: https://github.com/axin789/niuma_player
 repository: https://github.com/axin789/niuma_player
 issue_tracker: https://github.com/axin789/niuma_player/issues
@@ -37,6 +37,10 @@ dependencies:
   shared_preferences: ^2.2.0
   video_player: ">=2.8.0 <3.0.0"
   plugin_platform_interface: ^2.0.2
+  # Used by NiumaPlayerController to fetch WebVTT thumbnail tracks (M8).
+  # Cross-platform: VM uses dart:io HttpClient, web auto-routes to
+  # XMLHttpRequest. CORS for web is the caller's responsibility.
+  http: ^1.0.0
 
 dev_dependencies:
   flutter_test:
