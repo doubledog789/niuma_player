@@ -27,28 +27,62 @@ void main() {
     expect(tooltip.message, 'M10 启用');
   });
 
-  testWidgets('点击不响应——AbsorbPointer 包住或 onTap=null', (tester) async {
+  testWidgets('点击不响应——IgnorePointer 拦截 hit-test，外层 GestureDetector 不触发',
+      (tester) async {
     var tapCount = 0;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: GestureDetector(
-          onTap: () => tapCount++,
-          child: const SubtitleButton(),
+        body: Center(
+          child: GestureDetector(
+            onTap: () => tapCount++,
+            behavior: HitTestBehavior.opaque,
+            // GestureDetector 自身需要有尺寸——Center 把内容居中。
+            child: const SizedBox(
+              width: 48,
+              height: 48,
+              child: SubtitleButton(),
+            ),
+          ),
         ),
       ),
     ));
 
-    // 子按钮自身吸收 / 不响应——外层 GestureDetector 也不应被触发，
-    // 因为 SubtitleButton 渲染了一个 IgnorePointer 之类的不响应包装。
-    // 这里我们只验证按钮 widget 树里没有 enabled 的 InkWell。
     final btnFinder = find.byType(SubtitleButton);
     expect(btnFinder, findsOneWidget);
-    await tester.tap(btnFinder);
+    // SubtitleButton 自身渲染了一个 ignoring=true 的 IgnorePointer，
+    // 把按钮区的 hit-test 全吃掉。Tooltip 内部也有一个 IgnorePointer，
+    // 但 ignoring=false——所以这里只断"至少有一个 ignoring=true 的
+    // IgnorePointer 在按钮树里"。关键回归：之前的 anyOf(0, 1) 任何
+    // 情况都 pass 是无意义断言。
+    final ignoringTrue = find.descendant(
+      of: btnFinder,
+      matching: find.byWidgetPredicate(
+        (w) => w is IgnorePointer && w.ignoring == true,
+      ),
+    );
+    expect(
+      ignoringTrue,
+      findsOneWidget,
+      reason: 'SubtitleButton 应当渲染 ignoring=true 的 IgnorePointer 拦截 hit-test',
+    );
+    // 按钮内部 hit-test 全被 IgnorePointer 吃掉——tap 落到按钮区域时
+    // 应当**不**触发外层 GestureDetector（因为 IgnorePointer 让按钮
+    // 区域的命中盒消失，tester.tap 直接命中外层 GestureDetector 的
+    // hit area；warnIfMissed 关掉因为 IgnorePointer 有可能让命中
+    // 测试无法 hit 任何 button-shaped widget）。验证手段是：按钮
+    // 子树没有 InkWell。
+    expect(
+      find.descendant(
+        of: btnFinder,
+        matching: find.byType(InkWell),
+      ),
+      findsNothing,
+      reason: 'SubtitleButton 不应渲染可交互 InkWell',
+    );
+    await tester.tap(btnFinder, warnIfMissed: false);
     await tester.pump();
-    // 点击不应改变任何状态——M9 disabled 阶段没有逻辑响应。
-    // 这里我们只确认 widget 不抛、不打卡到 SnackBar 等。
-    expect(tapCount, anyOf(0, 1));
-    // 无论 GestureDetector 是否触发，按钮自身的 enabled 视觉是 disabled——
-    // 由上一条 Opacity 测试覆盖。
+    // tap 落在按钮区域 → 因为 IgnorePointer 让按钮 hit 失败，
+    // 外层 GestureDetector 仍接住——tapCount 应当等于 1。
+    expect(tapCount, 1, reason: 'IgnorePointer 不阻止外层 GestureDetector 接 hit');
   });
 }

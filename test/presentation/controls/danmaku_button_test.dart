@@ -29,14 +29,37 @@ void main() {
     expect(tooltip.message, 'M11 启用');
   });
 
-  testWidgets('点击不响应', (tester) async {
+  testWidgets('点击不响应——IgnorePointer 包裹图标，按钮自身无 enabled InkWell',
+      (tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: Scaffold(body: DanmakuButton()),
     ));
 
     expect(find.byType(DanmakuButton), findsOneWidget);
-    await tester.tap(find.byType(DanmakuButton));
+    // 严格断言：按钮子树里必须有一个 ignoring=true 的 IgnorePointer——
+    // Tooltip 自己也用 IgnorePointer 但 ignoring=false，所以按
+    // ignoring 字段筛。防止后续 refactor 误删 disabled 视觉。
+    final ignoringTrue = find.descendant(
+      of: find.byType(DanmakuButton),
+      matching: find.byWidgetPredicate(
+        (w) => w is IgnorePointer && w.ignoring == true,
+      ),
+    );
+    expect(
+      ignoringTrue,
+      findsOneWidget,
+      reason: 'DanmakuButton 应当渲染 ignoring=true 的 IgnorePointer',
+    );
+    // 按钮子树内也不应有 InkWell（避免误以为可点）。
+    expect(
+      find.descendant(
+        of: find.byType(DanmakuButton),
+        matching: find.byType(InkWell),
+      ),
+      findsNothing,
+      reason: 'M9 disabled 阶段不应渲染可交互的 InkWell',
+    );
+    await tester.tap(find.byType(DanmakuButton), warnIfMissed: false);
     await tester.pump();
-    // M9 阶段无任何逻辑——这里只确保 tap 不抛。
   });
 }

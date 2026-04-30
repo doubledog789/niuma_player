@@ -44,7 +44,6 @@ class NiumaPlayer extends StatefulWidget {
     this.adAnalyticsEmitter,
     this.pauseVideoDuringAd = true,
     this.controlsAutoHideAfter = const Duration(seconds: 5),
-    this.showThumbnailPreview = true,
   });
 
   /// 实际驱动播放的 controller。所有内部子组件共享同一实例。
@@ -68,15 +67,6 @@ class NiumaPlayer extends StatefulWidget {
   /// 进入 `playing` 后多久没有用户交互自动隐藏控件。默认 5s。
   /// 设为 [Duration.zero] 视为"永不自动隐藏"——控件永远可见。
   final Duration controlsAutoHideAfter;
-
-  /// 是否启用 ScrubBar 缩略图悬浮预览。默认 `true`，但同时也会被
-  /// `controller.source.thumbnailVtt == null` 隐式禁用——没有 VTT
-  /// 数据时无论这个标志真假，预览都不会渲染。
-  ///
-  /// **注意**：M9 的 [ScrubBar] 会自行检测 `thumbnailVtt` 是否为空，
-  /// 因此本字段当前主要是 API 占位——为以后允许调用方主动关闭预览
-  /// 留入口（即使 source 配置了 VTT）。
-  final bool showThumbnailPreview;
 
   @override
   State<NiumaPlayer> createState() => _NiumaPlayerState();
@@ -111,31 +101,70 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onValueChanged);
-    final schedule = widget.adSchedule;
-    if (schedule != null) {
-      _orchestrator = AdSchedulerOrchestrator(
-        schedule: schedule,
-        playerValue: widget.controller,
-        onPlay: () => widget.controller.play(),
-        onPause: () => widget.controller.pause(),
-        analytics: widget.adAnalyticsEmitter,
-      );
-      _orchestrator!.attach();
-      _orchestrator!.activeCue.addListener(_onActiveCueChanged);
-    }
+    _setupOrchestrator(widget);
     // 首帧也对齐 phase——挂载时已经在 playing 时立即启动计时。
     _onValueChanged();
+  }
+
+  @override
+  void didUpdateWidget(covariant NiumaPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final controllerChanged = oldWidget.controller != widget.controller;
+    final scheduleChanged = oldWidget.adSchedule != widget.adSchedule ||
+        oldWidget.adAnalyticsEmitter != widget.adAnalyticsEmitter;
+
+    if (controllerChanged) {
+      // detach 旧 controller，把 listener / orchestrator 全重建在新
+      // controller 上——否则 phase / activeCue 都还在 stale 实例上。
+      oldWidget.controller.removeListener(_onValueChanged);
+      _teardownOrchestrator();
+      _setupOrchestrator(widget);
+      widget.controller.addListener(_onValueChanged);
+      _lastPhase = null;
+      _lastCue = null;
+      _onValueChanged();
+    } else if (scheduleChanged) {
+      // controller 没换但 adSchedule 换了——只重建 orchestrator。
+      _teardownOrchestrator();
+      _setupOrchestrator(widget);
+      _lastCue = null;
+    }
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
     widget.controller.removeListener(_onValueChanged);
-    if (_orchestrator != null) {
-      _orchestrator!.activeCue.removeListener(_onActiveCueChanged);
-      _orchestrator!.dispose();
-    }
+    _teardownOrchestrator();
     super.dispose();
+  }
+
+  /// 按当前 [widget] 配置构建一个新的 [_orchestrator]——`adSchedule == null`
+  /// 时不创建。
+  void _setupOrchestrator(NiumaPlayer w) {
+    final schedule = w.adSchedule;
+    if (schedule == null) {
+      _orchestrator = null;
+      return;
+    }
+    _orchestrator = AdSchedulerOrchestrator(
+      schedule: schedule,
+      playerValue: w.controller,
+      onPlay: () => w.controller.play(),
+      onPause: () => w.controller.pause(),
+      analytics: w.adAnalyticsEmitter,
+    );
+    _orchestrator!.attach();
+    _orchestrator!.activeCue.addListener(_onActiveCueChanged);
+  }
+
+  /// 取下监听并 dispose 当前 [_orchestrator]——若为 null 则 no-op。
+  void _teardownOrchestrator() {
+    final orch = _orchestrator;
+    if (orch == null) return;
+    orch.activeCue.removeListener(_onActiveCueChanged);
+    orch.dispose();
+    _orchestrator = null;
   }
 
   void _onValueChanged() {

@@ -369,6 +369,59 @@ void main() {
     orch.dispose();
   });
 
+  testWidgets('orchestrator swap 时 detach 旧 listener，attach 新 listener',
+      (tester) async {
+    final orchA = _orch();
+    final orchB = _orch();
+    final ctl = FakeNiumaPlayerController();
+    final fake = FakeAnalyticsEmitter();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NiumaAdOverlay(
+          orchestrator: orchA,
+          videoController: ctl,
+          emitter: fake.call,
+        ),
+      ),
+    ));
+
+    // 切换 orchestrator B。
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NiumaAdOverlay(
+          orchestrator: orchB,
+          videoController: ctl,
+          emitter: fake.call,
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    // orchA 上 fire cue——overlay 不应当响应（已 detach）。
+    orchA.activeCue.value = const AdCue(
+      builder: _adBuilder,
+      minDisplayDuration: Duration.zero,
+    );
+    orchA.activeCueType.value = AdCueType.preRoll;
+    await tester.pump();
+    expect(find.text('AD'), findsNothing,
+        reason: '旧 orchestrator 的 cue 不应再驱动 overlay');
+
+    // orchB 上 fire cue——overlay 应当响应。
+    orchB.activeCue.value = const AdCue(
+      builder: _adBuilder,
+      minDisplayDuration: Duration.zero,
+    );
+    orchB.activeCueType.value = AdCueType.preRoll;
+    await tester.pump();
+    expect(find.text('AD'), findsOneWidget,
+        reason: '新 orchestrator 的 cue 应当驱动 overlay');
+
+    orchA.dispose();
+    orchB.dispose();
+  });
+
   testWidgets('overlay unmount during cue 调 _adCtrl.dispose 关闭 elapsedStream',
       (tester) async {
     final orch = _orch();

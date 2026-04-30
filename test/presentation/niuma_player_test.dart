@@ -228,6 +228,84 @@ void main() {
     });
   });
 
+  group('didUpdateWidget controller / orchestrator swap', () {
+    testWidgets('controller swap 时 listener 重 attach 到新 controller',
+        (tester) async {
+      final ctlA = FakeNiumaPlayerController();
+      final ctlB = FakeNiumaPlayerController();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: NiumaPlayer(controller: ctlA)),
+      ));
+
+      // 推 ctlA 到 paused（强制控件显示）——基线。
+      ctlA.value = _pausedValue();
+      await tester.pump();
+      expect(
+        tester
+            .widget<AnimatedOpacity>(find.descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            ))
+            .opacity,
+        1.0,
+      );
+
+      // 换成 ctlB，并把 ctlB 推到 playing；同时 ctlA 推到 paused 应被忽略。
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: NiumaPlayer(controller: ctlB)),
+      ));
+      ctlB.value = _playingValue();
+      await tester.pump();
+      // 新 controller 推 playing → 计时器开始，但 5s 内仍可见。
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        tester
+            .widget<AnimatedOpacity>(find.descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            ))
+            .opacity,
+        1.0,
+      );
+
+      // ctlA 这时即使推 paused 也不应影响（旧 listener 已 detach）——
+      // 这里的间接断言是：5s 后 ctlB 的 playing 状态确实驱动了 hide。
+      await tester.pump(const Duration(seconds: 5));
+      expect(
+        tester
+            .widget<AnimatedOpacity>(find.descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            ))
+            .opacity,
+        0.0,
+        reason: '新 controller 的 playing 状态应当驱动 auto-hide',
+      );
+    });
+
+    testWidgets('adSchedule null → non-null 时挂 NiumaAdOverlay', (tester) async {
+      final ctl = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: NiumaPlayer(controller: ctl)),
+      ));
+      expect(find.byType(NiumaAdOverlay), findsNothing);
+
+      const schedule = NiumaAdSchedule();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaPlayer(
+            controller: ctl,
+            adSchedule: schedule,
+          ),
+        ),
+      ));
+      await tester.pump();
+      expect(find.byType(NiumaAdOverlay), findsOneWidget,
+          reason: 'didUpdateWidget 应识别新的 schedule 并构建 orchestrator');
+    });
+  });
+
   group('M9 review 修复', () {
     testWidgets('ad cue 活跃时 tap 视频区不切换 controls 可见状态',
         (tester) async {

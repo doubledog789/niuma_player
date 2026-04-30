@@ -79,6 +79,22 @@ class _NiumaAdOverlayState extends State<NiumaAdOverlay> {
   }
 
   @override
+  void didUpdateWidget(covariant NiumaAdOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.orchestrator != widget.orchestrator) {
+      // orchestrator 换了——detach 旧的，重置内部 cue 状态，attach 新的。
+      oldWidget.orchestrator.activeCue.removeListener(_onActiveCueChanged);
+      _disposeAdCtrl();
+      _lastCue = null;
+      _wasPlayingBeforeCue = false;
+      widget.orchestrator.activeCue.addListener(_onActiveCueChanged);
+      if (widget.orchestrator.activeCue.value != null) {
+        _onActiveCueChanged();
+      }
+    }
+  }
+
+  @override
   void dispose() {
     widget.orchestrator.activeCue.removeListener(_onActiveCueChanged);
     _disposeAdCtrl();
