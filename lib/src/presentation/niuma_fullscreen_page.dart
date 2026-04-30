@@ -60,9 +60,8 @@ class NiumaFullscreenPage extends StatefulWidget {
   final Duration controlsAutoHideAfter;
 
   /// page route 的 settings.name，保留作为子树反向识别的辅助手段；
-  /// 但 [FullscreenButton] 现在主要通过 [_NiumaFullscreenScope]
-  /// InheritedWidget marker 判定（不再依赖 settings.name），避免
-  /// 子 route 嵌套时漏判 / 误判。
+  /// 但 `FullscreenButton` 现在主要通过内部的 InheritedWidget marker
+  /// 判定（不再依赖 settings.name），避免子 route 嵌套时漏判 / 误判。
   static const String routeName = 'NiumaFullscreenPage';
 
   /// 创建一个 push 进全屏页的 [Route<void>]。
