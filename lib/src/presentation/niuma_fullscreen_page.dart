@@ -105,6 +105,12 @@ class NiumaFullscreenPage extends StatefulWidget {
 /// "本 build context 处于全屏 page 内"。[FullscreenButton] 用
 /// [maybeOf] 判定按钮该 push（进入全屏）还是 pop（退出全屏），
 /// 不再依赖脆弱的 `route.isFirst` 兜底。
+///
+/// **不导出**：本类是 niuma_player 内部使用的 marker，不属于公开 API
+/// （`lib/niuma_player.dart` 没 export）。用户不需要直接构造它；单测如
+/// 需模拟"在 / 不在全屏页内"两种分支，可通过
+/// `package:niuma_player/src/presentation/niuma_fullscreen_page.dart`
+/// 的内部路径 import。
 class NiumaFullscreenScope extends InheritedWidget {
   /// 构造一个 marker scope。
   const NiumaFullscreenScope({super.key, required super.child});

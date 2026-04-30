@@ -369,6 +369,18 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
 ///
 /// 不持有 [NiumaPlayerController]——controller 是必须显式传的，子树
 /// 已经能直接拿到，不需要从这里读。
+///
+/// **使用约束**：[updateShouldNotify] 用 `==` 对所有字段做相等比较，
+/// 但 [NiumaAdSchedule] / [AnalyticsEmitter] / [NiumaPlayerTheme] 这
+/// 几个对象通常不实现结构相等（identity equal）——如果 host 在每次
+/// 构建 [NiumaPlayer] 时都 new 一个新对象传进来，本 scope 的依赖者
+/// 会被无谓地重建。建议把 `adSchedule` / `adAnalyticsEmitter` /
+/// `theme` 缓存为 `const` 或在 [State] 里作为 final 字段持有。
+///
+/// **不导出**：本类仅在内部使用（[NiumaPlayer.build] 注入，
+/// [FullscreenButton._onPressed] 读取），不属于公开 API。单测如需直接
+/// 操作通过 `package:niuma_player/src/presentation/niuma_player.dart`
+/// 的内部路径 import。
 class NiumaPlayerConfigScope extends InheritedWidget {
   /// 构造一个 [NiumaPlayerConfigScope]。
   const NiumaPlayerConfigScope({

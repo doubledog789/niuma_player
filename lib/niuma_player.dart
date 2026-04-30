@@ -29,10 +29,8 @@ export 'src/presentation/niuma_player_theme.dart'
     show NiumaPlayerTheme, NiumaPlayerThemeData;
 
 // M9 一体化组件 + 全屏 page
-export 'src/presentation/niuma_player.dart'
-    show NiumaPlayer, NiumaPlayerConfigScope;
-export 'src/presentation/niuma_fullscreen_page.dart'
-    show NiumaFullscreenPage, NiumaFullscreenScope;
+export 'src/presentation/niuma_player.dart' show NiumaPlayer;
+export 'src/presentation/niuma_fullscreen_page.dart' show NiumaFullscreenPage;
 
 // M9 缩略图悬浮预览
 export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;

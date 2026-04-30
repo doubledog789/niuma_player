@@ -153,12 +153,13 @@ NiumaPlayer(controller: controller);
 - B 站风格底部控件条（9 个控件 + 进度条）
 - 进入播放后 5 秒自动隐藏控件，点击视频区切换显隐，暂停时强制显示
 - 进度条拖动时上方悬浮 sprite 缩略图预览（M8 + M9 联动）
-- 右下 fullscreen 按钮：用 `NiumaFullscreenScope` `InheritedWidget`
-  marker 检测当前是否在全屏页内——marker 存在时点击 pop 回原页面，
-  不存在时 push `NiumaFullscreenPage`（200ms 淡入 + landscape 锁定 +
-  immersiveSticky）。**全屏路由透传**外层全部配置（`adSchedule` /
-  `adAnalyticsEmitter` / `pauseVideoDuringAd` / `controlsAutoHideAfter` /
-  `theme`），全屏页内的 `NiumaPlayer` 行为与原页一致。
+- 右下 fullscreen 按钮：通过内部 `InheritedWidget` marker 检测当前是
+  否在全屏页内——在全屏页内时点击 pop 回原页面，不在时 push
+  `NiumaFullscreenPage`（200ms 淡入 + landscape 锁定 + immersiveSticky）。
+  **全屏路由透传**外层全部配置（`adSchedule` / `adAnalyticsEmitter` /
+  `pauseVideoDuringAd` / `controlsAutoHideAfter` / `theme`，包括用
+  `NiumaPlayerThemeData` 注入的 inherited 主题），全屏页内的
+  `NiumaPlayer` 行为与原页一致。
 - 可选广告 overlay：传 `adSchedule` 自动激活；广告事件包含 `AdImpression`
   / `AdClick` / `AdDismissed`，后者的 `reason` 涵盖 `userSkip` /
   `timeout` / `error`（cue.builder 异常时使用 `error` 而非冒充 timeout）

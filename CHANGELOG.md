@@ -12,18 +12,19 @@
   `cue.builder` 抛异常时使用 `AdDismissed(reason: error)` 而不是
   冒充 `timeout`，避免污染分析仪表盘的 timeout 指标。Non-breaking
   enum 扩展。
-- `AdControllerImpl` 新增 `dispose()`：关闭 `_elapsedCtrl`
-  StreamController + 停止 stopwatch。`NiumaAdOverlay` 在 cue 非
+- `AdControllerImpl` 新增 `dispose()`：关闭内部 broadcast
+  `StreamController`（`_elapsedCtrl`）。`NiumaAdOverlay` 在 cue 非
   userSkip 路径下也正确释放 controller，修复了 timeout / dismissOnTap
   / dismissActive 路径下的 StreamController 泄漏。
-- `NiumaPlayerConfigScope` `InheritedWidget`（内部用）—— `NiumaPlayer`
-  在 build 顶上注入外层配置，`FullscreenButton` 在 push 全屏 route
-  时通过它把 `adSchedule` / `adAnalyticsEmitter` / `pauseVideoDuringAd`
-  / `controlsAutoHideAfter` / `theme` 一起带进全屏页。
-- `NiumaFullscreenPage` `_NiumaFullscreenScope` `InheritedWidget`
-  marker——`FullscreenButton` 用 `maybeOf(context) != null` 准确
-  检测"当前是否在全屏页内"，而不再用脆弱的 `!route.isFirst` 兜底
-  （原方案在 example demo 等任意非 home 路由上都会误判成 pop）。
+- 内部 `InheritedWidget` marker `NiumaPlayerConfigScope`（不导出，仅内部
+  使用）—— `NiumaPlayer` 在 build 顶上注入外层配置，`FullscreenButton`
+  在 push 全屏 route 时通过它把 `adSchedule` / `adAnalyticsEmitter` /
+  `pauseVideoDuringAd` / `controlsAutoHideAfter` / `theme` 一起带进
+  全屏页。
+- 内部 `InheritedWidget` marker `NiumaFullscreenScope`（不导出，仅内部
+  使用）——`FullscreenButton` 用 `maybeOf(context) != null` 准确检测
+  "当前是否在全屏页内"，而不再用脆弱的 `!route.isFirst` 兜底（原方案
+  在 example demo 等任意非 home 路由上都会误判成 pop）。
 - `NiumaFullscreenPage.route()` 工厂签名增加 `adSchedule` /
   `adAnalyticsEmitter` / `pauseVideoDuringAd` / `controlsAutoHideAfter`
   / `theme` 参数，全部透传到全屏页内部的 `NiumaPlayer`，修复全屏页丢失
@@ -51,6 +52,31 @@
 - `NiumaPlayer.showThumbnailPreview` 占位字段——M9 阶段 `ScrubBar`
   自己根据 `controller.source.thumbnailVtt` 决定是否启用预览，本字段
   从未生效，删之。
+
+### 修复（M9 round-2 review）
+- `FullscreenButton` 在 push 全屏 route 时，`NiumaPlayerConfigScope.theme`
+  为 `null` 时 fallback 到 `NiumaPlayerTheme.of(context)`——这样 README
+  推荐写法 `NiumaPlayerThemeData(child: NiumaPlayer(...))` 注入的主题
+  也能透传到全屏页，不再回退到默认主题（视觉回归）。
+- `NiumaAdOverlay.didUpdateWidget` orchestrator swap 分支：旧
+  orchestrator 还持有 active cue 且 cue 进入前视频在播时，先恢复
+  `videoController.play()` 再做 detach / reset——之前会让视频留在
+  paused 状态。
+- `NiumaPlayer.didUpdateWidget` 加 `controlsAutoHideAfter` 字段 diff：
+  改了 props 立即 cancel 旧 timer，按当前 phase 用新值重新 schedule。
+  之前老 timer 仍按旧值跑。
+- `NiumaPlayer._onTapVideo` 改用 `_setControlsVisible` 走统一入口（不
+  再直接 `setState`），让"build 阶段保护"逻辑天然覆盖到 tap 路径。
+- `NiumaAdOverlay._onActiveCueChanged` 切换分支不再递归 self：抽出
+  `_handleNewCue(cue)` 直接调，避免 `_lastCue` 来回写两遍。
+
+### 移除导出（M9 round-2 review）
+- `NiumaPlayerConfigScope` 与 `NiumaFullscreenScope` 从公开 API 中移除
+  导出（`lib/niuma_player.dart`），它们是纯内部 `InheritedWidget`
+  marker：前者用于 `FullscreenButton` push 全屏 route 时透传外层配置，
+  后者用于让 `FullscreenButton` 检测"当前是否处于全屏页内"。用户从不
+  需要直接构造它们；单测如需验证行为通过 `package:niuma_player/src/...`
+  的内部路径 import。
 
 ## [0.4.0] - 2026-04-30
 
