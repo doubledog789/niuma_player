@@ -7,6 +7,51 @@
 
 ## [Unreleased]
 
+### 新增（M9 review 修复）
+- `AdDismissReason` 枚举新增 `error` 值——`NiumaAdOverlay` 在
+  `cue.builder` 抛异常时使用 `AdDismissed(reason: error)` 而不是
+  冒充 `timeout`，避免污染分析仪表盘的 timeout 指标。Non-breaking
+  enum 扩展。
+- `AdControllerImpl` 新增 `dispose()`：关闭 `_elapsedCtrl`
+  StreamController + 停止 stopwatch。`NiumaAdOverlay` 在 cue 非
+  userSkip 路径下也正确释放 controller，修复了 timeout / dismissOnTap
+  / dismissActive 路径下的 StreamController 泄漏。
+- `NiumaPlayerConfigScope` `InheritedWidget`（内部用）—— `NiumaPlayer`
+  在 build 顶上注入外层配置，`FullscreenButton` 在 push 全屏 route
+  时通过它把 `adSchedule` / `adAnalyticsEmitter` / `pauseVideoDuringAd`
+  / `controlsAutoHideAfter` / `theme` 一起带进全屏页。
+- `NiumaFullscreenPage` `_NiumaFullscreenScope` `InheritedWidget`
+  marker——`FullscreenButton` 用 `maybeOf(context) != null` 准确
+  检测"当前是否在全屏页内"，而不再用脆弱的 `!route.isFirst` 兜底
+  （原方案在 example demo 等任意非 home 路由上都会误判成 pop）。
+- `NiumaFullscreenPage.route()` 工厂签名增加 `adSchedule` /
+  `adAnalyticsEmitter` / `pauseVideoDuringAd` / `controlsAutoHideAfter`
+  / `theme` 参数，全部透传到全屏页内部的 `NiumaPlayer`，修复全屏页丢失
+  外层配置。
+- `NiumaPlayer` 加 `didUpdateWidget`：controller swap 时 detach 旧
+  listener + 重建 orchestrator + attach 新 controller；`adSchedule`
+  swap 时只重建 orchestrator——之前用户 swap controller 后内部
+  状态停在 stale 实例。`NiumaAdOverlay` 同理。
+
+### 变更（M9 review 修复）
+- `AdSchedulerOrchestrator._fire` 强制先 `activeCue.value = null`
+  再 set 新 cue，避免连续 fire 同一 cue 实例时 `ValueNotifier`
+  short-circuit 不通知 listener。
+- `NiumaPlayer._onTapVideo` 在 ad cue 活跃时直接 return 不切换
+  controls 可见——把 tap 让给 `NiumaAdOverlay` 自己的 dismissOnTap
+  接管，避免双层 gesture 冲突。
+- `NiumaPlayer._setControlsVisible` 用 `_pendingVisibleIntent` 字段
+  存最新意图——多次入队的 post-frame callback 读字段拿"最后一次写入"，
+  避免旧 intent 覆盖新 intent。
+- `NiumaPlayerTheme.accentColor` dartdoc 明确生效范围："仅作用于
+  `ScrubBar` active 段 + thumb，不作用于普通图标按钮（图标按钮统一
+  用 `iconColor`）"。
+
+### 移除（M9 review 修复）
+- `NiumaPlayer.showThumbnailPreview` 占位字段——M9 阶段 `ScrubBar`
+  自己根据 `controller.source.thumbnailVtt` 决定是否启用预览，本字段
+  从未生效，删之。
+
 ## [0.4.0] - 2026-04-30
 
 ### 新增（M9 — UI overlay 层）

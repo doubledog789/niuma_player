@@ -38,7 +38,13 @@ class NiumaPlayerTheme {
     ),
   });
 
-  /// 强调色——进度条 active 段填充、关键按钮高亮等。
+  /// 强调色。
+  ///
+  /// **生效范围**：仅作用于"需要强调状态"的渲染——目前包含
+  /// [ScrubBar] 的 active 段填充（已播部分）和拖动 thumb 的颜色。
+  /// **不**作用于普通图标按钮——主控件栏的 PlayPause / Volume /
+  /// Fullscreen 等图标按钮统一使用 [iconColor]，不读 accentColor。
+  /// 若希望整套图标也跟着主题色变，请同时调 [iconColor]。
   ///
   /// `null` 时控件应回退到 `Theme.of(context).primaryColor`，让 host
   /// app 的 Material theme 接管色彩调性。
