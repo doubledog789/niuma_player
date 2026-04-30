@@ -5,44 +5,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/data_source.dart';
 
-/// Pluggable persistence contract for per-video resume positions.
+/// 单视频续播位置的可插拔持久化契约。
 ///
-/// Concrete implementations can wrap SharedPreferences, Hive, SQLite, or a
-/// remote cloud store. The player core depends only on this interface so that
-/// the host app can supply whichever backend suits its needs.
+/// 具体实现可以包装 SharedPreferences、Hive、SQLite 或远端云存储。
+/// 播放器核心只依赖该接口，方便宿主 app 接入合适的后端。
 abstract class ResumeStorage {
   const ResumeStorage();
 
-  /// Returns the saved playback position for [key], or `null` if none exists.
+  /// 返回 [key] 对应的已保存播放位置；不存在则返回 `null`。
   Future<Duration?> read(String key);
 
-  /// Persists [position] under [key], overwriting any previously saved value.
+  /// 将 [position] 以 [key] 持久化，覆盖之前的值。
   Future<void> write(String key, Duration position);
 
-  /// Removes the saved position for [key].
+  /// 删除 [key] 对应的已保存位置。
   ///
-  /// Called by the player when playback reaches `phase = ended` so stale
-  /// resume points are not offered on a future play of the same video.
+  /// 播放器在 `phase = ended` 时调用，避免下次重新播放同一视频时
+  /// 还提示已过时的续播点。
   Future<void> clear(String key);
 }
 
-/// Default [ResumeStorage] implementation backed by [SharedPreferences].
+/// 基于 [SharedPreferences] 的默认 [ResumeStorage] 实现。
 ///
-/// Positions are stored as integer milliseconds under the key
-/// `<prefix><key>`. This keeps storage compact and avoids floating-point
-/// precision issues. The host app may override [prefix] to namespace entries
-/// under an app-scoped key and avoid collisions with other libraries.
+/// 位置以整数毫秒形式存在 `<prefix><key>` 下。这样存储紧凑，
+/// 也避免浮点精度问题。宿主 app 可覆盖 [prefix] 把条目纳入应用
+/// 作用域的命名空间，避免与其它库冲突。
 class SharedPreferencesResumeStorage extends ResumeStorage {
-  /// Creates a [SharedPreferencesResumeStorage].
+  /// 创建一个 [SharedPreferencesResumeStorage]。
   ///
-  /// [prefix] is prepended to every storage key to avoid collisions with
-  /// other keys in SharedPreferences; defaults to `'niuma_player.resume.'`.
+  /// [prefix] 会拼到每个存储 key 之前以避免与 SharedPreferences 中
+  /// 其它 key 冲突；默认 `'niuma_player.resume.'`。
   const SharedPreferencesResumeStorage({this.prefix = 'niuma_player.resume.'});
 
-  /// The string prepended to every storage key for collision avoidance.
+  /// 用于避免冲突、拼到每个存储 key 之前的字符串。
   ///
-  /// Defaults to `'niuma_player.resume.'`. Override this if the host app
-  /// uses SharedPreferences for other data and wants a dedicated namespace.
+  /// 默认 `'niuma_player.resume.'`。当宿主 app 还把
+  /// SharedPreferences 用于其它数据并希望有独立命名空间时覆盖此值。
   final String prefix;
 
   String _k(String key) => '$prefix$key';
@@ -68,42 +66,39 @@ class SharedPreferencesResumeStorage extends ResumeStorage {
   }
 }
 
-/// Controls what the player does automatically when a saved resume position is
-/// found during [NiumaPlayerController.initialize].
+/// 在 [NiumaPlayerController.initialize] 期间发现已保存续播位置时
+/// 播放器要自动执行什么动作。
 enum ResumeBehaviour {
-  /// Silently seek to the saved position on init without any user interaction.
+  /// 初始化时静默 seek 到已保存位置，无需用户交互。
   auto,
 
-  /// Fire the `onResumePrompt` callback so the host app can show a dialog
-  /// before deciding whether to seek.
+  /// 触发 `onResumePrompt` 回调，让宿主 app 弹窗后再决定是否 seek。
   askUser,
 
-  /// Load storage and make the saved position available, but do not auto-seek.
-  /// The caller is responsible for deciding what to do with the position.
+  /// 加载存储、提供已保存位置，但不自动 seek。
+  /// 调用方自行决定如何处理这个位置。
   disabled,
 }
 
-/// Function type that derives a stable storage key from a [NiumaDataSource].
+/// 从 [NiumaDataSource] 派生稳定存储 key 的函数类型。
 ///
-/// The returned string is used as the key passed to [ResumeStorage.read],
-/// [ResumeStorage.write], and [ResumeStorage.clear].
+/// 返回值会作为 [ResumeStorage.read]、[ResumeStorage.write]、
+/// [ResumeStorage.clear] 的 key 使用。
 typedef ResumeKeyOf = String Function(NiumaDataSource source);
 
-/// Default key derivation: `video:<uri>`.
+/// 默认 key 派生：`video:<uri>`。
 ///
-/// Stable across launches as long as the URL is identical. Suitable for the
-/// majority of on-demand streaming use cases where the URI does not change
-/// between sessions.
+/// 只要 URL 一致，跨多次启动都稳定。适用于绝大多数 URI 不会随
+/// 会话变化的点播场景。
 String defaultResumeKey(NiumaDataSource source) => 'video:${source.uri}';
 
-/// Configuration bag passed to the resume orchestrator.
+/// 传给续播编排器的配置袋。
 ///
-/// Encapsulates every tunable aspect of resume-position behaviour: which
-/// storage backend to use, how to derive storage keys, when to suppress
-/// saving, and what to do when a saved position is found.
+/// 封装续播行为的所有可调维度：使用哪个存储后端、如何派生 key、
+/// 何时不写入、发现已保存位置时怎么处理。
 @immutable
 class ResumePolicy {
-  /// Creates a [ResumePolicy] with sensible production defaults.
+  /// 用合理的生产环境默认值创建一个 [ResumePolicy]。
   const ResumePolicy({
     this.storage = const SharedPreferencesResumeStorage(),
     this.keyOf = defaultResumeKey,
@@ -113,55 +108,48 @@ class ResumePolicy {
     this.savePeriod = const Duration(seconds: 5),
   });
 
-  /// Pluggable storage layer used to read and write resume positions.
+  /// 用于读写续播位置的可插拔存储层。
   ///
-  /// Defaults to [SharedPreferencesResumeStorage]. Swap this out to use Hive,
-  /// SQLite, a remote cloud store, or a [FakeResumeStorage] in tests.
+  /// 默认 [SharedPreferencesResumeStorage]。可以换成 Hive、SQLite、
+  /// 远端云存储，或测试中用 [FakeResumeStorage]。
   final ResumeStorage storage;
 
-  /// Key derivation function applied to the current [NiumaDataSource].
+  /// 应用于当前 [NiumaDataSource] 的 key 派生函数。
   ///
-  /// Defaults to [defaultResumeKey] which produces `video:<uri>`.
+  /// 默认 [defaultResumeKey]，产出 `video:<uri>`。
   final ResumeKeyOf keyOf;
 
-  /// What to do when a saved resume position is found on initialize.
+  /// 初始化时发现已保存续播位置后要执行什么动作。
   ///
-  /// Defaults to [ResumeBehaviour.auto].
+  /// 默认 [ResumeBehaviour.auto]。
   final ResumeBehaviour behaviour;
 
-  /// Minimum playback position before saving is considered worthwhile.
+  /// 至少播到多远才值得保存位置。
   ///
-  /// Prevents the "skip-to-5s on every fresh play" surprise: if the user
-  /// abandons playback before reaching this threshold, no position is saved.
-  /// Defaults to 30 seconds.
+  /// 防止"每次重新播放都被 skip 到 5 秒"的惊吓：若用户在该阈值
+  /// 之前就放弃，不保存位置。默认 30 秒。
   final Duration minSavedPosition;
 
-  /// Distance from the end of the video below which the saved position is
-  /// discarded rather than offered on the next play.
+  /// 距视频结尾小于该值时，已保存位置直接丢弃，下次播放不再恢复。
   ///
-  /// Avoids resuming at 2 s before the credits every time. Defaults to
-  /// 30 seconds.
+  /// 避免每次都从片尾前 2 秒接着播。默认 30 秒。
   final Duration discardIfNearEnd;
 
-  /// How frequently the player writes the current position to [storage]
-  /// during active playback.
+  /// 活跃播放期间播放器把当前 position 写入 [storage] 的频率。
   ///
-  /// Lower values reduce data loss on crash but increase I/O. Defaults to
-  /// every 5 seconds.
+  /// 值越小崩溃时丢失越少，但 I/O 开销越大。默认每 5 秒一次。
   final Duration savePeriod;
 }
 
-/// Sits between controller lifecycle events and [ResumeStorage].
+/// 位于 controller 生命周期事件与 [ResumeStorage] 之间。
 ///
-/// Reads the saved position on init and seeks if [ResumeBehaviour.auto] is
-/// configured. Writes the current position periodically during playback.
-/// Clears the entry when playback reaches `phase = ended` so a finished
-/// video doesn't offer a stale resume on the next play.
+/// init 时读取已保存位置；若配置为 [ResumeBehaviour.auto] 则 seek。
+/// 播放期间周期性写入当前位置。在 `phase = ended` 时清掉条目，
+/// 已看完的视频下次不再提示残留续播。
 class ResumeOrchestrator {
-  /// Creates a [ResumeOrchestrator].
+  /// 创建一个 [ResumeOrchestrator]。
   ///
-  /// All four parameters are required; pass a [FakeResumeStorage] and stub
-  /// lambdas in tests.
+  /// 四个参数都必填；测试中传入 [FakeResumeStorage] 和 stub lambda。
   ResumeOrchestrator({
     required this.policy,
     required this.source,
@@ -169,33 +157,29 @@ class ResumeOrchestrator {
     required this.currentPosition,
   });
 
-  /// Configuration bundle controlling storage backend, key derivation,
-  /// behaviour on init, and save cadence.
+  /// 控制存储后端、key 派生、init 行为和保存频率的配置组。
   final ResumePolicy policy;
 
-  /// The data source whose URI (via [ResumePolicy.keyOf]) drives storage
-  /// lookups.
+  /// URI（经 [ResumePolicy.keyOf]）决定存储 key 的数据源。
   final NiumaDataSource source;
 
-  /// Callback that bridges to the controller; called with the position to
-  /// seek to when a saved position is found and behaviour is
-  /// [ResumeBehaviour.auto].
+  /// 桥接到 controller 的回调；当发现已保存位置且 behaviour 为
+  /// [ResumeBehaviour.auto] 时，会被调用以 seek 到该位置。
   final Future<void> Function(Duration) seekTo;
 
-  /// Synchronous function that returns the current playback position.
+  /// 同步返回当前播放位置的函数。
   ///
-  /// Called on every periodic tick and at [dispose] time.
+  /// 每个周期 tick 和 [dispose] 时都会被调用。
   final Duration Function() currentPosition;
 
   Timer? _saveTimer;
   String get _key => policy.keyOf(source);
 
-  /// Call after the controller's `initialize()` resolves.
+  /// 在 controller 的 `initialize()` 完成后调用。
   ///
-  /// Reads the saved position from storage; if one exists and
-  /// [ResumePolicy.behaviour] is [ResumeBehaviour.auto], seeks to it
-  /// immediately. For [ResumeBehaviour.askUser] the caller is responsible for
-  /// invoking its own prompt callback.
+  /// 从存储中读取已保存位置；若存在且 [ResumePolicy.behaviour] 为
+  /// [ResumeBehaviour.auto] 则立即 seek。[ResumeBehaviour.askUser]
+  /// 由调用方负责触发自己的 prompt 回调。
   Future<void> onInitialized() async {
     if (policy.behaviour == ResumeBehaviour.disabled) return;
     final saved = await policy.storage.read(_key);
@@ -203,13 +187,13 @@ class ResumeOrchestrator {
     if (policy.behaviour == ResumeBehaviour.auto) {
       await seekTo(saved);
     }
-    // askUser: caller is responsible for invoking onResumePrompt.
+    // askUser：由调用方负责触发 onResumePrompt。
   }
 
-  /// Starts the periodic save timer.
+  /// 启动周期性保存定时器。
   ///
-  /// Typically called on the first `play` event. Cancels any existing timer
-  /// first so the method is idempotent.
+  /// 通常在第一次 `play` 事件时调用。会先取消已有 timer，因此该
+  /// 方法是幂等的。
   void startPeriodicSave() {
     _saveTimer?.cancel();
     _saveTimer = Timer.periodic(policy.savePeriod, (_) => _saveIfApplicable());
@@ -221,16 +205,15 @@ class ResumeOrchestrator {
     await policy.storage.write(_key, pos);
   }
 
-  /// Call when `phase = ended` to clear the resume entry unconditionally.
+  /// 在 `phase = ended` 时调用，无条件清除续播条目。
   ///
-  /// The user has finished the video, so there is no meaningful position to
-  /// offer on the next play.
+  /// 用户已经把视频看完了，下次播放没有有意义的位置可恢复。
   Future<void> onEnded() async {
     await policy.storage.clear(_key);
   }
 
-  /// Cancels the periodic save timer and performs a final save if the current
-  /// position is at or beyond [ResumePolicy.minSavedPosition].
+  /// 取消周期性保存定时器；若当前 position ≥
+  /// [ResumePolicy.minSavedPosition]，做一次最终写入。
   Future<void> dispose() async {
     _saveTimer?.cancel();
     final pos = currentPosition();

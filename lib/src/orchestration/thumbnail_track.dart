@@ -53,7 +53,7 @@ class WebVttCue {
 /// [NetworkImage] 自身的 == 走 url，我们的 cache 已经按 URL 去重，identity
 /// 等价于 URL 等价但更便宜。
 ///
-/// **稳定性边界（R2-S1）**：[ThumbnailCache] 在 LRU 容量内保证同 URL 返回
+/// **稳定性边界（R2-S1）**：`ThumbnailCache` 在 LRU 容量内保证同 URL 返回
 /// identical 实例；一旦该 sprite 被 evict（视频很长 / 切线路 / sprite 数
 /// 超过 cache `maxEntries`），下一次再查会拿到不同的 [ImageProvider] 实例，
 /// `==` 会失败——即使内容相同。这是预期行为：

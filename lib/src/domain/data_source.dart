@@ -1,11 +1,10 @@
-/// Source type for a [NiumaDataSource].
+/// [NiumaDataSource] 的 source 类型。
 enum NiumaSourceType { network, asset, file }
 
-/// Describes where a video comes from.
+/// 描述视频从哪儿来。
 ///
-/// Mirrors the subset of [VideoPlayerController] factory constructors that
-/// niuma_player supports. The underlying backend (video_player or IJK) is
-/// chosen by [NiumaPlayerController].
+/// 镜像 niuma_player 支持的 [VideoPlayerController] 工厂构造子集。
+/// 底层 backend（video_player 或 IJK）由 [NiumaPlayerController] 选择。
 class NiumaDataSource {
   const NiumaDataSource._({
     required this.type,
@@ -13,16 +12,16 @@ class NiumaDataSource {
     this.headers,
   });
 
-  /// The source type (network / asset / file).
+  /// source 类型（network / asset / file）。
   final NiumaSourceType type;
 
-  /// The URI / path / asset key, depending on [type].
+  /// URI / 路径 / asset key，取决于 [type]。
   final String uri;
 
-  /// Optional HTTP headers (only meaningful for [NiumaSourceType.network]).
+  /// 可选的 HTTP headers（仅对 [NiumaSourceType.network] 有意义）。
   final Map<String, String>? headers;
 
-  /// Network (http/https/hls/etc.) source.
+  /// 网络 source（http/https/hls 等）。
   factory NiumaDataSource.network(
     String url, {
     Map<String, String>? headers,
@@ -34,7 +33,7 @@ class NiumaDataSource {
     );
   }
 
-  /// Flutter asset source (packaged with the app).
+  /// Flutter asset source（与 app 一起打包）。
   factory NiumaDataSource.asset(String assetPath) {
     return NiumaDataSource._(
       type: NiumaSourceType.asset,
@@ -42,7 +41,7 @@ class NiumaDataSource {
     );
   }
 
-  /// Local file source.
+  /// 本地文件 source。
   factory NiumaDataSource.file(String filePath) {
     return NiumaDataSource._(
       type: NiumaSourceType.file,

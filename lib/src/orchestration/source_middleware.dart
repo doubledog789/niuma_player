@@ -1,30 +1,29 @@
 import '../domain/data_source.dart';
 
-/// Transforms a [NiumaDataSource] before it reaches the playback backend.
+/// 在 [NiumaDataSource] 进入播放后端之前对其进行变换。
 ///
-/// Applied on every operation that touches the network — `initialize`,
-/// `switchLine`, and retry — so each attempt gets fresh headers or a
-/// freshly signed URL.
+/// 在每次涉及网络的操作上都会执行——`initialize`、`switchLine`、重试——
+/// 让每次尝试都能拿到新的 headers 或重新签名后的 URL。
 abstract class SourceMiddleware {
   const SourceMiddleware();
 
-  /// Transforms [input] and returns the (possibly modified) data source.
+  /// 对 [input] 进行变换并返回（可能被修改后的）数据源。
   Future<NiumaDataSource> apply(NiumaDataSource input);
 }
 
-/// Merges a fixed set of HTTP headers into every network [NiumaDataSource].
+/// 把一组固定 HTTP headers 合并到每个网络 [NiumaDataSource] 上。
 ///
-/// Use this to inject authentication tokens, Referer headers, or any other
-/// static request headers that every network request must carry.
+/// 用来注入鉴权 token、Referer 等所有网络请求都必须携带的静态
+/// 请求头。
 class HeaderInjectionMiddleware extends SourceMiddleware {
-  /// Creates a middleware that merges [headers] into network sources.
+  /// 创建一个把 [headers] 合并到网络 source 的 middleware。
   const HeaderInjectionMiddleware(this.headers);
 
-  /// The headers to merge into the data source's existing headers map.
+  /// 要合并到数据源原有 headers 中的 headers。
   final Map<String, String> headers;
 
-  /// Returns [input] unchanged for non-network sources; otherwise returns a
-  /// new network source with [headers] merged on top of any existing headers.
+  /// 非网络 source 原样返回；否则返回一个新的网络 source，其
+  /// headers 为原 headers 与 [headers] 合并的结果。
   @override
   Future<NiumaDataSource> apply(NiumaDataSource input) async {
     if (input.type != NiumaSourceType.network) return input;
@@ -35,23 +34,21 @@ class HeaderInjectionMiddleware extends SourceMiddleware {
   }
 }
 
-/// Replaces the URL of every network [NiumaDataSource] with a freshly signed
-/// URL produced by the caller-supplied signer function.
+/// 用调用方提供的签名函数把每个网络 [NiumaDataSource] 的 URL 替换成
+/// 新签好名的 URL。
 ///
-/// On each [apply] call the signer is invoked with the raw URL and the result
-/// is used to build a new network source that carries the original headers
-/// unchanged. Non-network sources are returned as-is without calling the
-/// signer.
+/// 每次 [apply] 调用都会用原始 URL 触发 signer，并用结果构建一个新的
+/// 网络 source，原 headers 原样保留。非网络 source 直接返回，不调
+/// signer。
 class SignedUrlMiddleware extends SourceMiddleware {
-  /// Creates a middleware that calls [_signer] to map each raw URL to a
-  /// signed URL. [_signer] receives the raw URL and must return the signed URL.
+  /// 创建一个 middleware，它调用 [_signer] 把每个原始 URL 映射成签名后
+  /// 的 URL。[_signer] 接收原始 URL，必须返回签名后的 URL。
   SignedUrlMiddleware(this._signer);
 
   final Future<String> Function(String rawUrl) _signer;
 
-  /// Returns [input] unchanged for non-network sources; otherwise returns a
-  /// new network source whose URI is the signed URL with the original headers
-  /// passed through.
+  /// 非网络 source 原样返回；否则返回一个新的网络 source，URI 为签名
+  /// 后的 URL，原 headers 透传。
   @override
   Future<NiumaDataSource> apply(NiumaDataSource input) async {
     if (input.type != NiumaSourceType.network) return input;
@@ -60,15 +57,13 @@ class SignedUrlMiddleware extends SourceMiddleware {
   }
 }
 
-/// Runs [input] through each middleware in [middlewares] left-to-right,
-/// returning the final transformed [NiumaDataSource].
+/// 把 [input] 依次经过 [middlewares] 中每个 middleware（从左到右），返回
+/// 最终变换后的 [NiumaDataSource]。
 ///
-/// - Middlewares are applied in order: the output of each middleware becomes
-///   the input to the next one.
-/// - An empty [middlewares] list short-circuits immediately, returning [input]
-///   unchanged (the identical object, not a copy).
-/// - Each middleware sees only the output of the previous one, so transformations
-///   compose cleanly regardless of middleware type.
+/// - middleware 按顺序应用：每个的输出作为下一个的输入。
+/// - [middlewares] 为空时立即短路，原样返回 [input]（同一对象，不是副本）。
+/// - 每个 middleware 只看到上一个的输出，因此无论 middleware 类型如何，
+///   组合都能干净进行。
 Future<NiumaDataSource> runSourceMiddlewares(
   NiumaDataSource input,
   List<SourceMiddleware> middlewares,

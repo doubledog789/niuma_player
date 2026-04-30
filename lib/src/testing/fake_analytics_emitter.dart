@@ -1,40 +1,37 @@
 import '../observability/analytics_event.dart';
 
-/// A capturing test double for the `AnalyticsEmitter` typedef
-/// (`void Function(AnalyticsEvent)`).
+/// `AnalyticsEmitter` typedef（`void Function(AnalyticsEvent)`）的捕获型
+/// 测试替身。
 ///
-/// Instances record every [AnalyticsEvent] passed to [call] into an
-/// in-memory list. Expose [events] in assertions to verify which events
-/// were emitted and in what order.
+/// 实例会把每次传给 [call] 的 [AnalyticsEvent] 记录到内存列表中。在断言
+/// 里读取 [events] 来校验发出过哪些事件以及顺序。
 ///
-/// Because this class exposes a [call] method with the same signature as the
-/// `AnalyticsEmitter` typedef, instances can be passed directly wherever an
-/// `AnalyticsEmitter` is required — no wrapper or adapter needed.
+/// 由于本类提供了与 `AnalyticsEmitter` typedef 同签名的 [call] 方法，
+/// 实例可以直接传给任何需要 `AnalyticsEmitter` 的位置——不需要 wrapper
+/// 或适配器。
 ///
-/// This class is intended solely for use in tests; it must not be used in
-/// production code.
+/// 该类仅供测试使用，不得用于生产代码。
 class FakeAnalyticsEmitter {
   final List<AnalyticsEvent> _events = [];
 
-  /// An unmodifiable view of the events captured so far, in emission order.
+  /// 按发出顺序捕获到的事件的不可变视图。
   ///
-  /// Use this in test assertions, e.g.:
+  /// 用于测试断言，例如：
   /// ```dart
   /// expect(fake.events, hasLength(2));
   /// expect(fake.events.first, isA<AdClick>());
   /// ```
   List<AnalyticsEvent> get events => List.unmodifiable(_events);
 
-  /// Records [event] in the capture log.
+  /// 把 [event] 记录到捕获日志中。
   ///
-  /// The signature matches the `AnalyticsEmitter` typedef
-  /// (`void Function(AnalyticsEvent)`), so a `FakeAnalyticsEmitter` instance
-  /// can be passed wherever an `AnalyticsEmitter` is required.
+  /// 签名与 `AnalyticsEmitter` typedef
+  /// （`void Function(AnalyticsEvent)`）一致，因此 `FakeAnalyticsEmitter`
+  /// 实例可以传给任何需要 `AnalyticsEmitter` 的位置。
   void call(AnalyticsEvent event) => _events.add(event);
 
-  /// Clears all previously captured events.
+  /// 清空之前捕获到的全部事件。
   ///
-  /// Call this between test phases to reset state without creating a new
-  /// instance.
+  /// 在测试不同阶段之间调用以重置状态，无需新建实例。
   void clear() => _events.clear();
 }

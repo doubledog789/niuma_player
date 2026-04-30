@@ -1,46 +1,41 @@
 import '../domain/player_state.dart';
 import 'multi_source.dart';
 
-/// Decides which [MediaLine] to try next after an initialisation failure.
+/// 在初始化失败后决定下一条尝试的 [MediaLine]。
 ///
-/// Consulted by the controller after a failed `initialize` to determine
-/// whether to retry on a different [MediaLine]. Lines are walked in
-/// ascending [MediaLine.priority] order (lower number = tried first).
-/// Returns `null` when failover is not possible or the attempt budget is
-/// exhausted.
+/// controller 在 `initialize` 失败后调用，用以判断是否切换到另一条
+/// [MediaLine] 重试。按 [MediaLine.priority] 升序遍历（数字越小越早
+/// 尝试）。当无法 failover 或重试预算耗尽时返回 `null`。
 class AutoFailoverOrchestrator {
-  /// Creates an orchestrator for [lines] governed by [policy].
+  /// 为 [lines] 创建一个由 [policy] 控制的编排器。
   AutoFailoverOrchestrator({required this.lines, required this.policy});
 
-  /// The candidate playback lines available for failover.
+  /// 可供 failover 的候选播放线路。
   final List<MediaLine> lines;
 
-  /// The [MultiSourcePolicy] that controls whether failover is enabled and
-  /// how many switch attempts are permitted.
+  /// 控制是否启用 failover 以及最大切换次数的 [MultiSourcePolicy]。
   final MultiSourcePolicy policy;
 
   int _failovers = 0;
 
-  /// Increments the internal failover counter.
+  /// 递增内部 failover 计数。
   ///
-  /// The controller must call this after each successful line switch so that
-  /// [nextLine] can enforce [MultiSourcePolicy.maxAttempts].
+  /// controller 必须在每次成功切换线路后调用，使 [nextLine] 能够正确
+  /// 校验 [MultiSourcePolicy.maxAttempts]。
   void recordFailover() => _failovers++;
 
-  /// Returns the id of the next line to try, or `null` if no switch should
-  /// occur.
+  /// 返回下一条要尝试的线路 id；若不应切换则返回 `null`。
   ///
-  /// Returns `null` when:
-  /// - [policy] is disabled,
-  /// - the failover counter has reached [MultiSourcePolicy.maxAttempts],
-  /// - [category] is not retriable (only [PlayerErrorCategory.network] and
-  ///   [PlayerErrorCategory.terminal] trigger a switch),
-  /// - [currentId] is not found in [lines], or
-  /// - the current line is already the last in ascending-priority order.
+  /// 以下情况返回 `null`：
+  /// - [policy] 未启用；
+  /// - failover 计数已达 [MultiSourcePolicy.maxAttempts]；
+  /// - [category] 不可重试（只有 [PlayerErrorCategory.network] 和
+  ///   [PlayerErrorCategory.terminal] 会触发切换）；
+  /// - [currentId] 不在 [lines] 中；
+  /// - 当前线路在升序优先级中已是最后一条。
   ///
-  /// Lines are sorted ascending by [MediaLine.priority] (lower number tried
-  /// first); the next line is the immediate successor of [currentId] in that
-  /// ordering.
+  /// 线路按 [MediaLine.priority] 升序排序（数字越小越早尝试）；下一条
+  /// 即为该顺序中 [currentId] 之后紧邻的那条。
   String? nextLine({
     required String currentId,
     required PlayerErrorCategory category,

@@ -1,15 +1,15 @@
 import '../orchestration/resume_position.dart';
 
-/// In-memory [ResumeStorage] test double for use in widget and unit tests.
+/// 用于 widget 和单元测试的内存版 [ResumeStorage] 测试替身。
 ///
-/// All state is held in a plain [Map] — nothing is persisted to disk. Export
-/// this class via `lib/testing.dart` (or import directly from
-/// `package:niuma_player/src/testing/fake_resume_storage.dart`) in your own
-/// widget tests to inject a controllable storage backend without touching the
-/// file system or shared preferences.
+/// 所有状态都存放在一个普通 [Map] 中——不会写入磁盘。在自己的 widget
+/// 测试里通过 `lib/testing.dart` 导出（或直接从
+/// `package:niuma_player/src/testing/fake_resume_storage.dart` 引入）该
+/// 类，即可注入一个可控的存储后端，避免接触文件系统或 shared
+/// preferences。
 ///
-/// Uses `implements` rather than `extends` so that any future protected
-/// behaviour added to [ResumeStorage] does not leak into this test double.
+/// 使用 `implements` 而非 `extends`，这样将来 [ResumeStorage] 新增的
+/// protected 行为不会泄漏到本测试替身中。
 class FakeResumeStorage implements ResumeStorage {
   final Map<String, Duration> _store = {};
 
@@ -26,9 +26,8 @@ class FakeResumeStorage implements ResumeStorage {
     _store.remove(key);
   }
 
-  /// A read-only snapshot of the current in-memory store.
+  /// 当前内存存储的只读快照。
   ///
-  /// Useful in test assertions to verify the exact contents of storage
-  /// without going through the [read] API.
+  /// 用于在测试断言中校验存储的精确内容，无需走 [read] API。
   Map<String, Duration> get snapshot => Map.unmodifiable(_store);
 }

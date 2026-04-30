@@ -22,36 +22,32 @@ import '../orchestration/thumbnail_resolver.dart';
 import '../orchestration/thumbnail_track.dart';
 import '../orchestration/webvtt_parser.dart';
 
-/// Function shape for fetching a WebVTT body.
+/// 拉取 WebVTT body 的函数签名。
 ///
-/// Defaults to a thin wrapper over `http.get`. Tests inject a fake to avoid
-/// real network calls. Throwing or returning a non-VTT body is safe — the
-/// controller treats any failure as "thumbnails disabled" and continues to
-/// play the video normally.
+/// 默认是 `http.get` 的薄封装。测试注入 fake 避免真实网络调用。
+/// 抛异常或返回非 VTT body 都是安全的——controller 把任何失败视为
+/// "thumbnails 关闭"，正常继续播放视频。
 typedef ThumbnailFetcher = Future<String> Function(
   Uri uri,
   Map<String, String> headers,
 );
 
-/// Internal helper exposed for testing: streams a VTT body using the given
-/// [client], honouring [timeout] (wall-clock) and [maxBytes] (body size cap).
+/// 暴露给测试用的内部 helper：用给定的 [client] 流式拉取 VTT body，
+/// 遵守 [timeout]（wall-clock）和 [maxBytes]（body 大小上限）。
 ///
-/// Implementation uses [http.Client.send] (not `client.get`) so the body is
-/// **not** fully buffered into memory before the size cap is checked. The
-/// flow is:
-///   1. open the response stream + apply [timeout] to the headers phase;
-///   2. reject non-2xx status codes;
-///   3. if the server declared `Content-Length` and it already exceeds
-///      [maxBytes], reject before touching the body;
-///   4. otherwise accumulate chunks and abort the moment running total
-///      exceeds [maxBytes] — a malicious server cannot trick the VM into
-///      buffering arbitrary bytes first.
+/// 实现使用 [http.Client.send]（不是 `client.get`），因此在做 size cap
+/// 检查之前**不会**把 body 完整 buffer 到内存。流程是：
+///   1. 打开响应流 + 给 headers 阶段加 [timeout]；
+///   2. 拒绝非 2xx 状态码；
+///   3. 如果服务器声明了 `Content-Length` 且已超过 [maxBytes]，
+///      在读 body 前直接拒绝；
+///   4. 否则边累积 chunk 边检查；一旦累计超过 [maxBytes] 立即中止——
+///      恶意服务器无法骗 VM 先 buffer 任意字节。
 ///
-/// On non-2xx, oversized body, or timeout, throws [http.ClientException].
-/// In production the controller's default fetcher (built by
-/// `_makeDefaultThumbnailFetcher`) passes a fresh `http.Client()`; tests
-/// can pass a `MockClient` to drive the size cap / timeout / error branches
-/// without touching the network.
+/// 非 2xx、超大 body、timeout 都抛 [http.ClientException]。
+/// 生产环境中 controller 的默认 fetcher（由 `_makeDefaultThumbnailFetcher`
+/// 构造）传入一个新 `http.Client()`；测试可以传 `MockClient` 来驱动
+/// size cap / timeout / error 分支，不用碰真实网络。
 @visibleForTesting
 Future<String> fetchThumbnailVtt(
   Uri uri,
@@ -70,8 +66,8 @@ Future<String> fetchThumbnailVtt(
         uri,
       );
     }
-    // Honour Content-Length when the server is honest enough to declare it:
-    // we can refuse before reading any of the body.
+    // 服务器诚实声明 Content-Length 时利用它：在读 body 之前就可以
+    // 拒绝。
     final declared = streamed.contentLength;
     if (declared != null && declared > maxBytes) {
       throw http.ClientException(
@@ -96,9 +92,9 @@ Future<String> fetchThumbnailVtt(
   }
 }
 
-/// Builds the default [ThumbnailFetcher] closure used when callers don't
-/// inject their own. Captures the [options] so per-controller timeout / size
-/// cap settings flow through to [fetchThumbnailVtt].
+/// 构造调用方未注入自定义 fetcher 时使用的默认 [ThumbnailFetcher]
+/// 闭包。捕获 [options]，使每个 controller 自己的 timeout / size cap
+/// 设置能透到 [fetchThumbnailVtt]。
 ThumbnailFetcher _makeDefaultThumbnailFetcher(NiumaPlayerOptions options) {
   return (uri, headers) => fetchThumbnailVtt(
         uri,
@@ -109,8 +105,8 @@ ThumbnailFetcher _makeDefaultThumbnailFetcher(NiumaPlayerOptions options) {
       );
 }
 
-/// Options for tuning [NiumaPlayerController] behaviour. All fields have
-/// reasonable defaults so most callers should not need to touch this.
+/// 调整 [NiumaPlayerController] 行为的选项。所有字段都有合理默认值，
+/// 大多数调用方无需触碰。
 @immutable
 class NiumaPlayerOptions {
   const NiumaPlayerOptions({
@@ -120,53 +116,48 @@ class NiumaPlayerOptions {
     this.thumbnailMaxBodyBytes = 5 * 1024 * 1024,
   });
 
-  /// If the underlying backend hasn't reached "initialized" within this
-  /// window we treat it as a failure and (on Android) retry with IJK.
+  /// 若底层 backend 在该窗口内还没到 "initialized"，视作失败，
+  /// （Android 上）以 IJK 重试。
   ///
-  /// Default is generous because the native side already runs its own
-  /// no-progress watchdog (20s); this is the absolute wall-clock cap.
+  /// 默认值给得宽松，因为 native 侧已自带 no-progress watchdog（20s）；
+  /// 这里是绝对的 wall-clock 上限。
   final Duration initTimeout;
 
-  /// On Android, bypass the ExoPlayer fast path and go straight to IJK.
-  /// Useful for emergency overrides or A/B testing the rescue path. iOS
-  /// and Web ignore this flag (they always use video_player).
+  /// Android 上绕过 ExoPlayer 快路径直接走 IJK。
+  /// 用于紧急覆盖或 A/B 测试兜底路径。iOS 和 Web 忽略本标志
+  /// （永远走 video_player）。
   final bool forceIjkOnAndroid;
 
-  /// Hard wall-clock cap on the default VTT fetch. Anything beyond this is
-  /// treated as a hung server and the thumbnail track is silently disabled
-  /// (failing-open—video keeps playing).
+  /// 默认 VTT 拉取的 wall-clock 硬上限。超过即视为服务器卡死，
+  /// 缩略图轨道静默关闭（失败开放——视频继续播放）。
   ///
-  /// Only applies to the **default** [ThumbnailFetcher]. If a caller injects
-  /// their own fetcher via [NiumaPlayerController.thumbnailFetcher], they
-  /// own their own timeout policy.
+  /// 仅对**默认** [ThumbnailFetcher] 生效。如果调用方通过
+  /// [NiumaPlayerController.thumbnailFetcher] 注入了自家 fetcher，
+  /// 由其自行管理 timeout 策略。
   final Duration thumbnailFetchTimeout;
 
-  /// Hard cap on the VTT body size, in bytes. The default fetcher streams
-  /// the response and aborts the moment running total exceeds this — a
-  /// malicious server cannot force the VM to first buffer the entire body
-  /// before being rejected.
+  /// VTT body 大小硬上限（字节）。默认 fetcher 流式读取响应，一旦
+  /// 累计超过该值立即中止——恶意服务器无法强迫 VM 先把整个 body
+  /// buffer 完再被拒绝。
   ///
-  /// 5MB already implies tens of thousands of cues; typical thumbnail VTTs
-  /// are a few KB. Only applies to the default [ThumbnailFetcher].
+  /// 5MB 已意味着上万条 cue；典型 thumbnail VTT 只有几 KB。仅对
+  /// 默认 [ThumbnailFetcher] 生效。
   final int thumbnailMaxBodyBytes;
 }
 
-/// Public controller users interact with.
+/// 用户直接交互的公共 controller。
 ///
-/// Selection rules:
-///   - iOS / Web → `package:video_player` (AVPlayer / `<video>` + hls.js)
-///   - Android   → niuma_player's native plugin
+/// 选择规则：
+///   - iOS / Web → `package:video_player`（AVPlayer / `<video>` + hls.js）
+///   - Android   → niuma_player 自家 native 插件
 ///
-/// On Android the native plugin internally chooses between ExoPlayer and
-/// IJK based on its persistent `DeviceMemoryStore`. If ExoPlayer fails
-/// during opening, the native side persistently marks the device as
-/// "needs IJK" and this controller transparently retries once with
-/// `forceIjk=true` — the user just sees a brief delay before playback
-/// starts.
+/// Android 上 native 插件会基于持久化的 `DeviceMemoryStore` 在
+/// ExoPlayer 与 IJK 之间选择。若 ExoPlayer 在 opening 期间失败，
+/// native 侧持久化地把该设备记成 "needs IJK"，本 controller 会透明
+/// 地用 `forceIjk=true` 再试一次——用户只会看到短暂的延迟。
 ///
-/// Multi-line playback (CDN failover, quality variants) is supported via
-/// [NiumaMediaSource]. For single-URL use cases, prefer the
-/// [NiumaPlayerController.dataSource] convenience factory.
+/// 通过 [NiumaMediaSource] 支持多线路播放（CDN failover、画质变体）。
+/// 单 URL 场景建议用 [NiumaPlayerController.dataSource] 便捷 factory。
 ///
 /// **事件 / 值通知是同步触发的**：[events] 流和这个 controller（作为
 /// [ValueNotifier]）的监听器在 backend 推上来事件 / 值变更时**同步** fire。
@@ -200,9 +191,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
             : ThumbnailLoadState.idle,
         super(NiumaPlayerValue.uninitialized());
 
-  /// Single-source convenience factory. Wraps the [ds] in a
-  /// [NiumaMediaSource.single] so callers without multi-line needs can keep
-  /// the simpler ergonomics.
+  /// 单 source 便捷 factory。把 [ds] 包成 [NiumaMediaSource.single]，
+  /// 让无需多线路的调用方继续用更简洁的写法。
   factory NiumaPlayerController.dataSource(
     NiumaDataSource ds, {
     String? thumbnailVtt,
@@ -219,38 +209,35 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         thumbnailFetcher: thumbnailFetcher,
       );
 
-  /// The [NiumaMediaSource] describing all available playback lines for this
-  /// controller. Pass a [NiumaMediaSource.single] for single-URL playback, or
-  /// a [NiumaMediaSource.lines] for quality/CDN switching.
+  /// 描述本 controller 所有可用播放线路的 [NiumaMediaSource]。
+  /// 单 URL 播放传 [NiumaMediaSource.single]；画质 / CDN 切换传
+  /// [NiumaMediaSource.lines]。
   final NiumaMediaSource source;
 
-  /// Optional middleware pipeline applied to the data source before each
-  /// backend bring-up. Runs on every `initialize`, every `switchLine`
-  /// (Task 25), and every retry (Task 26) — guarantees fresh headers /
-  /// signed URLs.
+  /// 可选的 middleware 流水线，在每次 backend 起飞前作用于数据源。
+  /// 在每次 `initialize`、每次 `switchLine`（Task 25）、每次重试
+  /// （Task 26）上都会跑——保证 headers / signed URL 是新鲜的。
   final List<SourceMiddleware> middlewares;
 
-  /// Retry policy applied when [initialize] throws a recoverable error
-  /// (network / transient by default). Caps at the policy's [RetryPolicy.maxAttempts];
-  /// if all attempts fail, the error propagates and triggers the existing
-  /// Android forceIjk Try-Fail-Remember fallback.
+  /// [initialize] 抛出可恢复错误（默认 network / transient）时套用的
+  /// 重试策略。上限是策略的 [RetryPolicy.maxAttempts]；全部失败后错误
+  /// 继续向上传播，触发现有的 Android forceIjk Try-Fail-Remember 兜底。
   ///
-  /// **Trade-off**: retry runs *inside* the forceIjk fallback layer. In the
-  /// worst case, a single user-visible [initialize] call may make up to
-  /// `maxAttempts × 2` total backend initialisation attempts — first
-  /// `maxAttempts` ExoPlayer attempts, then `maxAttempts` IJK attempts.
+  /// **权衡**：重试运行在 forceIjk 兜底层*之内*。最坏情况下，单次面向
+  /// 用户的 [initialize] 调用最多会做 `maxAttempts × 2` 次后端初始化
+  /// 尝试——先 `maxAttempts` 次 ExoPlayer，再 `maxAttempts` 次 IJK。
   ///
-  /// Worst case wall-clock budget for a never-completing initialize:
-  /// `maxAttempts × initTimeout × 2 + sum(backoff) × 2`. With the defaults
-  /// (`initTimeout: 30s`, `maxAttempts: 3`, exponential 1s + 2s + 4s = 7s),
-  /// that is `(3 × 30 + 7) × 2 ≈ 194s` before failure surfaces. To tighten
-  /// the bound, lower [RetryPolicy.maxAttempts], lower
-  /// [NiumaPlayerOptions.initTimeout], or pass [RetryPolicy.none] to trade
-  /// resilience for latency.
+  /// 一个永不完成的 initialize 的最差 wall-clock 预算：
+  /// `maxAttempts × initTimeout × 2 + sum(backoff) × 2`。默认值下
+  /// （`initTimeout: 30s`、`maxAttempts: 3`、指数退避 1s + 2s + 4s = 7s），
+  /// 大约 `(3 × 30 + 7) × 2 ≈ 194s` 才会暴露失败。要收紧上限，
+  /// 降低 [RetryPolicy.maxAttempts]、降低
+  /// [NiumaPlayerOptions.initTimeout]，或传入 [RetryPolicy.none] 用
+  /// 韧性换延迟。
   final RetryPolicy retryPolicy;
 
-  /// Backwards-compatible accessor for callers that only use a single line.
-  /// Returns the data source of the currently active line.
+  /// 给只用一条线路的调用方的向后兼容访问器。
+  /// 返回当前激活线路的数据源。
   NiumaDataSource get dataSource => source.currentLine.source;
   final NiumaPlayerOptions options;
 
@@ -263,12 +250,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Completer<void>? _initCompleter;
   bool _disposed = false;
 
-  /// Tracks the id of the currently active line so [switchLine] can emit the
-  /// correct [LineSwitching.fromId]. Updated by [switchLine] on success.
+  /// 跟踪当前激活线路的 id，以便 [switchLine] 能发出正确的
+  /// [LineSwitching.fromId]。在 [switchLine] 成功时更新。
   String? _activeLineId;
 
-  /// The data source after running through the [middlewares] pipeline.
-  /// Populated at the start of [_runInitialize] and reused by [_initNative].
+  /// 经过 [middlewares] 流水线后的数据源。
+  /// 由 [_runInitialize] 起始处填充，[_initNative] 复用。
   NiumaDataSource? _resolvedSource;
 
   // ----- Thumbnail (M8) -----
@@ -278,9 +265,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   final ThumbnailFetcher _thumbnailFetcher;
   ThumbnailLoadState _thumbnailLoadState;
 
-  /// In-flight load future — used to dedup concurrent calls to
-  /// [_loadThumbnailsIfAny] so multiple `unawaited(...)` triggers only
-  /// ever do one fetch.
+  /// 进行中的加载 future——用于去重并发 [_loadThumbnailsIfAny] 调用，
+  /// 让多次 `unawaited(...)` 触发也只做一次 fetch。
   Future<void>? _thumbnailLoadFuture;
 
   /// 当前缩略图加载状态。详见 [ThumbnailLoadState] 文档。
@@ -295,31 +281,29 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast(sync: true);
 
-  /// Broadcast stream of [BackendSelected] / [FallbackTriggered] events. Safe
-  /// to subscribe before [initialize].
+  /// [BackendSelected] / [FallbackTriggered] 等事件的 broadcast stream。
+  /// 在 [initialize] 之前订阅是安全的。
   Stream<NiumaPlayerEvent> get events => _eventController.stream;
 
-  /// Which Dart-side backend is currently active. Before [initialize]
-  /// completes this defaults to `videoPlayer` (arbitrary — callers should
-  /// wait for `BackendSelected`).
+  /// 当前激活的 Dart 侧 backend。[initialize] 完成之前默认为
+  /// `videoPlayer`（任意值——调用方应等 `BackendSelected`）。
   PlayerBackendKind get activeBackend =>
       _backend?.kind ?? PlayerBackendKind.videoPlayer;
 
-  /// Texture id for the active backend, or null (video_player doesn't expose
-  /// one — it manages its own widget).
+  /// 当前激活 backend 的 texture id；video_player 不暴露 texture
+  /// （它管理自己的 widget），返回 null。
   int? get textureId => _backend?.textureId;
 
-  /// The underlying backend instance. Exposed so [NiumaPlayerView] can pick
-  /// the right rendering widget.
+  /// 底层 backend 实例。对外暴露以便 [NiumaPlayerView] 选择正确的
+  /// 渲染 widget。
   PlayerBackend? get backend => _backend;
 
-  /// Drives the platform-specific selection and leaves [backend] populated.
-  /// Safe to call more than once; subsequent calls return the same future.
+  /// 驱动平台特定的选择，并在 [backend] 上留下结果。
+  /// 多次调用是安全的；后续调用返回同一个 future。
   ///
-  /// Errors are propagated through the cached completer's future rather
-  /// than rethrown: the cached future is the *only* listener, and calling
-  /// `rethrow` here would also surface the error as unhandled because the
-  /// completer's future would never gain a second subscriber.
+  /// 错误通过缓存 completer 的 future 传播，而非 rethrow：缓存的 future
+  /// 是*唯一*订阅者，这里 `rethrow` 反而会让错误以 unhandled 形式冒出
+  /// 来——因为 completer 的 future 永远不会再获得第二个订阅者。
   Future<void> initialize() {
     if (_disposed) {
       return Future<void>.error(
@@ -340,12 +324,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     return completer.future;
   }
 
-  /// Classifies an exception into a [PlayerErrorCategory] for retry decisions.
+  /// 把异常分类成 [PlayerErrorCategory] 以便决定是否重试。
   ///
-  /// [TimeoutException] maps to [PlayerErrorCategory.network]. Objects that
-  /// carry a `.category` getter of type [PlayerErrorCategory] (e.g., the test
-  /// helper `_RetryableError`) are classified via that getter using duck-typing,
-  /// so the test class never needs to be visible in production code.
+  /// [TimeoutException] 映射到 [PlayerErrorCategory.network]。带有类型为
+  /// [PlayerErrorCategory] 的 `.category` getter 的对象（例如测试 helper
+  /// `_RetryableError`）通过 duck-typing 用该 getter 分类，因此测试类
+  /// 永远不必在生产代码中可见。
   PlayerErrorCategory _categorize(Object e) {
     if (e is TimeoutException) return PlayerErrorCategory.network;
     try {
@@ -353,17 +337,15 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       final c = d.category;
       if (c is PlayerErrorCategory) return c;
     } catch (_) {
-      // not a categorized exception; fall through
+      // 不是带分类的异常；继续往下走
     }
     return PlayerErrorCategory.unknown;
   }
 
-  /// Runs [bringUp] with retry according to [retryPolicy].
+  /// 按 [retryPolicy] 带重试地运行 [bringUp]。
   ///
-  /// On each throw, classifies the error via [_categorize] and asks
-  /// [retryPolicy] whether to retry. If not, the exception is rethrown
-  /// immediately so the caller's error-handling path (e.g. forceIjk fallback)
-  /// can take over.
+  /// 每次抛错时用 [_categorize] 分类，并询问 [retryPolicy] 是否重试。
+  /// 否则立即 rethrow，让调用方的错误处理路径（如 forceIjk 兜底）接管。
   Future<T> _withRetry<T>(Future<T> Function() bringUp) async {
     var attempt = 1;
     while (true) {
@@ -379,12 +361,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _runInitialize() async {
-    // iOS / Web → always video_player.
+    // iOS / Web → 永远走 video_player。
     if (_platform.isIOS || _platform.isWeb) {
       await _withRetry(() async {
-        // Each retry attempt: dispose any prior (failed) backend, re-run the
-        // middleware pipeline (so signed URLs / fresh headers are recomputed),
-        // build a fresh backend, then call initialize().
+        // 每次重试：dispose 之前（已失败的）backend，重新跑 middleware
+        // 流水线（重算 signed URL / 新鲜 headers），构造新 backend，
+        // 再调用 initialize()。
         await _disposeCurrentBackend();
         _resolvedSource = await runSourceMiddlewares(
           source.currentLine.source,
@@ -402,11 +384,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       return;
     }
 
-    // Android: single native backend. The Dart-side retry logic below is
-    // the entirety of the Try-Fail-Remember mechanism — native picks the
-    // initial variant and persists "needs IJK" itself, so all we have to
-    // do is dispose-and-reopen with `forceIjk=true` if the first attempt
-    // fails for any non-final reason.
+    // Android：单一 native backend。下面的 Dart 侧重试逻辑就是
+    // Try-Fail-Remember 机制的全部——native 自行挑选初始变体并持久化
+    // "needs IJK"，所以这里要做的只是：第一次出于任何非终结原因失败
+    // 时，dispose 之后用 `forceIjk=true` 重开。
     if (options.forceIjkOnAndroid) {
       await _initNative(forceIjk: true);
       unawaited(_loadThumbnailsIfAny());
@@ -416,9 +397,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     try {
       await _initNative(forceIjk: false);
     } catch (e) {
-      // First attempt failed. Native should have already marked memory if
-      // the cause was a codec issue; either way we retry with forceIjk to
-      // make sure the user gets *something* playing if IJK can handle it.
+      // 第一次尝试失败。如果原因是 codec 问题，native 应该已经写入
+      // memory；不管怎样，我们用 forceIjk 重试，确保只要 IJK 能处理，
+      // 用户就能看到*点儿什么*。
       _emit(FallbackTriggered(
         FallbackReason.error,
         errorCode: e.toString(),
@@ -429,16 +410,14 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     unawaited(_loadThumbnailsIfAny());
   }
 
-  /// Loads + parses the optional [NiumaMediaSource.thumbnailVtt] in the
-  /// background. Failures are swallowed (logged via [debugPrint]) so video
-  /// playback is never affected by a broken thumbnail track.
+  /// 在后台加载并解析可选的 [NiumaMediaSource.thumbnailVtt]。失败会被
+  /// swallow（通过 [debugPrint] 打日志），保证视频播放永远不受坏掉
+  /// 的缩略图轨道影响。
   ///
-  /// Idempotent during a single load: concurrent invocations share the
-  /// in-flight future (I6). After completion, the cached future is cleared
-  /// (`whenComplete`), so a future call — e.g. after an external retry — can
-  /// re-attempt the load and actually re-fetch (R2-I1). Today nothing in
-  /// the controller triggers a re-load on its own, but the door is open
-  /// (and dartdoc no longer lies about resetting).
+  /// 单次加载内幂等：并发调用共享同一个进行中的 future（I6）。完成后
+  /// 缓存的 future 被清空（`whenComplete`），未来再调一次（例如外部
+  /// 重试）就能真正重新发起 fetch（R2-I1）。目前 controller 自身不会
+  /// 主动触发重新加载，但门已经打开（dartdoc 不再骗人说会重置）。
   Future<void> _loadThumbnailsIfAny() {
     if (_thumbnailLoadFuture != null) return _thumbnailLoadFuture!;
     final future = _runThumbnailLoad().whenComplete(() {
@@ -449,9 +428,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _runThumbnailLoad() async {
-    // R2-S4: defensive entry-gate. Mirrors the per-await `_disposed` guards
-    // throughout this method (I5/I9) so a load that's queued behind dispose()
-    // doesn't even flip state to loading.
+    // R2-S4：防御性入口闸。镜像本方法内每个 await 后的 `_disposed` 守卫
+    // （I5/I9），保证排在 dispose() 之后的加载根本不会把状态翻成 loading。
     if (_disposed) return;
     final url = source.thumbnailVtt;
     if (url == null) return;
@@ -475,11 +453,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       _resolvedThumbnailUrl = ds.uri;
       _thumbnailLoadState = ThumbnailLoadState.ready;
     } catch (e) {
-      // I5: catch 块进入前先检查 _disposed —— dispose 中途完成的 fetcher
-      // 不应该再写已 disposed 的字段。
+      // I5：进 catch 前先检查 _disposed——dispose 中途完成的 fetcher
+      // 不应该再去写已 dispose 的字段。
       if (_disposed) return;
       debugPrint('[niuma_player] thumbnail VTT 加载失败：$e（不影响播放）');
-      // I9: 同时清掉两个状态字段，避免 partial state（cues 空但 resolvedUrl 有值）。
+      // I9：同时清空两个状态字段，避免 partial state（cues 空但 resolvedUrl 有值）。
       _thumbnailCues = const <WebVttCue>[];
       _resolvedThumbnailUrl = null;
       _thumbnailLoadState = ThumbnailLoadState.failed;
@@ -508,9 +486,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     PlayerBackend? lastBackend;
     try {
       await _withRetry(() async {
-        // Each retry attempt: dispose any prior (failed) backend, re-run the
-        // middleware pipeline (so signed URLs / fresh headers are recomputed),
-        // build a fresh native backend, then call initialize().
+        // 每次重试：dispose 之前（已失败的）backend，重新跑 middleware
+        // 流水线（重算 signed URL / 新鲜 headers），构造新 native backend，
+        // 再调用 initialize()。
         await _disposeCurrentBackend();
         _resolvedSource = await runSourceMiddlewares(
           source.currentLine.source,
@@ -525,9 +503,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         await native.initialize().timeout(options.initTimeout);
       });
     } on TimeoutException {
-      // Convert the wall-clock timeout into the FallbackTriggered semantic
-      // the public events stream expects, then rethrow so the caller's
-      // retry path runs.
+      // 把 wall-clock timeout 转成公共 events 流期望的 FallbackTriggered
+      // 语义，再 rethrow 让调用方的重试路径继续跑。
       _emit(const FallbackTriggered(FallbackReason.timeout));
       rethrow;
     }
@@ -549,9 +526,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     });
     _eventSub = backend.eventStream.listen((e) {
       if (_disposed) return;
-      // `FallbackTriggered` is controller-level: the controller emits its
-      // own canonical version inside [_runInitialize], so we drop
-      // backend-level fallback signals here to avoid duplicates.
+      // `FallbackTriggered` 是 controller 级事件：controller 在
+      // [_runInitialize] 内自己发出权威版本，所以这里把 backend 级
+      // fallback 信号丢掉避免重复。
       if (e is FallbackTriggered) return;
       if (!_eventController.isClosed) {
         _eventController.add(e);
@@ -598,22 +575,20 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
   Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
 
-  /// Switches playback to the line identified by [lineId].
+  /// 切换到 [lineId] 标识的线路。
   ///
-  /// Saves the current playback position and `isPlaying` state, tears down
-  /// the active backend, runs the middleware pipeline against the new line's
-  /// source, brings up a fresh backend for the target line, seeks back to the
-  /// saved position (if non-zero), and resumes playback if the player was
-  /// playing before the switch.
+  /// 保存当前播放 position 和 `isPlaying` 状态，拆掉当前 backend，
+  /// 在新线路 source 上跑 middleware 流水线，为目标线路拉起新 backend，
+  /// seek 回保存的位置（非 0 时），切换前在播放则恢复播放。
   ///
-  /// Events emitted (in order on success):
-  ///   1. [LineSwitching] — backend tear-down is about to begin.
-  ///   2. [LineSwitched]  — new backend is ready.
+  /// 成功时按顺序发出的事件：
+  ///   1. [LineSwitching] — backend 拆除即将开始。
+  ///   2. [LineSwitched]  — 新 backend 已就绪。
   ///
-  /// On failure, [LineSwitchFailed] is emitted and the error is rethrown.
+  /// 失败时发出 [LineSwitchFailed] 并 rethrow 错误。
   ///
-  /// Throws [ArgumentError] if [lineId] is not present in [source]'s lines.
-  /// No-ops silently if [lineId] equals the currently active line.
+  /// 当 [lineId] 不在 [source] 的 lines 中时抛 [ArgumentError]。
+  /// 当 [lineId] 等于当前激活线路时静默 no-op。
   Future<void> switchLine(String lineId) async {
     if (_disposed) return;
     final target = source.lineById(lineId);
@@ -639,8 +614,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       if (_platform.isIOS || _platform.isWeb) {
         await _attachBackend(_backendFactory.createVideoPlayer(resolved));
         if (_disposed) {
-          // The backend we just attached must not leak; tear it down before
-          // bailing.
+          // 刚 attach 的 backend 不能泄漏；返回前先拆掉。
           await _disposeCurrentBackend();
           return;
         }
@@ -650,8 +624,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         await _initNative(forceIjk: options.forceIjkOnAndroid);
       }
       if (_disposed) {
-        // Backend reached "initialized" but the controller was disposed
-        // mid-flight — clean up and bail without emitting LineSwitched.
+        // backend 已达到 "initialized"，但 controller 中途被 dispose
+        // 了——清理后退出，不再发 LineSwitched。
         await _disposeCurrentBackend();
         return;
       }
@@ -672,9 +646,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     }
   }
 
-  /// Wipes the "this device needs IJK" memory for every device fingerprint.
-  /// App-level "clear cache / reset" flows should call this so a future
-  /// initialize re-probes ExoPlayer instead of going straight to IJK.
+  /// 清掉所有设备指纹下的 "this device needs IJK" 记忆。
+  /// app 级"清缓存 / 重置"流程应调用此方法，让下次 initialize 重新
+  /// 探测 ExoPlayer，而不是直接走 IJK。
   static Future<void> clearDeviceMemory() => DeviceMemory().clear();
 
   @override
