@@ -422,6 +422,62 @@ void main() {
     orchB.dispose();
   });
 
+  testWidgets(
+      'orchestrator swap during active cue 时恢复底层视频 play（pauseVideoWhileShowing=true）',
+      (tester) async {
+    // R2-Important-1：旧 orchestrator 持有 active cue + 底层视频原本在播
+    // → swap 到新 orchestrator 时，旧 cue 的 pause 已经把视频停下，但
+    // didUpdateWidget swap 分支只 dispose adCtrl + 重置 _wasPlayingBeforeCue
+    // 而没 undo 那次 pause——结果视频留在 paused 状态。
+    final orchA = _orch();
+    final orchB = _orch();
+    final ctl = FakeNiumaPlayerController();
+    ctl.value = NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.playing);
+    final fake = FakeAnalyticsEmitter();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NiumaAdOverlay(
+          orchestrator: orchA,
+          videoController: ctl,
+          emitter: fake.call,
+        ),
+      ),
+    ));
+
+    // orchA 上 fire cue——cue 出现时 overlay 自动调 ctl.pause()。
+    orchA.activeCue.value = const AdCue(
+      builder: _adBuilder,
+      minDisplayDuration: Duration.zero,
+    );
+    orchA.activeCueType.value = AdCueType.preRoll;
+    await tester.pump();
+    expect(ctl.pauseCount, 1,
+        reason: 'cue 出现时 pauseVideoWhileShowing=true 应当调用 pause');
+    expect(ctl.playCount, 0);
+
+    // swap 到 orchB——此时旧 orchA 仍然持有 activeCue，旧 cue 的 pause 已
+    // 经发生但还没恢复。didUpdateWidget 的 swap 分支应当先恢复
+    // _wasPlayingBeforeCue 的 play，再做 detach / reset。
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NiumaAdOverlay(
+          orchestrator: orchB,
+          videoController: ctl,
+          emitter: fake.call,
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    expect(ctl.playCount, 1,
+        reason: 'orchestrator swap 时 active cue 之前在播——应当恢复 play');
+
+    orchA.dispose();
+    orchB.dispose();
+  });
+
   testWidgets('overlay unmount during cue 调 _adCtrl.dispose 关闭 elapsedStream',
       (tester) async {
     final orch = _orch();

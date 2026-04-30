@@ -129,6 +129,19 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       _setupOrchestrator(widget);
       _lastCue = null;
     }
+
+    // controlsAutoHideAfter 改了——cancel 旧计时，按当前 phase 决定是否
+    // 用新值重启。pauseVideoDuringAd 改了只影响下次 cue 进入的行为，
+    // 已激活的 cue 状态不重置（语义上把"切换时机点"留给下次更安全），
+    // 所以这里只 diff controlsAutoHideAfter。
+    if (oldWidget.controlsAutoHideAfter != widget.controlsAutoHideAfter) {
+      _hideTimer?.cancel();
+      _hideTimer = null;
+      if (widget.controller.value.phase == PlayerPhase.playing &&
+          _orchestrator?.activeCue.value == null) {
+        _scheduleAutoHide();
+      }
+    }
   }
 
   @override
@@ -256,9 +269,12 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     // 广告 cue 活跃时把 tap 让给 NiumaAdOverlay（它自己有 dismissOnTap
     // 行为）——本控件层不切换可见，避免拦截 cue 关闭手势。
     if (_orchestrator?.activeCue.value != null) return;
-    setState(() => _controlsVisible = !_controlsVisible);
-    if (_controlsVisible &&
-        widget.controller.value.phase == PlayerPhase.playing) {
+    final next = !_controlsVisible;
+    // 走 _setControlsVisible 而不是直接 setState——一致性优先：
+    // 理论上 build 阶段不会有 tap，但走统一入口可以让后续的"build
+    // 阶段保护"逻辑（post-frame 延后 + intent 合并）天然覆盖到 tap 路径。
+    _setControlsVisible(next);
+    if (next && widget.controller.value.phase == PlayerPhase.playing) {
       _scheduleAutoHide();
     }
   }

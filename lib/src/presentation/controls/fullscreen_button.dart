@@ -40,11 +40,20 @@ class FullscreenButton extends StatelessWidget {
       // 从外层 NiumaPlayer 注入的 NiumaPlayerConfigScope 把 adSchedule /
       // emitter / pauseVideoDuringAd / autoHide / theme 一并透传到全屏
       // 页，避免全屏页里的内层 NiumaPlayer 丢失外层配置。
+      //
+      // theme 字段优先用 NiumaPlayer.theme（cfg.theme），为 null 时退到
+      // 通过 [NiumaPlayerThemeData] InheritedWidget 注入的当前主题
+      // ([NiumaPlayerTheme.of])——README 推荐的用法是
+      // `NiumaPlayerThemeData(child: NiumaPlayer(controller: ctl))`
+      // 此时 NiumaPlayer.theme=null，没这个 fallback 全屏页就拿不到外层
+      // inherited 主题，造成视觉回归。
       final cfg = NiumaPlayerConfigScope.maybeOf(context);
+      final inheritedTheme =
+          cfg?.theme ?? NiumaPlayerTheme.of(context);
       Navigator.of(context).push(
         NiumaFullscreenPage.route(
           controller: controller,
-          theme: cfg?.theme,
+          theme: inheritedTheme,
           adSchedule: cfg?.adSchedule,
           adAnalyticsEmitter: cfg?.adAnalyticsEmitter,
           pauseVideoDuringAd: cfg?.pauseVideoDuringAd ?? true,

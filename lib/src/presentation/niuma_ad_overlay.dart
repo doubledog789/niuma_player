@@ -83,6 +83,16 @@ class _NiumaAdOverlayState extends State<NiumaAdOverlay> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.orchestrator != widget.orchestrator) {
       // orchestrator 换了——detach 旧的，重置内部 cue 状态，attach 新的。
+      //
+      // 关键：如果旧 orchestrator 还持有 active cue 且 cue 进入前视频
+      // 在播（_wasPlayingBeforeCue=true），swap 时必须先恢复 play——
+      // 旧 cue 的 pause 已经把视频停下，新 orchestrator 不会替我们
+      // 还原。不还原会让视频留在 paused 状态，行为回归。
+      if (_lastCue != null &&
+          widget.pauseVideoWhileShowing &&
+          _wasPlayingBeforeCue) {
+        widget.videoController.play();
+      }
       oldWidget.orchestrator.activeCue.removeListener(_onActiveCueChanged);
       _disposeAdCtrl();
       _lastCue = null;
@@ -116,39 +126,7 @@ class _NiumaAdOverlayState extends State<NiumaAdOverlay> {
     _lastCue = next;
 
     if (next != null && prev == null) {
-      // 进入：新 cue 开始。
-      _wasPlayingBeforeCue =
-          widget.videoController.value.phase == PlayerPhase.playing;
-      if (widget.pauseVideoWhileShowing) {
-        widget.videoController.pause();
-      }
-      final cueType = widget.orchestrator.activeCueType.value ??
-          AdCueType.preRoll;
-      _adCtrl = AdControllerImpl(
-        cue: next,
-        cueType: cueType,
-        emitter: widget.emitter,
-        onDismissRequested: () {
-          // controller.dismiss() 内部已 emit AdDismissed；这里只需要
-          // 把 overlay 状态收回，让 ValueNotifier 通知到 listener，再走
-          // 一遍我们的离开分支。
-          widget.orchestrator.dismissActive();
-        },
-      );
-      // timeout 自动关闭。
-      final timeout = next.timeout;
-      if (timeout != null) {
-        _timeoutTimer = Timer(timeout, () {
-          if (!mounted) return;
-          if (widget.orchestrator.activeCue.value != next) return;
-          widget.emitter(AnalyticsEvent.adDismissed(
-            cueType: cueType,
-            reason: AdDismissReason.timeout,
-          ));
-          widget.orchestrator.dismissActive();
-        });
-      }
-      setState(() {});
+      _handleNewCue(next);
     } else if (next == null && prev != null) {
       // 离开：cue 结束。dispose 内部 controller，恢复视频。
       _disposeAdCtrl();
@@ -159,11 +137,49 @@ class _NiumaAdOverlayState extends State<NiumaAdOverlay> {
       if (mounted) setState(() {});
     } else if (next != null && prev != null && !identical(next, prev)) {
       // 切换：罕见，但 cue 直接换成另一个 cue（编排器 race）——
-      // 安全起见走"关闭旧 + 打开新"。
+      // 安全起见走"关闭旧 + 打开新"。直接调 [_handleNewCue] 而不是
+      // 递归 self（旧实现需要先 _lastCue=null + 重入），更直接也避免
+      // 把 _lastCue 来回写两遍。
       _disposeAdCtrl();
-      _lastCue = null; // 强制下次 _onActiveCueChanged 视为"新出现"。
-      _onActiveCueChanged();
+      _handleNewCue(next);
     }
+  }
+
+  /// 进入一个新 cue：记录 _wasPlayingBeforeCue，可选 pause 视频，
+  /// 构造 [AdControllerImpl]，按 timeout 注册自动 dismiss timer。
+  void _handleNewCue(AdCue cue) {
+    _wasPlayingBeforeCue =
+        widget.videoController.value.phase == PlayerPhase.playing;
+    if (widget.pauseVideoWhileShowing) {
+      widget.videoController.pause();
+    }
+    final cueType =
+        widget.orchestrator.activeCueType.value ?? AdCueType.preRoll;
+    _adCtrl = AdControllerImpl(
+      cue: cue,
+      cueType: cueType,
+      emitter: widget.emitter,
+      onDismissRequested: () {
+        // controller.dismiss() 内部已 emit AdDismissed；这里只需要
+        // 把 overlay 状态收回，让 ValueNotifier 通知到 listener，再走
+        // 一遍我们的离开分支。
+        widget.orchestrator.dismissActive();
+      },
+    );
+    // timeout 自动关闭。
+    final timeout = cue.timeout;
+    if (timeout != null) {
+      _timeoutTimer = Timer(timeout, () {
+        if (!mounted) return;
+        if (widget.orchestrator.activeCue.value != cue) return;
+        widget.emitter(AnalyticsEvent.adDismissed(
+          cueType: cueType,
+          reason: AdDismissReason.timeout,
+        ));
+        widget.orchestrator.dismissActive();
+      });
+    }
+    if (mounted) setState(() {});
   }
 
   @override

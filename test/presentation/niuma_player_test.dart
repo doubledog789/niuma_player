@@ -386,6 +386,88 @@ void main() {
     });
   });
 
+  group('M9 round-2 review 修复', () {
+    testWidgets(
+        'NiumaPlayerThemeData inherited 注入主题——FullscreenButton push 时透传到全屏页',
+        (tester) async {
+      // README 推荐写法：上层用 NiumaPlayerThemeData(child: NiumaPlayer(...))，
+      // NiumaPlayer.theme 字段为 null。点击 fullscreen 进入全屏后，全屏页内
+      // 的 widget 应当读到外层 inherited theme（而不是默认 theme）。
+      final ctl = FakeNiumaPlayerController();
+      const customTheme =
+          NiumaPlayerTheme(accentColor: Color(0xFFAA0000), iconSize: 42);
+
+      await tester.pumpWidget(MaterialApp(
+        home: NiumaPlayerThemeData(
+          data: customTheme,
+          child: Scaffold(body: NiumaPlayer(controller: ctl)),
+        ),
+      ));
+
+      // 点击外层的 FullscreenButton——它在 NiumaControlBar 里。
+      await tester.tap(find.byType(FullscreenButton));
+      await tester.pumpAndSettle();
+
+      // 全屏页内的子树读到的 theme 应该是 customTheme（不是默认）。
+      // 通过在全屏页内找 NiumaPlayerTheme.of 的间接证据：iconSize 应该是 42。
+      final fullscreenIcons =
+          tester.widgetList<IconButton>(find.descendant(
+        of: find.byType(NiumaFullscreenPage),
+        matching: find.byType(IconButton),
+      ));
+      expect(fullscreenIcons, isNotEmpty,
+          reason: '全屏页内应有 IconButton');
+      // 至少有一个 IconButton 用了 customTheme.iconSize=42。
+      expect(
+        fullscreenIcons.any((b) => b.iconSize == 42),
+        isTrue,
+        reason: '全屏页内的 IconButton 应当读到外层 NiumaPlayerThemeData '
+            '注入的 customTheme（iconSize=42）',
+      );
+    });
+
+    testWidgets(
+        'didUpdateWidget controlsAutoHideAfter 改变时重置计时器使用新值',
+        (tester) async {
+      final ctl = FakeNiumaPlayerController();
+
+      Widget build(Duration autoHide) => MaterialApp(
+            home: Scaffold(
+              body: NiumaPlayer(
+                controller: ctl,
+                controlsAutoHideAfter: autoHide,
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(build(const Duration(seconds: 10)));
+
+      // 进入 playing：旧 10s 计时器启动。
+      ctl.value = _playingValue();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      AnimatedOpacity readOpacity() => tester.widget<AnimatedOpacity>(
+            find.descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            ),
+          );
+      expect(readOpacity().opacity, 1.0, reason: '1s 时仍可见');
+
+      // 改 controlsAutoHideAfter 到 2s——didUpdateWidget 应当 cancel 旧
+      // 计时器并按新值重启。
+      await tester.pumpWidget(build(const Duration(seconds: 2)));
+      await tester.pump();
+
+      // 改 props 那一刻起再过 2s 应该隐藏（如果 didUpdateWidget 没处理，
+      // 旧 10s 计时器仍在跑，到这里只过了 1+2=3s，远不到 10s，控件仍可见）。
+      await tester.pump(const Duration(seconds: 2, milliseconds: 100));
+      expect(readOpacity().opacity, 0.0,
+          reason: 'controlsAutoHideAfter 改成 2s 后应当按新值重启计时器');
+    });
+  });
+
   group('fake_async 时序', () {
     test('计时逻辑使用 Timer——可被 fake_async 推动', () {
       // Smoke test：FakeAsync 能正常推动；具体 widget 行为已在上面 widget
