@@ -31,6 +31,9 @@ export 'src/presentation/niuma_player_theme.dart'
 // M9 缩略图悬浮预览
 export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;
 
+// M9 控件条组合
+export 'src/presentation/niuma_control_bar.dart' show NiumaControlBar;
+
 // M9 原子控件
 export 'src/presentation/controls/play_pause_button.dart'
     show PlayPauseButton;

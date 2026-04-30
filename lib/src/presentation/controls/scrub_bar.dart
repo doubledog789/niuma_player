@@ -38,6 +38,13 @@ class _ScrubBarState extends State<ScrubBar> {
 
   bool get _hasThumbnail => widget.controller.source.thumbnailVtt != null;
 
+  /// 进度条本体的高度——足以容纳"拖动 thumb"圆点（thumbRadiusActive=9 → 18px
+   /// 直径）和上下安全区。如果调用方需要更大点击区，外面包 [SizedBox] 即可。
+  double _hostHeight() {
+    final theme = NiumaPlayerTheme.of(context);
+    return theme.scrubBarThumbRadiusActive * 2 + 8;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
@@ -55,9 +62,11 @@ class _ScrubBarState extends State<ScrubBar> {
         final bufferedProgress =
             hasDuration ? (bufMs / durMs).clamp(0.0, 1.0) : 0.0;
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
+        return SizedBox(
+          height: _hostHeight(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
             final thumbX = width * progress;
             final previewWidth = theme.thumbnailPreviewSize.width;
             final previewLeft =
@@ -130,12 +139,13 @@ class _ScrubBarState extends State<ScrubBar> {
                       thumbRadius: _scrubbing
                           ? theme.scrubBarThumbRadiusActive
                           : theme.scrubBarThumbRadius,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         );
       },
     );
