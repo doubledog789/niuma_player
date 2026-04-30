@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../observability/analytics_emitter.dart';
@@ -141,14 +142,25 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
   @override
   void dispose() {
     if (!kIsWeb) {
-      // 传空 list 而不是 DeviceOrientation.values：
-      // - 空 list = 释放锁定，Android 回到 manifest screenOrientation
-      //   设置（通常是 unspecified，跟设备传感器走）+ iOS 回到 plist
-      //   UISupportedInterfaceOrientations。
-      // - DeviceOrientation.values（含全 4 方向）会让 Android 解读
-      //   成 SCREEN_ORIENTATION_FULL_USER 显式锁定，Activity 不再
-      //   重新评估当前方向，用户感觉"无法旋转"。
-      SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]);
+      // Android 退全屏方向恢复需要两步走：
+      //
+      // 1) 先显式设 [portraitUp]——给 Activity 一个"竖屏"信号触发
+      //    onConfigurationChanged，Android 把当前 surface 从横屏切回
+      //    竖屏。如果不做这一步，仅传空 list 解锁，Activity 仍停在
+      //    横屏 config 直到用户物理旋转设备，用户体感"退出全屏没回正"。
+      // 2) 下一帧再传空 list 释放锁定，让用户后续能按设备传感器自由
+      //    旋转（不强制竖屏锁定）。
+      //
+      // iOS 不需要这套——SystemChrome 在 iOS 上立刻生效，传一次空 list
+      // 就回到 plist UISupportedInterfaceOrientations 默认。但执行
+      // 同样代码无副作用：iOS 第一步等价于"暂时偏好 portrait"，第二
+      // 步等价于"defer to plist"。
+      SystemChrome.setPreferredOrientations(
+        const <DeviceOrientation>[DeviceOrientation.portraitUp],
+      );
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]);
+      });
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     super.dispose();

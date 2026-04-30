@@ -100,7 +100,7 @@ void main() {
     expect(modeCalls.first.arguments, 'SystemUiMode.immersiveSticky');
   });
 
-  testWidgets('dispose 释放 orientation 锁（空 list）+ edgeToEdge', (tester) async {
+  testWidgets('dispose 双步骤：先 portrait 再空 list + edgeToEdge', (tester) async {
     final ctl = FakeNiumaPlayerController();
 
     final navKey = GlobalKey<NavigatorState>();
@@ -127,15 +127,25 @@ void main() {
     final orientationCalls = calls
         .where((c) => c.method == 'SystemChrome.setPreferredOrientations')
         .toList();
-    expect(orientationCalls, isNotEmpty,
-        reason: 'dispose 应当再次调用 setPreferredOrientations 恢复');
-    // 恢复时传空 list——告诉 Flutter "释放锁定，回到 OS / app 默认
-    // 方向"。如果传 DeviceOrientation.values（4 个全开），Android 会
-    // 解读成 SCREEN_ORIENTATION_FULL_USER 显式锁定，Activity 不重新
-    // 评估当前方向，用户感觉"无法旋转"。
-    final args = orientationCalls.last.arguments as List<dynamic>;
-    expect(args, isEmpty,
-        reason: 'dispose 必须传空 list 释放方向锁，否则 Android 仍处显式锁定状态');
+    // dispose 触发两次 setPreferredOrientations：
+    // 第 1 次：[DeviceOrientation.portraitUp]——同步触发 Android Activity
+    //         从横屏切回竖屏 reconfigure。不传这个的话，Android 即使解锁
+    //         也停在横屏 config，体感"退全屏没回正"。
+    // 第 2 次：空 list（在 post-frame callback 里）——释放锁定，让用户
+    //         后续能按传感器自由旋转。
+    // calls.clear 在 pop 之前调过，所以这里只有 dispose 引发的 2 次调用：
+    //   第 1 次：[DeviceOrientation.portraitUp]——同步触发 Android Activity
+    //          从横屏切回竖屏 reconfigure。不传这个的话，Android 即使解锁
+    //          也停在横屏 config，体感"退全屏没回正"。
+    //   第 2 次：空 list（在 post-frame callback 里）——释放锁定，让用户
+    //          后续能按传感器自由旋转。
+    expect(orientationCalls.length, greaterThanOrEqualTo(2),
+        reason: 'dispose 触发两次：portrait → empty');
+    expect(orientationCalls.first.arguments,
+        equals(<String>['DeviceOrientation.portraitUp']),
+        reason: 'dispose 第一步：强设 portrait 触发 Activity reconfigure');
+    expect(orientationCalls.last.arguments, isEmpty,
+        reason: 'dispose 最后一步（post-frame）：空 list 释放锁定');
 
     final modeCalls = calls
         .where((c) => c.method == 'SystemChrome.setEnabledSystemUIMode')
