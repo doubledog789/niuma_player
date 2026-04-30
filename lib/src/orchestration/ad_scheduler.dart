@@ -44,6 +44,14 @@ class AdSchedulerOrchestrator {
   /// 没有广告排播。
   final ValueNotifier<AdCue?> activeCue = ValueNotifier(null);
 
+  /// 与 [activeCue] 同步切换的当前 cue 的位置类型通知器。
+  ///
+  /// `null` 表示当前没有广告排播。需要这个独立通知器，是因为视图层
+  /// 在构造 `AdControllerImpl` 时必须知道 cue 类型，才能把
+  /// `AdImpression` / `AdClick` / `AdDismissed` 事件标记到正确的
+  /// [AdCueType] 上。
+  final ValueNotifier<AdCueType?> activeCueType = ValueNotifier(null);
+
   PlayerPhase? _lastPhase;
   bool _preRollFired = false;
   Duration _lastPos = Duration.zero;
@@ -66,10 +74,22 @@ class AdSchedulerOrchestrator {
     playerValue.addListener(_onValue);
   }
 
-  /// 停止监听 [playerValue] 并 dispose [activeCue] 通知器。
+  /// 停止监听 [playerValue] 并 dispose [activeCue] / [activeCueType] 通知器。
   void dispose() {
     playerValue.removeListener(_onValue);
     activeCue.dispose();
+    activeCueType.dispose();
+  }
+
+  /// 关闭当前激活的 cue。
+  ///
+  /// 同时把 [activeCue] 与 [activeCueType] 清空。视图层在
+  /// `AdController.dismiss` 走完后调用此方法，把"哪个 cue 在前台"
+  /// 的事实从编排器视角擦除。重复调用是幂等的——`null` 状态下再
+  /// 调一次不会触发额外通知。
+  void dismissActive() {
+    activeCue.value = null;
+    activeCueType.value = null;
   }
 
   void _onValue() {
@@ -151,6 +171,7 @@ class AdSchedulerOrchestrator {
   void _fire(AdCue cue, AdCueType type) {
     if (playerValue.value.isPlaying) onPause();
     activeCue.value = cue;
+    activeCueType.value = type;
     _analytics?.call(AnalyticsEvent.adScheduled(cueType: type));
   }
 }

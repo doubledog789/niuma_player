@@ -286,4 +286,116 @@ void main() {
 
     orch.dispose();
   });
+
+  // ─────────────── M9 follow-up: activeCueType + dismissActive ───────────────
+
+  test('activeCueType 与 activeCue 同步——preRoll', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        preRoll: AdCue(builder: (_, __) => const SizedBox()),
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    expect(orch.activeCue.value, isNull);
+    expect(orch.activeCueType.value, isNull);
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.ready));
+
+    expect(orch.activeCue.value, isNotNull);
+    expect(orch.activeCueType.value, AdCueType.preRoll);
+
+    orch.dispose();
+  });
+
+  test('activeCueType 在 midRoll 触发时同步设为 midRoll', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        midRolls: [
+          MidRollAd(
+            at: const Duration(seconds: 30),
+            cue: AdCue(builder: (_, __) => const SizedBox()),
+          ),
+        ],
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    player.emit(NiumaPlayerValue.uninitialized().copyWith(
+      phase: PlayerPhase.playing,
+      position: const Duration(seconds: 29),
+    ));
+    player.emit(NiumaPlayerValue.uninitialized().copyWith(
+      phase: PlayerPhase.playing,
+      position: const Duration(seconds: 31),
+    ));
+    expect(orch.activeCueType.value, AdCueType.midRoll);
+    orch.dispose();
+  });
+
+  test('activeCueType 在 pauseAd 触发时同步设为 pauseAd', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        pauseAd: AdCue(builder: (_, __) => const SizedBox()),
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.playing));
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.paused));
+    expect(orch.activeCueType.value, AdCueType.pauseAd);
+    orch.dispose();
+  });
+
+  test('activeCueType 在 postRoll 触发时同步设为 postRoll', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        postRoll: AdCue(builder: (_, __) => const SizedBox()),
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.ended));
+    expect(orch.activeCueType.value, AdCueType.postRoll);
+    orch.dispose();
+  });
+
+  test('dismissActive 同时清空 activeCue 与 activeCueType', () {
+    final player = _FakePlayer();
+    final orch = AdSchedulerOrchestrator(
+      schedule: NiumaAdSchedule(
+        preRoll: AdCue(builder: (_, __) => const SizedBox()),
+      ),
+      playerValue: player,
+      onPlay: player.play,
+      onPause: player.pause,
+    )..attach();
+
+    player.emit(NiumaPlayerValue.uninitialized()
+        .copyWith(phase: PlayerPhase.ready));
+    expect(orch.activeCue.value, isNotNull);
+    expect(orch.activeCueType.value, isNotNull);
+
+    orch.dismissActive();
+
+    expect(orch.activeCue.value, isNull);
+    expect(orch.activeCueType.value, isNull);
+    orch.dispose();
+  });
 }
