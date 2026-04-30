@@ -7,6 +7,48 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-30
+
+### 新增（M9 — UI overlay 层）
+- `NiumaPlayer` 一体化默认播放组件——5 行起步：传一个
+  `NiumaPlayerController` 即可拿到完整可用的播放界面（B 站风格底栏 +
+  auto-hide + 进度条缩略图预览 + 可选广告 overlay + 全屏入口）。
+- `NiumaFullscreenPage` + `NiumaFullscreenPage.route(controller)` 路由
+  工厂——push 进全屏页（淡入 200ms），自动锁定 landscape +
+  `SystemUiMode.immersiveSticky`；dispose 恢复 `DeviceOrientation.values`
+  + `edgeToEdge`。Web 上 `kIsWeb` 保护跳过 SystemChrome 调用。
+- `NiumaPlayerTheme` `InheritedWidget`（13 字段）+ `NiumaPlayerThemeData`，
+  支持 host app 注入自定义 accent / 图标尺寸 / 进度条尺寸 / 缩略图
+  预览尺寸 / 控件背景渐变等。
+- 9 个原子控件：`PlayPauseButton` / `ScrubBar` / `TimeDisplay` /
+  `VolumeButton` / `SpeedSelector`（0.5×–2×）/ `QualitySelector`
+  （消费 `source.lines` + `switchLine`）/ `SubtitleButton`（M9 disabled，
+  M10 启用）/ `DanmakuButton`（M9 disabled，M11 启用）/ `FullscreenButton`。
+  全部对外 export，调用方可自己拼非默认布局。
+- `NiumaControlBar` —— B 站风格密集底栏，把 9 个原子控件 + ScrubBar 按
+  "上 ScrubBar / 下 Row" 两层组合；背景走主题 `controlsBackgroundGradient`。
+- `NiumaScrubPreview` —— 进度条 hover / 拖动时悬浮缩略图组件，消费 M8
+  `controller.thumbnailFor` + `NiumaThumbnailView`，可选时间标签。
+- `NiumaAdOverlay` —— 把 `AdSchedulerOrchestrator.activeCue` 翻译成屏上
+  widget；自动暂停 / 恢复底层视频、跑 `cue.timeout` 倒计时、捕获
+  `cue.builder` 异常时 emit `AdDismissed` 并清场。
+- `NiumaPlayer.adSchedule` 非空时在内部自动构造
+  `AdSchedulerOrchestrator` + `NiumaAdOverlay`；`adAnalyticsEmitter`
+  路由 `AdImpression` / `AdClick` / `AdDismissed` 事件。
+- Auto-hide 状态机：进入 `playing` 5s（默认，可配 `controlsAutoHideAfter`）
+  自动隐藏控件；`paused` 强制显示；点击视频区翻转显隐；广告 cue
+  active 时强制隐藏让 overlay 接管；`Duration.zero` 视为永不自动隐藏。
+
+### 变更（M7 follow-up）
+- `AdSchedulerOrchestrator` 新增 `activeCueType: ValueNotifier<AdCueType?>`
+  与 `dismissActive()`，让 overlay 在构造 `AdControllerImpl` 时知道
+  cue 类型，用来给 `AdImpression` / `AdClick` / `AdDismissed` 标记
+  正确的 `AdCueType`。
+- `AdControllerImpl` 真实落实 `reportImpression`（去重，仅发一次）/
+  `reportClick` / `dismiss` 路由——`dismiss` 在 `cue.minDisplayDuration`
+  内静默拒绝，超过后 emit `AdDismissed(userSkip)` + 调
+  `onDismissRequested` 让 overlay 收回。
+
 ## [0.3.0] - 2026-04-30
 
 ### 新增（M8 — 缩略图 VTT）
@@ -102,7 +144,8 @@
 - 14 个单元测试，覆盖 iOS / Web / Android happy path、retry success、
   retry failure、wall-clock 超时，以及 `DeviceMemory` 持久化。
 
-[Unreleased]: https://github.com/axin789/niuma_player/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/axin789/niuma_player/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/axin789/niuma_player/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/axin789/niuma_player/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/axin789/niuma_player/releases/tag/v0.2.0
 [0.1.0]: https://github.com/axin789/niuma_player/releases/tag/v0.1.0
