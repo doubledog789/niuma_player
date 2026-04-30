@@ -307,35 +307,43 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         final theme = NiumaPlayerTheme.of(innerContext);
         final fadeDuration = theme.fadeInDuration;
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _onTapVideo,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              NiumaPlayerView(widget.controller),
-              AnimatedOpacity(
-                opacity: _controlsVisible ? 1.0 : 0.0,
-                duration: fadeDuration,
-                child: IgnorePointer(
-                  ignoring: !_controlsVisible,
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: NiumaControlBar(controller: widget.controller),
-                  ),
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            NiumaPlayerView(widget.controller),
+            // 透明 click-catcher：放在视频之上、控件之下。
+            // 在 Flutter web 上 package:video_player 走 HtmlElementView
+            // （HTML <video> 元素），DOM click 被该元素直接吃掉不冒泡到
+            // 外层 Flutter GestureDetector。这一层是 Flutter widget，
+            // hit test 永远命中（opaque），保证 tap 切换控件可见的逻辑
+            // 在 web / native 都能跑。
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _onTapVideo,
+              ),
+            ),
+            AnimatedOpacity(
+              opacity: _controlsVisible ? 1.0 : 0.0,
+              duration: fadeDuration,
+              child: IgnorePointer(
+                ignoring: !_controlsVisible,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: NiumaControlBar(controller: widget.controller),
                 ),
               ),
-              if (_orchestrator != null)
-                Positioned.fill(
-                  child: NiumaAdOverlay(
-                    orchestrator: _orchestrator!,
-                    videoController: widget.controller,
-                    emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
-                    pauseVideoWhileShowing: widget.pauseVideoDuringAd,
-                  ),
+            ),
+            if (_orchestrator != null)
+              Positioned.fill(
+                child: NiumaAdOverlay(
+                  orchestrator: _orchestrator!,
+                  videoController: widget.controller,
+                  emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
+                  pauseVideoWhileShowing: widget.pauseVideoDuringAd,
                 ),
-            ],
-          ),
+              ),
+          ],
         );
       },
     );

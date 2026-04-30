@@ -61,6 +61,9 @@ class _M9CustomDemoPageState extends State<M9CustomDemoPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('M9 积木自定义布局')),
+      // 深色背景：默认 NiumaPlayerTheme 用白色 icon / 高对比配色，
+      // 直接放在 Scaffold 默认白底上会"白上加白"看不见。
+      backgroundColor: Colors.black87,
       body: NiumaPlayerThemeData(
         data: theme,
         child: Column(
@@ -110,7 +113,7 @@ class _M9CustomDemoPageState extends State<M9CustomDemoPage> {
                 '2. 紫色 accent + 加大 thumb 半径来自 NiumaPlayerTheme 注入\n'
                 '3. 拖动进度条时 ScrubBar 顶上出现缩略图预览\n'
                 '4. 全屏按钮仍然 push NiumaFullscreenPage',
-                style: TextStyle(fontSize: 12),
+                style: TextStyle(fontSize: 12, color: Colors.white70),
               ),
             ),
           ],
