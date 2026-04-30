@@ -170,6 +170,11 @@ class AdSchedulerOrchestrator {
 
   void _fire(AdCue cue, AdCueType type) {
     if (playerValue.value.isPlaying) onPause();
+    // 强制先归零再 set——[ValueNotifier] 同实例不通知。如果上一个
+    // cue 跟新 cue 是同一个对象（dismissActive 后立即重 fire），
+    // 不归零的话 listener 不会再次触发。
+    activeCue.value = null;
+    activeCueType.value = null;
     activeCue.value = cue;
     activeCueType.value = type;
     _analytics?.call(AnalyticsEvent.adScheduled(cueType: type));
@@ -275,5 +280,18 @@ class AdControllerImpl implements AdController {
   void reportClick() {
     // click 不去重：观众可能反复点击 CTA 区域，每次都是有意义的信号。
     emitter(AnalyticsEvent.adClick(cueType: cueType));
+  }
+
+  /// 释放本 controller 的内部资源——主要是关闭 [_elapsedCtrl]。
+  ///
+  /// 调用时机：宿主 overlay 在 cue 走完任意一种关闭路径（timeout /
+  /// dismissOnTap / dismissActive / 异常 / unmount）后都应当调用，
+  /// 避免 [StreamController] 持续存活造成泄漏。
+  ///
+  /// 幂等：close 已被 close 的 stream 不会抛——可以重复调用。
+  void dispose() {
+    if (!_elapsedCtrl.isClosed) {
+      _elapsedCtrl.close();
+    }
   }
 }

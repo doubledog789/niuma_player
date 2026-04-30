@@ -98,6 +98,15 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 上一次观察到的 active cue——用于在 cue 出现 / 消失时同步控件状态。
   AdCue? _lastCue;
 
+  /// 最新一次"我希望 controls 切到 visible 还是 hidden"的意图——
+  /// `null` 表示"目前没有 pending 切换请求"。
+  ///
+  /// `_setControlsVisible` 在 framework 锁定阶段会 enqueue 一个
+  /// post-frame callback；如果在 callback fire 前又来一次反向切换，
+  /// 旧 callback 仍然按闭包里的 `visible` 参数执行——会覆盖新意图。
+  /// 把意图存这里，post-frame 再读字段，确保按"最后一次写入"生效。
+  bool? _pendingVisibleIntent;
+
   @override
   void initState() {
     super.initState();
@@ -184,21 +193,40 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// build / layout / paint 阶段都可能 fire。直接 setState 会撞 framework
   /// lock。这里检测 [SchedulerBinding.schedulerPhase]，必要时用
   /// post-frame callback 延后。
+  ///
+  /// 多次调用合并：post-frame callback 用 [_pendingVisibleIntent] 字段
+  /// 读最新意图，避免连发两次反向切换时旧 callback 覆盖新意图。
   void _setControlsVisible(bool visible) {
     if (_controlsVisible == visible) return;
     final phase = SchedulerBinding.instance.schedulerPhase;
     if (phase == SchedulerPhase.persistentCallbacks ||
         phase == SchedulerPhase.midFrameMicrotasks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() => _controlsVisible = visible);
-      });
+      final hadPending = _pendingVisibleIntent != null;
+      _pendingVisibleIntent = visible;
+      // 仅在没有 pending callback 时 enqueue——再次切换只更新 field。
+      if (!hadPending) {
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            _pendingVisibleIntent = null;
+            return;
+          }
+          final intent = _pendingVisibleIntent;
+          _pendingVisibleIntent = null;
+          if (intent == null) return;
+          if (_controlsVisible == intent) return;
+          setState(() => _controlsVisible = intent);
+        });
+      }
     } else {
+      _pendingVisibleIntent = null;
       setState(() => _controlsVisible = visible);
     }
   }
 
   void _onTapVideo() {
+    // 广告 cue 活跃时把 tap 让给 NiumaAdOverlay（它自己有 dismissOnTap
+    // 行为）——本控件层不切换可见，避免拦截 cue 关闭手势。
+    if (_orchestrator?.activeCue.value != null) return;
     setState(() => _controlsVisible = !_controlsVisible);
     if (_controlsVisible &&
         widget.controller.value.phase == PlayerPhase.playing) {
@@ -248,11 +276,75 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       },
     );
 
+    // 包一层 NiumaPlayerConfigScope，让子树（特别是 FullscreenButton）
+    // 在 push 全屏 route 时能读到外层 NiumaPlayer 的全部配置——避免
+    // 全屏页内部的 NiumaPlayer 丢失 adSchedule / theme / autoHide 等
+    // 关键 props。
+    content = NiumaPlayerConfigScope(
+      adSchedule: widget.adSchedule,
+      adAnalyticsEmitter: widget.adAnalyticsEmitter,
+      pauseVideoDuringAd: widget.pauseVideoDuringAd,
+      controlsAutoHideAfter: widget.controlsAutoHideAfter,
+      theme: widget.theme,
+      child: content,
+    );
+
     if (widget.theme != null) {
       content = NiumaPlayerThemeData(data: widget.theme!, child: content);
     }
     return content;
   }
+}
+
+/// 把外层 [NiumaPlayer] 的关键配置注入子树的 [InheritedWidget]。
+///
+/// 这是为 [FullscreenButton] push 全屏 route 时**透传配置**而准备的：
+/// 子树拿不到 widget 实例，但能读到本 marker，从而把外层用户配的
+/// `adSchedule` / `adAnalyticsEmitter` / `pauseVideoDuringAd` /
+/// `controlsAutoHideAfter` / `theme` 一起带进全屏页。
+///
+/// 不持有 [NiumaPlayerController]——controller 是必须显式传的，子树
+/// 已经能直接拿到，不需要从这里读。
+class NiumaPlayerConfigScope extends InheritedWidget {
+  /// 构造一个 [NiumaPlayerConfigScope]。
+  const NiumaPlayerConfigScope({
+    super.key,
+    required this.adSchedule,
+    required this.adAnalyticsEmitter,
+    required this.pauseVideoDuringAd,
+    required this.controlsAutoHideAfter,
+    required this.theme,
+    required super.child,
+  });
+
+  /// 外层 NiumaPlayer 配置的广告排期（可空）。
+  final NiumaAdSchedule? adSchedule;
+
+  /// 外层 NiumaPlayer 配置的广告分析 emitter（可空）。
+  final AnalyticsEmitter? adAnalyticsEmitter;
+
+  /// 外层 NiumaPlayer 配置的"广告显示期间是否暂停底层视频"。
+  final bool pauseVideoDuringAd;
+
+  /// 外层 NiumaPlayer 配置的 auto-hide 时长。
+  final Duration controlsAutoHideAfter;
+
+  /// 外层 NiumaPlayer 配置的可选主题。
+  final NiumaPlayerTheme? theme;
+
+  /// 找最近的 [NiumaPlayerConfigScope]——存在即返回；不存在返回 null。
+  static NiumaPlayerConfigScope? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<NiumaPlayerConfigScope>();
+  }
+
+  @override
+  bool updateShouldNotify(NiumaPlayerConfigScope oldWidget) =>
+      adSchedule != oldWidget.adSchedule ||
+      adAnalyticsEmitter != oldWidget.adAnalyticsEmitter ||
+      pauseVideoDuringAd != oldWidget.pauseVideoDuringAd ||
+      controlsAutoHideAfter != oldWidget.controlsAutoHideAfter ||
+      theme != oldWidget.theme;
 }
 
 /// noop analytics emitter——用户不传 emitter 时把事件丢掉，避免广告

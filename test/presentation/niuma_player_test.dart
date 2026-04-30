@@ -228,6 +228,86 @@ void main() {
     });
   });
 
+  group('M9 review 修复', () {
+    testWidgets('ad cue 活跃时 tap 视频区不切换 controls 可见状态',
+        (tester) async {
+      final ctl = FakeNiumaPlayerController();
+      const schedule = NiumaAdSchedule();
+      final emitter = FakeAnalyticsEmitter();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaPlayer(
+            controller: ctl,
+            adSchedule: schedule,
+            adAnalyticsEmitter: emitter.call,
+          ),
+        ),
+      ));
+
+      // 初始 opacity=1（控件可见）。
+      AnimatedOpacity readOpacity() => tester.widget<AnimatedOpacity>(
+            find.descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            ),
+          );
+      expect(readOpacity().opacity, 1.0);
+
+      // 找到 NiumaAdOverlay 的 orchestrator 并 fire 一个 cue。
+      final overlay =
+          tester.widget<NiumaAdOverlay>(find.byType(NiumaAdOverlay));
+      overlay.orchestrator.activeCue.value = const AdCue(
+        builder: _adBuilder,
+        minDisplayDuration: Duration.zero,
+      );
+      overlay.orchestrator.activeCueType.value = AdCueType.preRoll;
+      await tester.pump();
+      // cue 进入隐藏控件——opacity → 0。
+      expect(readOpacity().opacity, 0.0);
+
+      // cue 活跃时 tap 视频区——应被忽略，控件仍隐藏。
+      await tester.tapAt(tester.getCenter(find.byType(NiumaPlayer)));
+      await tester.pump();
+      expect(readOpacity().opacity, 0.0,
+          reason: 'cue 活跃时 tap 不应切换控件可见');
+
+      // dismissActive → controls 恢复。
+      overlay.orchestrator.dismissActive();
+      await tester.pump();
+      expect(readOpacity().opacity, 1.0,
+          reason: 'cue 离开后控件应恢复显示');
+    });
+
+    testWidgets(
+        'NiumaFullscreenPage.route 透传 adSchedule——全屏页内含 NiumaAdOverlay',
+        (tester) async {
+      final ctl = FakeNiumaPlayerController();
+      const schedule = NiumaAdSchedule();
+      final emitter = FakeAnalyticsEmitter();
+      final navKey = GlobalKey<NavigatorState>();
+
+      await tester.pumpWidget(MaterialApp(
+        navigatorKey: navKey,
+        home: const Scaffold(body: SizedBox()),
+      ));
+
+      navKey.currentState!.push<void>(NiumaFullscreenPage.route(
+        controller: ctl,
+        adSchedule: schedule,
+        adAnalyticsEmitter: emitter.call,
+      ));
+      await tester.pumpAndSettle();
+
+      // 全屏页 NiumaPlayer 应继承 adSchedule，因此挂了 NiumaAdOverlay。
+      expect(find.byType(NiumaAdOverlay), findsOneWidget,
+          reason: 'NiumaFullscreenPage.route 应透传 adSchedule');
+
+      // 关闭页面恢复。
+      navKey.currentState!.pop();
+      await tester.pumpAndSettle();
+    });
+  });
+
   group('fake_async 时序', () {
     test('计时逻辑使用 Timer——可被 fake_async 推动', () {
       // Smoke test：FakeAsync 能正常推动；具体 widget 行为已在上面 widget
@@ -244,3 +324,6 @@ void main() {
     });
   });
 }
+
+Widget _adBuilder(BuildContext _, AdController __) =>
+    const SizedBox(width: 100, height: 100, child: Text('AD'));

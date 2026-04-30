@@ -25,6 +25,10 @@ enum AdDismissReason {
 
   /// 用户点击了广告外部 / 关闭区域而被关闭。
   dismissOnTap,
+
+  /// 广告 builder 抛异常 / 出现内部错误后被强制关闭。区分于 [timeout]，
+  /// 避免分析仪表盘把"builder 崩溃"误计成"展示完时长"。
+  error,
 }
 
 /// niuma_player 内部发出的结构化事件类型；由调用方传入的

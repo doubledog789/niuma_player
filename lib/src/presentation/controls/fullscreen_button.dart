@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../niuma_fullscreen_page.dart';
+import '../niuma_player.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
 
@@ -23,22 +24,33 @@ class FullscreenButton extends StatelessWidget {
 
   /// 判断当前 build context 是否处于 [NiumaFullscreenPage] 内。
   ///
-  /// 优先看 route 的 `settings.name`——`NiumaFullscreenPage.route` 始终
-  /// 设置 [NiumaFullscreenPage.routeName]。若上层 host app 自己包装
-  /// [NiumaFullscreenPage] 而没穿透 settings，回退用 `isFirst` 判断
-  /// （顶层 route 一定不在全屏 page 内）。
+  /// 通过 [NiumaFullscreenScope] InheritedWidget marker 检测——只有
+  /// 真正在全屏页里的子树才能拿到这个 marker。早先版本用
+  /// `route.isFirst` 当兜底，会把任何非 home 路由（比如 example
+  /// 里 push 上去的 demo 页）误判为"在全屏内"，导致按钮把 demo 页
+  /// 自身 pop 掉而不是进入全屏，所以彻底去掉那条 fallback。
   bool _inFullscreenPage(BuildContext context) {
-    final route = ModalRoute.of(context);
-    if (route?.settings.name == NiumaFullscreenPage.routeName) return true;
-    return !(route?.isFirst ?? true);
+    return NiumaFullscreenScope.maybeOf(context) != null;
   }
 
   void _onPressed(BuildContext context) {
     if (_inFullscreenPage(context)) {
       Navigator.of(context).pop();
     } else {
+      // 从外层 NiumaPlayer 注入的 NiumaPlayerConfigScope 把 adSchedule /
+      // emitter / pauseVideoDuringAd / autoHide / theme 一并透传到全屏
+      // 页，避免全屏页里的内层 NiumaPlayer 丢失外层配置。
+      final cfg = NiumaPlayerConfigScope.maybeOf(context);
       Navigator.of(context).push(
-        NiumaFullscreenPage.route(controller: controller),
+        NiumaFullscreenPage.route(
+          controller: controller,
+          theme: cfg?.theme,
+          adSchedule: cfg?.adSchedule,
+          adAnalyticsEmitter: cfg?.adAnalyticsEmitter,
+          pauseVideoDuringAd: cfg?.pauseVideoDuringAd ?? true,
+          controlsAutoHideAfter:
+              cfg?.controlsAutoHideAfter ?? const Duration(seconds: 5),
+        ),
       );
     }
   }

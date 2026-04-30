@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../observability/analytics_emitter.dart';
+import '../orchestration/ad_schedule.dart';
 import 'niuma_player.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
@@ -31,6 +33,10 @@ class NiumaFullscreenPage extends StatefulWidget {
   const NiumaFullscreenPage._({
     required this.controller,
     this.theme,
+    this.adSchedule,
+    this.adAnalyticsEmitter,
+    this.pauseVideoDuringAd = true,
+    this.controlsAutoHideAfter = const Duration(seconds: 5),
   });
 
   /// 与外部 page 共享的 [NiumaPlayerController]。
@@ -41,18 +47,39 @@ class NiumaFullscreenPage extends StatefulWidget {
   /// 可选主题；为空则继承上层 [NiumaPlayerThemeData]，再为空则用默认值。
   final NiumaPlayerTheme? theme;
 
-  /// page route 的 settings.name，用于在 widget tree 内反向识别"我是否
-  /// 在全屏 page 内"——目前 [FullscreenButton] 用 `ModalRoute.of(...)
-  /// .isFirst` 做判定，这个常量预留给以后更精细的判定。
+  /// 透传给内层 [NiumaPlayer] 的广告排期；为空则不渲染广告 overlay。
+  final NiumaAdSchedule? adSchedule;
+
+  /// 透传给内层 [NiumaPlayer] 的广告分析 emitter。
+  final AnalyticsEmitter? adAnalyticsEmitter;
+
+  /// 透传给内层 [NiumaPlayer] 的"广告显示期间是否暂停底层视频"。
+  final bool pauseVideoDuringAd;
+
+  /// 透传给内层 [NiumaPlayer] 的 auto-hide 时长。
+  final Duration controlsAutoHideAfter;
+
+  /// page route 的 settings.name，保留作为子树反向识别的辅助手段；
+  /// 但 [FullscreenButton] 现在主要通过 [_NiumaFullscreenScope]
+  /// InheritedWidget marker 判定（不再依赖 settings.name），避免
+  /// 子 route 嵌套时漏判 / 误判。
   static const String routeName = 'NiumaFullscreenPage';
 
   /// 创建一个 push 进全屏页的 [Route<void>]。
   ///
   /// 转场是 200ms 的淡入淡出（[PageRouteBuilder]），与 M9 主题
   /// `fadeInDuration` 默认值一致。
+  ///
+  /// [adSchedule] / [adAnalyticsEmitter] / [pauseVideoDuringAd] /
+  /// [controlsAutoHideAfter] 全部透传给全屏页内的 [NiumaPlayer]——
+  /// 不传时退化到 [NiumaPlayer] 的默认值，避免外层配置在跨页时丢失。
   static Route<void> route({
     required NiumaPlayerController controller,
     NiumaPlayerTheme? theme,
+    NiumaAdSchedule? adSchedule,
+    AnalyticsEmitter? adAnalyticsEmitter,
+    bool pauseVideoDuringAd = true,
+    Duration controlsAutoHideAfter = const Duration(seconds: 5),
   }) {
     return PageRouteBuilder<void>(
       settings: const RouteSettings(name: routeName),
@@ -61,6 +88,10 @@ class NiumaFullscreenPage extends StatefulWidget {
       pageBuilder: (_, __, ___) => NiumaFullscreenPage._(
         controller: controller,
         theme: theme,
+        adSchedule: adSchedule,
+        adAnalyticsEmitter: adAnalyticsEmitter,
+        pauseVideoDuringAd: pauseVideoDuringAd,
+        controlsAutoHideAfter: controlsAutoHideAfter,
       ),
       transitionsBuilder: (_, animation, __, child) =>
           FadeTransition(opacity: animation, child: child),
@@ -69,6 +100,24 @@ class NiumaFullscreenPage extends StatefulWidget {
 
   @override
   State<NiumaFullscreenPage> createState() => _NiumaFullscreenPageState();
+}
+
+/// InheritedWidget marker——出现在 [NiumaFullscreenPage] 子树中代表
+/// "本 build context 处于全屏 page 内"。[FullscreenButton] 用
+/// [maybeOf] 判定按钮该 push（进入全屏）还是 pop（退出全屏），
+/// 不再依赖脆弱的 `route.isFirst` 兜底。
+class NiumaFullscreenScope extends InheritedWidget {
+  /// 构造一个 marker scope。
+  const NiumaFullscreenScope({super.key, required super.child});
+
+  /// 找最近的 [NiumaFullscreenScope]——存在即返回非空 marker。
+  static NiumaFullscreenScope? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<NiumaFullscreenScope>();
+  }
+
+  @override
+  bool updateShouldNotify(NiumaFullscreenScope oldWidget) => false;
 }
 
 class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
@@ -100,7 +149,15 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: NiumaPlayer(controller: widget.controller),
+        child: NiumaFullscreenScope(
+          child: NiumaPlayer(
+            controller: widget.controller,
+            adSchedule: widget.adSchedule,
+            adAnalyticsEmitter: widget.adAnalyticsEmitter,
+            pauseVideoDuringAd: widget.pauseVideoDuringAd,
+            controlsAutoHideAfter: widget.controlsAutoHideAfter,
+          ),
+        ),
       ),
     );
     if (widget.theme != null) {

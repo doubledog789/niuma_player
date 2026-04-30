@@ -21,9 +21,9 @@ import 'niuma_player_controller.dart';
 ///   并在 [pauseVideoWhileShowing] 为 true 且 cue 出现前视频在播时
 ///   恢复 `videoController.play()`。
 /// - `cue.builder` 调用过程中如果抛异常：捕获、emit
-///   [AnalyticsEvent.adDismissed]（reason: timeout，作为退化兼容
-///   值——M9 的 [AdDismissReason] 暂未提供 `error`），同步把 overlay
-///   清空、释放 controller 并恢复视频。
+///   [AnalyticsEvent.adDismissed]（reason: [AdDismissReason.error]），
+///   同步把 overlay 清空、释放 controller 并恢复视频——这是独立分类，
+///   不再借用 `timeout` 污染分析。
 /// - `cue.dismissOnTap=true` 时整覆盖区可点击（透明 GestureDetector
 ///   叠在 builder 上方），调内部 controller 的 `dismiss()` 走完
 ///   `minDisplayDuration` 检查。
@@ -88,6 +88,9 @@ class _NiumaAdOverlayState extends State<NiumaAdOverlay> {
   void _disposeAdCtrl() {
     _timeoutTimer?.cancel();
     _timeoutTimer = null;
+    // 先 dispose 关 stream，再置 null——避免 timeout / dismissOnTap /
+    // dismissActive / unmount 等所有路径下 _elapsedCtrl 泄漏。
+    _adCtrl?.dispose();
     _adCtrl = null;
   }
 
@@ -157,8 +160,8 @@ class _NiumaAdOverlayState extends State<NiumaAdOverlay> {
     try {
       child = cue.builder(context, adCtrl);
     } catch (e, st) {
-      // builder 抛异常——M9 的 AdDismissReason 没有 error 选项，复用 timeout
-      // 作为兼容值；errorBuilder 之外的所有意外退场都标记成 timeout。
+      // builder 抛异常——使用专门的 AdDismissReason.error 上报，避免
+      // 把"builder 崩溃"冒充成"展示完时长"污染分析仪表盘。
       debugPrint('[niuma_player] AdCue.builder 抛异常: $e\n$st');
       // 在 build 期间不能直接 setState；post-frame 走清理 + emit。
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -166,7 +169,7 @@ class _NiumaAdOverlayState extends State<NiumaAdOverlay> {
         if (widget.orchestrator.activeCue.value != cue) return;
         widget.emitter(AnalyticsEvent.adDismissed(
           cueType: adCtrl.cueType,
-          reason: AdDismissReason.timeout,
+          reason: AdDismissReason.error,
         ));
         widget.orchestrator.dismissActive();
       });

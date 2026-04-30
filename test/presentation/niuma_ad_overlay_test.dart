@@ -337,6 +337,84 @@ void main() {
     expect(dismissed, hasLength(1));
     orch.dispose();
   });
+
+  testWidgets('cue.builder 抛异常时 reason=AdDismissReason.error', (tester) async {
+    // M9 review 要求：builder 异常专用 error 而不是冒充 timeout。
+    final orch = _orch();
+    final ctl = FakeNiumaPlayerController();
+    final fake = FakeAnalyticsEmitter();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NiumaAdOverlay(
+          orchestrator: orch,
+          videoController: ctl,
+          emitter: fake.call,
+        ),
+      ),
+    ));
+
+    orch.activeCue.value = AdCue(
+      minDisplayDuration: Duration.zero,
+      builder: (ctx, ctrl) => throw StateError('builder boom'),
+    );
+    orch.activeCueType.value = AdCueType.preRoll;
+    await tester.pump();
+    await tester.pump();
+
+    final dismissed = fake.events.whereType<AdDismissed>().toList();
+    expect(dismissed, hasLength(1));
+    expect(dismissed.first.reason, AdDismissReason.error,
+        reason: '异常路径应使用 AdDismissReason.error，不再冒充 timeout');
+    orch.dispose();
+  });
+
+  testWidgets('overlay unmount during cue 调 _adCtrl.dispose 关闭 elapsedStream',
+      (tester) async {
+    final orch = _orch();
+    final ctl = FakeNiumaPlayerController();
+    final fake = FakeAnalyticsEmitter();
+
+    // 用一个 builder 把内部 controller 暴露到外面，便于断言 elapsedStream 状态。
+    AdController? capturedCtrl;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: NiumaAdOverlay(
+          orchestrator: orch,
+          videoController: ctl,
+          emitter: fake.call,
+        ),
+      ),
+    ));
+
+    orch.activeCue.value = AdCue(
+      minDisplayDuration: Duration.zero,
+      builder: (ctx, ctrl) {
+        capturedCtrl = ctrl;
+        return const Text('AD');
+      },
+    );
+    orch.activeCueType.value = AdCueType.preRoll;
+    await tester.pump();
+
+    expect(capturedCtrl, isNotNull);
+
+    // 订阅 elapsedStream，unmount 后应当被 close（onDone 被调）。
+    var streamDone = false;
+    capturedCtrl!.elapsedStream.listen(
+      (_) {},
+      onDone: () => streamDone = true,
+    );
+
+    // unmount overlay——切换到一个完全不同的 widget 树。
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump();
+
+    expect(streamDone, isTrue,
+        reason: 'overlay unmount 时 _adCtrl.dispose 应关闭 elapsedStream');
+    orch.dispose();
+  });
 }
 
 /// 简单的 cue.builder——返回带文字的 SizedBox。
