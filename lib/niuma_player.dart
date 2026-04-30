@@ -24,6 +24,22 @@ export 'src/presentation/niuma_player_controller.dart'
 export 'src/presentation/niuma_player_view.dart';
 export 'src/presentation/niuma_thumbnail_view.dart' show NiumaThumbnailView;
 
+// M9 主题
+export 'src/presentation/niuma_player_theme.dart'
+    show NiumaPlayerTheme, NiumaPlayerThemeData;
+
+// M9 原子控件
+export 'src/presentation/controls/play_pause_button.dart'
+    show PlayPauseButton;
+export 'src/presentation/controls/time_display.dart' show TimeDisplay;
+export 'src/presentation/controls/volume_button.dart' show VolumeButton;
+export 'src/presentation/controls/speed_selector.dart' show SpeedSelector;
+export 'src/presentation/controls/quality_selector.dart' show QualitySelector;
+export 'src/presentation/controls/subtitle_button.dart' show SubtitleButton;
+export 'src/presentation/controls/danmaku_button.dart' show DanmakuButton;
+export 'src/presentation/controls/fullscreen_button.dart'
+    show FullscreenButton;
+
 // 编排
 export 'src/orchestration/multi_source.dart'
     show MediaQuality, MediaLine, NiumaMediaSource, MultiSourcePolicy;
