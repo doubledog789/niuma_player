@@ -110,4 +110,4 @@ First public release.
 [Unreleased]: https://github.com/axin789/niuma_player/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/axin789/niuma_player/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/axin789/niuma_player/releases/tag/v0.2.0
-[0.1.0]: https://github.com/niuma/niuma_player/releases/tag/v0.1.0
+[0.1.0]: https://github.com/axin789/niuma_player/releases/tag/v0.1.0

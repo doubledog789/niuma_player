@@ -433,18 +433,26 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// background. Failures are swallowed (logged via [debugPrint]) so video
   /// playback is never affected by a broken thumbnail track.
   ///
-  /// Idempotent: concurrent invocations share a single in-flight future
-  /// (I6). After completion the future is reset to null so a future call —
-  /// e.g. after a configured retry — could in principle re-attempt; today
-  /// nothing in the controller does that, but the door is open.
+  /// Idempotent during a single load: concurrent invocations share the
+  /// in-flight future (I6). After completion, the cached future is cleared
+  /// (`whenComplete`), so a future call — e.g. after an external retry — can
+  /// re-attempt the load and actually re-fetch (R2-I1). Today nothing in
+  /// the controller triggers a re-load on its own, but the door is open
+  /// (and dartdoc no longer lies about resetting).
   Future<void> _loadThumbnailsIfAny() {
     if (_thumbnailLoadFuture != null) return _thumbnailLoadFuture!;
-    final fut = _runThumbnailLoad();
-    _thumbnailLoadFuture = fut;
-    return fut;
+    final future = _runThumbnailLoad().whenComplete(() {
+      _thumbnailLoadFuture = null;
+    });
+    _thumbnailLoadFuture = future;
+    return future;
   }
 
   Future<void> _runThumbnailLoad() async {
+    // R2-S4: defensive entry-gate. Mirrors the per-await `_disposed` guards
+    // throughout this method (I5/I9) so a load that's queued behind dispose()
+    // doesn't even flip state to loading.
+    if (_disposed) return;
     final url = source.thumbnailVtt;
     if (url == null) return;
     _thumbnailLoadState = ThumbnailLoadState.loading;
