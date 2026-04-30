@@ -1,20 +1,50 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+
+import '../domain/player_state.dart';
+import '../observability/analytics_emitter.dart';
+import '../orchestration/ad_schedule.dart';
+import '../orchestration/ad_scheduler.dart';
+import 'niuma_ad_overlay.dart';
 import 'niuma_control_bar.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
 import 'niuma_player_view.dart';
 
-/// niuma_player 一体化默认播放组件——M9 Task 8 的最小占位实现。
+/// niuma_player 一体化默认播放组件。
 ///
-/// 仅渲染：[NiumaPlayerView] 叠 [NiumaControlBar]（始终可见）。
-/// 完整的 auto-hide 状态机 / 广告 overlay 接入由 Task 9 实装。
-class NiumaPlayer extends StatelessWidget {
+/// 这是 90% 用户应该使用的入口：传一个 [NiumaPlayerController]，
+/// 拿到一个完整的播放界面：
+/// - 底部 [NiumaControlBar]（B 站风格密集底栏）
+/// - [controlsAutoHideAfter] 时长不操作后自动隐藏控件
+/// - 任意点击切换控件显示 / 隐藏
+/// - `phase=paused` 时强制显示控件（不会"暂停了又找不到按钮"）
+/// - 可选广告 [NiumaAdOverlay]——传 [adSchedule] 即激活
+///
+/// 自定义需求超过这套预设时：
+/// 1. 上层包一层 [NiumaPlayerThemeData] 调主题；
+/// 2. 自己拿原子控件（[PlayPauseButton] / [ScrubBar] / [TimeDisplay] /
+///    ...）+ [NiumaPlayerView] 拼布局——本组件就是参考实现。
+///
+/// **Auto-hide 状态机**：
+/// - 进入 `playing` 时启动 [controlsAutoHideAfter] 计时器；超时即隐藏。
+/// - 进入 `paused` 时强制显示控件，并取消计时器。
+/// - 用户点击视频区翻转显示状态；翻回显示且仍在 `playing` 时重启计时器。
+/// - 广告 cue 进入时强制隐藏控件、暂停计时器（让 overlay 接管视野）；
+///   cue 离开时恢复显示状态，按当前 phase 决定是否重启计时器。
+class NiumaPlayer extends StatefulWidget {
   /// 创建一个 [NiumaPlayer]。
   const NiumaPlayer({
     super.key,
     required this.controller,
     this.theme,
+    this.adSchedule,
+    this.adAnalyticsEmitter,
+    this.pauseVideoDuringAd = true,
+    this.controlsAutoHideAfter = const Duration(seconds: 5),
+    this.showThumbnailPreview = true,
   });
 
   /// 实际驱动播放的 controller。所有内部子组件共享同一实例。
@@ -24,21 +54,207 @@ class NiumaPlayer extends StatelessWidget {
   /// [NiumaPlayerThemeData]——上层无需手动嵌套。
   final NiumaPlayerTheme? theme;
 
+  /// 可选广告排期。非空时构造内部 [AdSchedulerOrchestrator] +
+  /// [NiumaAdOverlay]，按排期触发广告；为 `null` 时零额外开销，
+  /// 不创建编排器、不渲染 overlay。
+  final NiumaAdSchedule? adSchedule;
+
+  /// 广告事件 sink。`null` 时使用 noop emitter（事件被丢弃）。
+  final AnalyticsEmitter? adAnalyticsEmitter;
+
+  /// 广告显示期间是否暂停底层视频。默认 `true`。
+  final bool pauseVideoDuringAd;
+
+  /// 进入 `playing` 后多久没有用户交互自动隐藏控件。默认 5s。
+  /// 设为 [Duration.zero] 视为"永不自动隐藏"——控件永远可见。
+  final Duration controlsAutoHideAfter;
+
+  /// 是否启用 ScrubBar 缩略图悬浮预览。默认 `true`，但同时也会被
+  /// `controller.source.thumbnailVtt == null` 隐式禁用——没有 VTT
+  /// 数据时无论这个标志真假，预览都不会渲染。
+  ///
+  /// **注意**：M9 的 [ScrubBar] 会自行检测 `thumbnailVtt` 是否为空，
+  /// 因此本字段当前主要是 API 占位——为以后允许调用方主动关闭预览
+  /// 留入口（即使 source 配置了 VTT）。
+  final bool showThumbnailPreview;
+
+  @override
+  State<NiumaPlayer> createState() => _NiumaPlayerState();
+}
+
+class _NiumaPlayerState extends State<NiumaPlayer> {
+  /// 当前是否显示控件栏。`true` 即可见，`false` 即淡出。
+  bool _controlsVisible = true;
+
+  /// auto-hide 计时器；每次进入 `playing` / 用户交互都会重置。
+  Timer? _hideTimer;
+
+  /// 可选广告编排器；当 [NiumaPlayer.adSchedule] 非空时构造，dispose 时清理。
+  AdSchedulerOrchestrator? _orchestrator;
+
+  /// 上一次观察到的 phase——用于在 paused → playing 转换时启动计时器。
+  PlayerPhase? _lastPhase;
+
+  /// 上一次观察到的 active cue——用于在 cue 出现 / 消失时同步控件状态。
+  AdCue? _lastCue;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onValueChanged);
+    final schedule = widget.adSchedule;
+    if (schedule != null) {
+      _orchestrator = AdSchedulerOrchestrator(
+        schedule: schedule,
+        playerValue: widget.controller,
+        onPlay: () => widget.controller.play(),
+        onPause: () => widget.controller.pause(),
+        analytics: widget.adAnalyticsEmitter,
+      );
+      _orchestrator!.attach();
+      _orchestrator!.activeCue.addListener(_onActiveCueChanged);
+    }
+    // 首帧也对齐 phase——挂载时已经在 playing 时立即启动计时。
+    _onValueChanged();
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    widget.controller.removeListener(_onValueChanged);
+    if (_orchestrator != null) {
+      _orchestrator!.activeCue.removeListener(_onActiveCueChanged);
+      _orchestrator!.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onValueChanged() {
+    final v = widget.controller.value;
+    final phase = v.phase;
+
+    if (phase == PlayerPhase.paused) {
+      // paused → 永远显示控件，并取消计时。
+      _hideTimer?.cancel();
+      _hideTimer = null;
+      _setControlsVisible(true);
+    } else if (phase == PlayerPhase.playing) {
+      // 进入 playing：如果之前是别的 phase（含 idle / opening / ready），
+      // 启动 auto-hide 倒计时。
+      if (_lastPhase != PlayerPhase.playing) {
+        _scheduleAutoHide();
+      }
+    }
+    _lastPhase = phase;
+  }
+
+  void _onActiveCueChanged() {
+    final cue = _orchestrator?.activeCue.value;
+    if (cue != null && _lastCue == null) {
+      // 新 cue 进入——隐藏控件让 overlay 接管，取消计时。
+      _hideTimer?.cancel();
+      _setControlsVisible(false);
+    } else if (cue == null && _lastCue != null) {
+      // cue 离开——恢复显示并按 phase 决定是否启动计时。
+      _setControlsVisible(true);
+      if (widget.controller.value.phase == PlayerPhase.playing) {
+        _scheduleAutoHide();
+      }
+    }
+    _lastCue = cue;
+  }
+
+  void _scheduleAutoHide() {
+    _hideTimer?.cancel();
+    final after = widget.controlsAutoHideAfter;
+    if (after <= Duration.zero) return;
+    _hideTimer = Timer(after, () {
+      if (!mounted) return;
+      // 二次校验：广告活跃 / 暂停状态下不强制隐藏。
+      if (_orchestrator?.activeCue.value != null) return;
+      if (widget.controller.value.phase == PlayerPhase.paused) return;
+      _setControlsVisible(false);
+    });
+  }
+
+  /// 把 `_controlsVisible` 切到 [visible]——必要时延后到下一帧避免
+  /// "framework is locked"。
+  ///
+  /// 背景：[NiumaPlayerController] 是 sync ValueNotifier；监听器在
+  /// build / layout / paint 阶段都可能 fire。直接 setState 会撞 framework
+  /// lock。这里检测 [SchedulerBinding.schedulerPhase]，必要时用
+  /// post-frame callback 延后。
+  void _setControlsVisible(bool visible) {
+    if (_controlsVisible == visible) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _controlsVisible = visible);
+      });
+    } else {
+      setState(() => _controlsVisible = visible);
+    }
+  }
+
+  void _onTapVideo() {
+    setState(() => _controlsVisible = !_controlsVisible);
+    if (_controlsVisible &&
+        widget.controller.value.phase == PlayerPhase.playing) {
+      _scheduleAutoHide();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    Widget content = Stack(
-      fit: StackFit.expand,
-      children: [
-        NiumaPlayerView(controller),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: NiumaControlBar(controller: controller),
-        ),
-      ],
+    Widget content = Builder(
+      builder: (innerContext) {
+        // 在内层 Builder 中读 theme，确保如果外层 widget.theme 注入了
+        // NiumaPlayerThemeData，本层读到的就是新主题。
+        final theme = NiumaPlayerTheme.of(innerContext);
+        final fadeDuration = theme.fadeInDuration;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _onTapVideo,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              NiumaPlayerView(widget.controller),
+              AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: fadeDuration,
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: NiumaControlBar(controller: widget.controller),
+                  ),
+                ),
+              ),
+              if (_orchestrator != null)
+                Positioned.fill(
+                  child: NiumaAdOverlay(
+                    orchestrator: _orchestrator!,
+                    videoController: widget.controller,
+                    emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
+                    pauseVideoWhileShowing: widget.pauseVideoDuringAd,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
-    if (theme != null) {
-      content = NiumaPlayerThemeData(data: theme!, child: content);
+
+    if (widget.theme != null) {
+      content = NiumaPlayerThemeData(data: widget.theme!, child: content);
     }
     return content;
   }
 }
+
+/// noop analytics emitter——用户不传 emitter 时把事件丢掉，避免广告
+/// overlay 内部 null 校验。
+void _noopEmitter(Object event) {}
