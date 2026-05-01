@@ -571,8 +571,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> seekTo(Duration position) async => _backend?.seekTo(position);
-  Future<void> setPlaybackSpeed(double speed) async =>
-      _backend?.setSpeed(speed);
+  Future<void> setPlaybackSpeed(double speed) async {
+    value = value.copyWith(playbackSpeed: speed);
+    await _backend?.setSpeed(speed);
+  }
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
   Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
 
@@ -666,10 +668,16 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
   /// SDK 内部用：[NiumaGestureLayer] 推 HUD 状态。
   /// 业务层一般不直接调（不公开导出）。
-  @visibleForTesting
-  void debugSetGestureFeedback(GestureFeedbackState? state) {
+  // ignore: use_setters_to_change_properties
+  void setGestureFeedbackInternal(GestureFeedbackState? state) {
     _gestureFeedback.value = state;
   }
+
+  /// 测试辅助：同 [setGestureFeedbackInternal]，加 @visibleForTesting
+  /// 让测试代码可显式通过带 debug 前缀的方法推状态。
+  @visibleForTesting
+  void debugSetGestureFeedback(GestureFeedbackState? state) =>
+      setGestureFeedbackInternal(state);
 
   @override
   Future<void> dispose() async {

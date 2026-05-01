@@ -124,6 +124,7 @@ class NiumaPlayerValue {
     required this.bufferedPosition,
     this.openingStage,
     this.error,
+    this.playbackSpeed = 1.0,
   });
 
   /// 空初始值（[PlayerBackend.initialize] 之前）。
@@ -152,6 +153,9 @@ class NiumaPlayerValue {
   /// 结构化错误信息；仅当 `phase == error` 时非 null。用
   /// [PlayerError.category] 驱动重试 / 回退 / UI 决策。
   final PlayerError? error;
+
+  /// 当前倍速（默认 1.0）。由 [NiumaPlayerController.setPlaybackSpeed] 更新。
+  final double playbackSpeed;
 
   // ────────────── 兼容性 getter（由 phase 派生） ──────────────
 
@@ -198,6 +202,7 @@ class NiumaPlayerValue {
     // 用一个 sentinel 显式置 null：传 `clearError: true` 来重置。
     PlayerError? error,
     bool clearError = false,
+    double? playbackSpeed,
   }) {
     return NiumaPlayerValue(
       phase: phase ?? this.phase,
@@ -209,6 +214,7 @@ class NiumaPlayerValue {
           ? null
           : (openingStage ?? this.openingStage),
       error: clearError ? null : (error ?? this.error),
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 
@@ -222,7 +228,8 @@ class NiumaPlayerValue {
         other.size == size &&
         other.bufferedPosition == bufferedPosition &&
         other.openingStage == openingStage &&
-        other.error == error;
+        other.error == error &&
+        other.playbackSpeed == playbackSpeed;
   }
 
   @override
@@ -234,6 +241,7 @@ class NiumaPlayerValue {
         bufferedPosition,
         openingStage,
         error,
+        playbackSpeed,
       );
 
   @override
@@ -245,7 +253,8 @@ class NiumaPlayerValue {
         'size: $size, '
         'bufferedPosition: $bufferedPosition, '
         'openingStage: $openingStage, '
-        'error: $error)';
+        'error: $error, '
+        'playbackSpeed: $playbackSpeed)';
   }
 }
 
