@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/orchestration/danmaku_bucket_loader.dart';
 import 'package:niuma_player/src/orchestration/danmaku_models.dart';
@@ -114,6 +116,27 @@ void main() {
       await l.ensureLoaded(const Duration(seconds: 30));
       await l.prefetchNext(const Duration(seconds: 30));
       expect(calls, [0, 60]);
+    });
+
+    test('clear 期间飞行中的 loader 完成不污染新一代 cache', () async {
+      final completer = Completer<List<DanmakuItem>>();
+      final l = DanmakuBucketLoader(
+        loader: (s, e) => completer.future,
+        bucketSize: const Duration(seconds: 60),
+      );
+      // 发起加载（落到 _inFlight）
+      final f = l.ensureLoaded(const Duration(seconds: 30));
+      expect(l.isLoaded(0), isFalse);
+      // clear → 递增 generation
+      l.clear();
+      // 旧 future 现在 resolve
+      completer.complete([
+        const DanmakuItem(position: Duration(seconds: 30), text: 'stale'),
+      ]);
+      await f;
+      // 关键断言：旧 future 的 _loaded.add 应被门控阻止
+      expect(l.isLoaded(0), isFalse,
+          reason: 'clear 后飞来的 stale 响应不能让 _loaded 被错标');
     });
   });
 }

@@ -23,6 +23,8 @@ class DanmakuBucketLoader {
   // 进行中的 future（dedup 用）。完成后从 map 移除；成功的同时写入 _loaded。
   final Map<int, Future<List<DanmakuItem>>> _inFlight =
       <int, Future<List<DanmakuItem>>>{};
+  // 代际计数器：clear() 时递增，让飞行中的 future 知道自己已被作废。
+  int _generation = 0;
 
   /// 桶 index 计算。
   int _indexOf(Duration position) =>
@@ -45,16 +47,17 @@ class DanmakuBucketLoader {
     final start = Duration(milliseconds: idx * bucketSize.inMilliseconds);
     final end = Duration(milliseconds: (idx + 1) * bucketSize.inMilliseconds);
 
+    final gen = _generation;
     final future = Future<List<DanmakuItem>>(() async {
       try {
         final result = await loader(start, end);
-        _loaded.add(idx);
+        if (_generation == gen) _loaded.add(idx);
         return result;
       } catch (e, st) {
         debugPrint('[DanmakuBucketLoader] bucket $idx 加载失败：$e\n$st');
         return const <DanmakuItem>[];
       } finally {
-        _inFlight.remove(idx);
+        if (_generation == gen) _inFlight.remove(idx);
       }
     });
     _inFlight[idx] = future;
@@ -69,7 +72,11 @@ class DanmakuBucketLoader {
   }
 
   /// 切换视频源时清空。
+  ///
+  /// 内部用 generation counter 让飞行中的 loader 在 resolve 时自动作废
+  /// 写入，避免旧 source 的迟到响应污染新 source 的 cache。
   void clear() {
+    _generation++;
     _loaded.clear();
     _inFlight.clear();
   }
