@@ -259,6 +259,39 @@ showModalBottomSheet(
 
 完整 demo 见 [`example/lib/m11_danmaku_demo_page.dart`](example/lib/m11_danmaku_demo_page.dart)。
 
+## M13 特性（手势交互）
+
+视频区 5 项核心手势——B 站 / YouTube 标配。零新增 pubspec 依赖（自家原生）。
+
+```dart
+NiumaPlayer(
+  controller: videoCtrl,
+  // 手势默认仅在全屏页生效；inline 启用：
+  gesturesEnabledInline: true,
+  // 黑名单：禁用部分手势
+  disabledGestures: const {GestureKind.brightness},
+  // 自定义 HUD（可选）
+  gestureHudBuilder: (ctx, state) => MyHudWidget(state: state),
+);
+
+// 业务想监听手势状态做埋点 / 自定义反馈
+videoCtrl.gestureFeedback.addListener(() {
+  print('当前手势: ${videoCtrl.gestureFeedback.value}');
+});
+```
+
+**支持的手势：**
+
+- 双击 → 切换播放/暂停
+- 水平滑 → seek 进度（半屏宽 = 视频时长一半）
+- 左半屏上下滑 → 亮度（窗口级，退出页面自动恢复）
+- 右半屏上下滑 → 系统媒体音量
+- 长按 → 临时 2x 倍速，松手回原速
+
+**默认 HUD 风格：** B 站风暗色卡片 + 图标 + 文字 + 进度条；主题色跟随 `Theme.colorScheme.primary`。
+
+完整 demo：[`example/lib/m13_gesture_demo_page.dart`](example/lib/m13_gesture_demo_page.dart)。
+
 ## 监听后端选择
 
 ```dart

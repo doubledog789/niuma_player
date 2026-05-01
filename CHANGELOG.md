@@ -5,6 +5,57 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+> **注**：v0.6.0 是 M12 PiP 画中画里程碑，与 M13 手势在不同分支并行开发；
+> 两个版本最终按合并顺序确定 v0.6.0 / v0.7.0 哪个先发。本 CHANGELOG 假设
+> M13 在 v0.7.0 发布。
+
+## [0.7.0] - 2026-05-01
+
+### 新增（M13 手势交互层）
+
+- **5 项核心视频手势**：
+  - 双击播放/暂停（HUD 闪一下"已暂停"或"播放中"）
+  - 左右水平滑 seek（中央 HUD "+15s / 当前 / 总"，松手才真 seek）
+  - 左半屏垂直滑亮度（窗口级 `Window.attributes.screenBrightness` /
+    `UIScreen.main.brightness`，自动节流 50ms）
+  - 右半屏垂直滑音量（系统媒体音量 `AudioManager.STREAM_MUSIC` /
+    `MPVolumeView` 隐藏 hack）
+  - 长按视频区临时 2x 倍速，松手恢复原速度
+- **`NiumaGestureLayer`** widget：核心手势调度层，可独立 Stack 也由
+  `NiumaPlayer` 自动接管（替换 M9 的 click-catcher）
+- **`NiumaGestureHud`** widget：默认 HUD（B 站风暗色卡片 + 图标 + 文字
+  + 进度条），主题色由 `Theme.colorScheme.primary` 控制
+- **`GestureKind` enum + `GestureFeedbackState`** 不可变数据类
+- **`controller.gestureFeedback`**：`ValueListenable<GestureFeedbackState?>`，
+  业务可监听做埋点 / 自定义反馈
+- **3 个 NiumaPlayer 字段**：
+  - `gesturesEnabledInline`（默认 false，inline 场景 opt-in）
+  - `disabledGestures`（黑名单：`{GestureKind.brightness}` 等）
+  - `gestureHudBuilder`（自定义 HUD 视觉）
+- **`NiumaPlayerValue.playbackSpeed`** 字段——长按倍速暂存原速度需要这个
+- **iOS / Android 原生**：自家 `niuma_player/system` MethodChannel
+  - iOS：`NiumaSystemPlugin.swift` 用 `UIScreen.main.brightness` +
+    `MPVolumeView`（iOS 13+ connectedScenes 多窗口兼容）
+  - Android：`NiumaPlayerPlugin.kt` 加 `ActivityAware` 拿 Activity，
+    `Window.attributes.screenBrightness` + `AudioManager.STREAM_MUSIC`
+- **退出全屏自动恢复亮度**——避免 SDK 改了用户全局亮度感受
+- **全屏页 / inline opt-in 双轨**：`NiumaPlayer` 在 `NiumaFullscreenScope`
+  内自动 enabled=true；inline 默认关，业务 opt-in `gesturesEnabledInline:true`
+- **`NiumaFullscreenPage` 透传**：`disabledGestures` / `gestureHudBuilder`
+  通过 `NiumaPlayerConfigScope` 自动传到全屏页内层 `NiumaPlayer`
+
+### 不变
+
+- 不新增 `pubspec.yaml` 依赖
+- M3-M11 既有 API 全兼容；M9 既有"单击切控件显隐"行为完全保留
+- inline 默认关手势——业务不传 `gesturesEnabledInline:true` 行为不变
+
+### 已知限制
+
+- 双击屏幕**边缘** ±10s（YouTube 特有）留 M13.1
+- 长按倍速值固定 2x，业务想自定义倍数留 M13.2
+- 系统级亮度（影响 SDK 之外的 app）不支持，需要 WRITE_SETTINGS 权限
+
 ## [0.5.0] - 2026-05-01
 
 ### 新增（M11 弹幕）
