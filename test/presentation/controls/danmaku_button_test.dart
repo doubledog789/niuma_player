@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/orchestration/danmaku_models.dart';
-import 'package:niuma_player/src/presentation/niuma_danmaku_controller.dart';
-import 'package:niuma_player/src/presentation/niuma_danmaku_scope.dart';
 
 void main() {
   testWidgets('显式 controller：tap → toggle visible', (tester) async {

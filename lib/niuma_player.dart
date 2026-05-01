@@ -86,6 +86,15 @@ export 'src/orchestration/ad_schedule.dart'
 export 'src/orchestration/ad_scheduler.dart' show AdSchedulerOrchestrator;
 export 'src/orchestration/auto_failover.dart' show AutoFailoverOrchestrator;
 
+// M11 弹幕
+export 'src/orchestration/danmaku_models.dart'
+    show DanmakuItem, DanmakuMode, DanmakuSettings, DanmakuLoader;
+export 'src/presentation/niuma_danmaku_controller.dart'
+    show NiumaDanmakuController;
+export 'src/presentation/niuma_danmaku_overlay.dart' show NiumaDanmakuOverlay;
+export 'src/presentation/niuma_danmaku_scope.dart' show NiumaDanmakuScope;
+export 'src/presentation/danmaku_settings_panel.dart' show DanmakuSettingsPanel;
+
 // 可观测性
 export 'src/observability/analytics_event.dart'
     show
