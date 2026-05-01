@@ -145,6 +145,16 @@ class VideoPlayerBackend implements PlayerBackend {
   @override
   Future<void> setLooping(bool looping) => _inner.setLooping(looping);
 
+  // M13 stub — Task 3 替换为真 channel 调度。
+  @override
+  Future<double> getBrightness() async => 0.0;
+  @override
+  Future<bool> setBrightness(double value) async => false;
+  @override
+  Future<double> getSystemVolume() async => 0.0;
+  @override
+  Future<bool> setSystemVolume(double value) async => false;
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;

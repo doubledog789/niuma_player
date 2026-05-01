@@ -52,5 +52,17 @@ abstract class PlayerBackend {
 
   Future<void> setLooping(bool looping);
 
+  /// 读当前亮度（窗口级 0..1，未支持返 0）。
+  Future<double> getBrightness() async => 0.0;
+
+  /// 设置窗口亮度（0..1）。失败 / 不支持返 false。
+  Future<bool> setBrightness(double value) async => false;
+
+  /// 读当前系统媒体音量 0..1。
+  Future<double> getSystemVolume() async => 0.0;
+
+  /// 设置系统媒体音量（0..1）。失败 / 不支持返 false。
+  Future<bool> setSystemVolume(double value) async => false;
+
   Future<void> dispose();
 }
