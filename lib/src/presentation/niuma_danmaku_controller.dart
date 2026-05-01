@@ -75,30 +75,32 @@ class NiumaDanmakuController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 取 `[0, position + window]` 时间范围内的 items。
+  /// 取窗口 `[position - window, position]` 内的 items。
   ///
-  /// 返回 `item.position <= position + window` 的所有 items，
-  /// 即已入场及即将在 window 时长内入场的弹幕集合（用于渲染预热）。
-  /// 调用方可自行以 `item.position <= position` 过滤已入场 items。
+  /// 用于 painter 取"已经入场、还没离场"的弹幕：scroll 弹幕在
+  /// `[item.position, item.position + scrollDuration]` 期间可见，所以
+  /// painter 当前时刻 currentPos 在该区间等价于
+  /// `item.position ∈ [currentPos - scrollDuration, currentPos]`。
   ///
-  /// 二分找下界（从 index 0 起），线性扫到上界为止。
-  /// 复杂度 O(log N + visible)。
+  /// 二分找下界 + 线性扫到上界。复杂度 O(log N + visible)。
   Iterable<DanmakuItem> visibleAt(Duration position,
       {required Duration window}) sync* {
-    final upperMs = position.inMilliseconds + window.inMilliseconds;
-    // 所有 items 均从 index 0 开始，二分找上界截断点。
+    final lowerMs = position.inMilliseconds - window.inMilliseconds;
+    final upperMs = position.inMilliseconds;
+    // 二分找第一个 position.inMilliseconds >= lowerMs 的 index
     var lo = 0;
     var hi = _items.length;
-    // 找第一个 > upperMs 的 index（上界 exclusive）。
     while (lo < hi) {
       final mid = (lo + hi) >> 1;
-      if (_items[mid].position.inMilliseconds <= upperMs) {
+      if (_items[mid].position.inMilliseconds < lowerMs) {
         lo = mid + 1;
       } else {
         hi = mid;
       }
     }
-    for (var i = 0; i < lo; i++) {
+    for (var i = lo; i < _items.length; i++) {
+      final ms = _items[i].position.inMilliseconds;
+      if (ms > upperMs) break;
       yield _items[i];
     }
   }

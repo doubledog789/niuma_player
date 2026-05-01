@@ -59,17 +59,44 @@ void main() {
       c.dispose();
     });
 
-    test('visibleAt 窗口边界', () {
+    test('visibleAt 返回 [position-window, position] 内的 items', () {
       final c = NiumaDanmakuController();
       c.addAll([
         const DanmakuItem(position: Duration(seconds: 5), text: 'a'),
         const DanmakuItem(position: Duration(seconds: 10), text: 'b'),
         const DanmakuItem(position: Duration(seconds: 20), text: 'c'),
       ]);
-      // 窗口 [position - window, position]
-      final v = c.visibleAt(const Duration(seconds: 12),
-          window: const Duration(seconds: 5));
+      // 窗口 = [position - window, position] = [5s, 15s]
+      // 5s 命中下界（含）；10s 命中；20s 超上界（排除）
+      final v = c.visibleAt(const Duration(seconds: 15),
+          window: const Duration(seconds: 10));
       expect(v.map((e) => e.text).toList(), ['a', 'b']);
+      c.dispose();
+    });
+
+    test('visibleAt 边界 inclusive：item.position == position-window 命中', () {
+      final c = NiumaDanmakuController();
+      c.addAll([
+        const DanmakuItem(position: Duration(seconds: 5), text: 'lower'),
+        const DanmakuItem(position: Duration(seconds: 10), text: 'upper'),
+      ]);
+      // 窗口 = [5s, 10s]，下界与 'lower' 重合
+      final v = c.visibleAt(const Duration(seconds: 10),
+          window: const Duration(seconds: 5));
+      expect(v.map((e) => e.text).toList(), ['lower', 'upper']);
+      c.dispose();
+    });
+
+    test('visibleAt 上界 exclusive：position < item.position 不命中', () {
+      final c = NiumaDanmakuController();
+      c.addAll([
+        const DanmakuItem(position: Duration(seconds: 5), text: 'a'),
+        const DanmakuItem(position: Duration(seconds: 10), text: 'future'),
+      ]);
+      // currentPos=8 时，10s 还没入场，不应返回
+      final v = c.visibleAt(const Duration(seconds: 8),
+          window: const Duration(seconds: 5));
+      expect(v.map((e) => e.text).toList(), ['a']);
       c.dispose();
     });
 
