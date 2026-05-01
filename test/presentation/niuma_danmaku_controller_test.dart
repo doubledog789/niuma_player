@@ -100,6 +100,17 @@ void main() {
       c.dispose();
     });
 
+    test('addAll 接受 generator iterable 不丢首元素', () {
+      final c = NiumaDanmakuController();
+      Iterable<DanmakuItem> gen() sync* {
+        yield const DanmakuItem(position: Duration(seconds: 1), text: 'first');
+        yield const DanmakuItem(position: Duration(seconds: 2), text: 'second');
+      }
+      c.addAll(gen());
+      expect(c.items.map((e) => e.text).toList(), ['first', 'second']);
+      c.dispose();
+    });
+
     test('ensureLoadedFor 转发到 BucketLoader', () async {
       final calls = <(Duration, Duration)>[];
       final c = NiumaDanmakuController(loader: (s, e) {

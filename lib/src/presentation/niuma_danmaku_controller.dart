@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 
 import '../orchestration/danmaku_bucket_loader.dart';
@@ -28,10 +30,18 @@ class NiumaDanmakuController extends ChangeNotifier {
   /// 当前 settings（不可变）。
   DanmakuSettings get settings => _settings;
 
-  /// 已知 items，按 position 升序。请勿直接修改。
-  List<DanmakuItem> get items => List<DanmakuItem>.unmodifiable(_items);
+  late final UnmodifiableListView<DanmakuItem> _itemsView =
+      UnmodifiableListView(_items);
 
-  /// 单条加入。O(log N) 二分插入。触发 notify。
+  /// 已知 items，按 position 升序的只读视图。
+  ///
+  /// 返回的是 [_items] 的 [UnmodifiableListView] 包装（非快照），所以底层
+  /// list 变化会被自动反映；调用方对返回值的写操作会抛 [UnsupportedError]。
+  /// painter 每帧调用本 getter 零拷贝开销。
+  List<DanmakuItem> get items => _itemsView;
+
+  /// 单条加入。二分定位 O(log N) + List.insert O(N) 内存移动 = 整体 O(N)。
+  /// 触发 notify。
   void add(DanmakuItem item) {
     _insertSorted(item);
     notifyListeners();
@@ -39,8 +49,9 @@ class NiumaDanmakuController extends ChangeNotifier {
 
   /// 批量加入。一次性 notify。
   void addAll(Iterable<DanmakuItem> items) {
-    if (items.isEmpty) return;
-    for (final it in items) {
+    final list = items is List<DanmakuItem> ? items : items.toList();
+    if (list.isEmpty) return;
+    for (final it in list) {
       _insertSorted(it);
     }
     notifyListeners();
@@ -116,5 +127,13 @@ class NiumaDanmakuController extends ChangeNotifier {
   void resetForNewSource() {
     _bucketLoader.clear();
     clear();
+  }
+
+  @override
+  void dispose() {
+    // 当前无本地资源需要释放（_bucketLoader 持纯内存状态，items 是普通 List）。
+    // 留此 override 作为 Task 7 overlay 等下游可能挂载的 listener / timer
+    // 在 dispose 时取消的扩展点。
+    super.dispose();
   }
 }
