@@ -5,6 +5,52 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [0.5.0] - 2026-05-01
+
+### 新增（M11 弹幕）
+
+- **`NiumaDanmakuController`**——弹幕的核心持有者，提供 `add` / `addAll` /
+  `clear` / `updateSettings` / `ensureLoadedFor` / `resetForNewSource` API。
+  `add`/`addAll` 二分插入维持 position 排序；`visibleAt(position, window)`
+  二分找下界 + 线性扫窗口上界，O(log N + visible)。
+- **三种弹幕模式**：scroll（R→L 滚动）/ topFixed（顶部居中固定）/
+  bottomFixed（底部居中固定）。三模式共用 `DanmakuTrackAllocator`
+  做 first-fit 轨道分配，满轨返回 -1（caller 丢弃，自然降密度）。
+- **60s 桶 lazy load**——`DanmakuLoader` 回调按 `bucketSize` 切片调用，
+  dedup 并发请求，loader 抛异常时 cache 不写、下次重试。`clear()` 用
+  generation counter 防止旧源迟到响应污染新源 cache。
+- **`NiumaDanmakuOverlay`** widget——可独立 Stack 进自定义布局，也由
+  `NiumaPlayer.danmakuController` 自动接管（z 轴：视频→弹幕→控件→广告）。
+  监听 video + danmaku merge listenable；|Δposition|>1s 或跨桶时
+  fire-and-forget 触发 `ensureLoadedFor`。
+- **`DanmakuSettingsPanel`** widget——4 项配置：visible / fontScale /
+  opacity / displayAreaPercent，业务自己 `showModalBottomSheet` 或塞
+  Drawer / Dialog。
+- **`DanmakuButton` 激活**——M9 stub 升级为真功能，三档可达性：
+  显式 `danmakuController` 参数 > `NiumaDanmakuScope.maybeOf` 兜底
+  > 都没有 `IgnorePointer ignoring=true` 禁用态。
+- **`NiumaDanmakuScope`** InheritedWidget——`NiumaPlayer` 接到
+  `danmakuController` 时自动注入子树，`DanmakuButton` 通过 context 找。
+- **CustomPainter 单 paint pass 渲染**，TextPainter LRU cache（256 上限），
+  目标 60fps@200 同屏弹幕（中端 Android）。每帧 paint 开头
+  `allocator.clear()` 保证 first-fit 从干净状态出发。
+- **example demo 页**：`m11_danmaku_demo_page.dart` mock 60s 桶喂 100
+  条/桶随机三模式弹幕 + 顶栏齿轮调出 `DanmakuSettingsPanel` modal +
+  「插一条 echo」按钮模拟 send 后回包。
+
+### 不变
+
+- 原生侧零改动；不新增任何 `pubspec.yaml` 依赖。
+- M7 / M8 / M9 既有 API 全兼容，`NiumaPlayer.danmakuController` 默认 null
+  保持 M9 行为。
+
+### 已知限制
+
+- V1 仅 LTR 滚动方向；不内置 RTL 支持。
+- V1 不内置发送 UI 与持久化设置——业务自己 POST 拿回包后调
+  `controller.add(item)` echo。
+- 弹幕特效（描边色 / 阴影自定义）V1 锁默认值（黑描边 1px）。
+
 ## [Unreleased]
 
 ### 新增（M9 review 修复）
