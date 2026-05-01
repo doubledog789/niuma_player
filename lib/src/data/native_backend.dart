@@ -328,6 +328,19 @@ class NativeBackend implements PlayerBackend {
     );
   }
 
+  // TODO(task4): 在 Task 4 实现真正的 PiP 逻辑（Android PictureInPictureParams）
+  @override
+  Future<bool> enterPictureInPicture({
+    required int aspectNum,
+    required int aspectDen,
+  }) async => false;
+
+  @override
+  Future<bool> exitPictureInPicture() async => false;
+
+  @override
+  Future<bool> queryPictureInPictureSupport() async => false;
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;

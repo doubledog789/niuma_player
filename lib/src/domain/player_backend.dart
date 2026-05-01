@@ -52,5 +52,24 @@ abstract class PlayerBackend {
 
   Future<void> setLooping(bool looping);
 
+  /// 进入 PiP（画中画）。
+  ///
+  /// [aspectNum] / [aspectDen] 是 video aspect 的整数表达
+  /// （Android 端 PictureInPictureParams 要求 Rational）。
+  /// 不支持 / 失败返回 false。
+  ///
+  /// 默认实现返 false——backend 不支持 PiP（如 IJK、Mock）时**无需**重写
+  /// 此方法即为正确行为。VideoPlayerBackend / NativeBackend 应重写。
+  Future<bool> enterPictureInPicture({
+    required int aspectNum,
+    required int aspectDen,
+  }) async => false;
+
+  /// 退出 PiP。不在 PiP 是 no-op，返回 false。默认实现返 false。
+  Future<bool> exitPictureInPicture() async => false;
+
+  /// 查询当前设备 + 视频是否支持 PiP。默认返 false。
+  Future<bool> queryPictureInPictureSupport() async => false;
+
   Future<void> dispose();
 }

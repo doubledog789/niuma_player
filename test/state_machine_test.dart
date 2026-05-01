@@ -140,6 +140,18 @@ class FakePlayerBackend implements PlayerBackend {
   Future<void> setLooping(bool looping) async {}
 
   @override
+  Future<bool> enterPictureInPicture({
+    required int aspectNum,
+    required int aspectDen,
+  }) async => false;
+
+  @override
+  Future<bool> exitPictureInPicture() async => false;
+
+  @override
+  Future<bool> queryPictureInPictureSupport() async => false;
+
+  @override
   Future<void> dispose() async {
     disposed = true;
     await _valueController.close();

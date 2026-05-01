@@ -145,6 +145,19 @@ class VideoPlayerBackend implements PlayerBackend {
   @override
   Future<void> setLooping(bool looping) => _inner.setLooping(looping);
 
+  // TODO(task3): 在 Task 3 实现真正的 PiP 逻辑（iOS AVPictureInPictureController）
+  @override
+  Future<bool> enterPictureInPicture({
+    required int aspectNum,
+    required int aspectDen,
+  }) async => false;
+
+  @override
+  Future<bool> exitPictureInPicture() async => false;
+
+  @override
+  Future<bool> queryPictureInPictureSupport() async => false;
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
