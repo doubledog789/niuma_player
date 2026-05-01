@@ -298,8 +298,14 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     child: widget.hudBuilder != null
-                        ? widget.hudBuilder!(ctx, state)
-                        : NiumaGestureHud(state: state),
+                        ? KeyedSubtree(
+                            key: ValueKey(state.kind),
+                            child: widget.hudBuilder!(ctx, state),
+                          )
+                        : NiumaGestureHud(
+                            key: ValueKey(state.kind),
+                            state: state,
+                          ),
                   ),
                 );
               },
