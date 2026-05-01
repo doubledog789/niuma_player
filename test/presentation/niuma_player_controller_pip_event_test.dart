@@ -115,6 +115,26 @@ void main() {
       backend.emit(const PipModeChanged(isInPip: false));
       await Future<void>.delayed(Duration.zero);
       expect(c.value.isInPictureInPicture, isFalse);
+      // 非 playing 状态退 PiP 不调 pause（由 fix #3 保证）
+      expect(backend.pauseCalled, 0);
+      await c.dispose();
+    });
+
+    test('PipModeChanged(false) + playing → 自动暂停（B 站/YouTube 行为）',
+        () async {
+      final backend = _PipEmittingFakeBackend();
+      final c = _makeController(backend);
+      await c.initialize();
+      // 模拟在 PiP 中正在播
+      backend.simulateValue(c.value.copyWith(
+        phase: PlayerPhase.playing,
+        isInPictureInPicture: true,
+      ));
+      // 用户按 X 关闭 PiP
+      backend.emit(const PipModeChanged(isInPip: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(c.value.isInPictureInPicture, isFalse);
+      expect(backend.pauseCalled, 1, reason: '退出 PiP 应自动暂停');
       await c.dispose();
     });
 

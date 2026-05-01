@@ -533,6 +533,13 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       if (e is FallbackTriggered) return;
       if (e is PipModeChanged) {
         value = value.copyWith(isInPictureInPicture: e.isInPip);
+        // 退出 PiP（X 按钮 / restore 回 app / 系统自动关）默认暂停播放——
+        // 与 B 站 / YouTube mobile 行为一致。业务想"退出 PiP 后继续放"
+        // 自己监听 controller.events 拦 PipModeChanged(isInPip:false) 调
+        // play() 即可。
+        if (!e.isInPip && value.phase == PlayerPhase.playing) {
+          unawaited(pause());
+        }
         if (!_eventController.isClosed) _eventController.add(e);
         return;
       }
