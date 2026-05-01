@@ -298,6 +298,19 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     }
   }
 
+  /// 任何 pointer 落在本 NiumaPlayer 子树时调用——拖进度条 / 点控件按钮
+  /// 等"用户活跃中"信号让 auto-hide 计时器重新计时，避免拖动期间满 5s
+  /// 突然隐藏控件。
+  ///
+  /// 仅在 `_controlsVisible == true` 且 phase=playing 时重启计时——隐藏
+  /// 状态下交互通常意味着用户先 tap 显示了控件，再后续操作；那次 tap
+  /// 已经走 [_onTapVideo] 安排好计时，这里不重复。
+  void _onUserActivity() {
+    if (!_controlsVisible) return;
+    if (widget.controller.value.phase != PlayerPhase.playing) return;
+    _scheduleAutoHide();
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget content = Builder(
@@ -307,43 +320,55 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         final theme = NiumaPlayerTheme.of(innerContext);
         final fadeDuration = theme.fadeInDuration;
 
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            NiumaPlayerView(widget.controller),
-            // 透明 click-catcher：放在视频之上、控件之下。
-            // 在 Flutter web 上 package:video_player 走 HtmlElementView
-            // （HTML <video> 元素），DOM click 被该元素直接吃掉不冒泡到
-            // 外层 Flutter GestureDetector。这一层是 Flutter widget，
-            // hit test 永远命中（opaque），保证 tap 切换控件可见的逻辑
-            // 在 web / native 都能跑。
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _onTapVideo,
-              ),
-            ),
-            AnimatedOpacity(
-              opacity: _controlsVisible ? 1.0 : 0.0,
-              duration: fadeDuration,
-              child: IgnorePointer(
-                ignoring: !_controlsVisible,
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: NiumaControlBar(controller: widget.controller),
-                ),
-              ),
-            ),
-            if (_orchestrator != null)
+        // 外层 Listener 不消费事件（translucent 行为靠 onPointerSignal）
+        // ——onPointerDown / onPointerMove 命中本 widget 子树任意位置都
+        // 重置 auto-hide 计时器：拖进度条 / 点按钮 / 音量条等期间持续保活
+        // 控件可见，避免"用户还在操作但 5s 后突然消失"的不合理体验。
+        // controller.value 变化以外的交互（仅本地 widget state 变化的拖动）
+        // 才需要这一层兜底；不做的话 ScrubBar drag 期间 _onValueChanged
+        // 不 fire，timer 一直跑到底。
+        return Listener(
+          behavior: HitTestBehavior.deferToChild,
+          onPointerDown: (_) => _onUserActivity(),
+          onPointerMove: (_) => _onUserActivity(),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              NiumaPlayerView(widget.controller),
+              // 透明 click-catcher：放在视频之上、控件之下。
+              // 在 Flutter web 上 package:video_player 走 HtmlElementView
+              // （HTML <video> 元素），DOM click 被该元素直接吃掉不冒泡到
+              // 外层 Flutter GestureDetector。这一层是 Flutter widget，
+              // hit test 永远命中（opaque），保证 tap 切换控件可见的逻辑
+              // 在 web / native 都能跑。
               Positioned.fill(
-                child: NiumaAdOverlay(
-                  orchestrator: _orchestrator!,
-                  videoController: widget.controller,
-                  emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
-                  pauseVideoWhileShowing: widget.pauseVideoDuringAd,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _onTapVideo,
                 ),
               ),
-          ],
+              AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: fadeDuration,
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: NiumaControlBar(controller: widget.controller),
+                  ),
+                ),
+              ),
+              if (_orchestrator != null)
+                Positioned.fill(
+                  child: NiumaAdOverlay(
+                    orchestrator: _orchestrator!,
+                    videoController: widget.controller,
+                    emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
+                    pauseVideoWhileShowing: widget.pauseVideoDuringAd,
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
