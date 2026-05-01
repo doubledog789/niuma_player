@@ -10,7 +10,7 @@ class DanmakuItem {
   const DanmakuItem({
     required this.position,
     required this.text,
-    this.fontSize = 20,
+    this.fontSize = 20.0,
     this.color = const Color(0xFFFFFFFF),
     this.mode = DanmakuMode.scroll,
     this.pool,

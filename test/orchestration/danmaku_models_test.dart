@@ -22,11 +22,35 @@ void main() {
       expect(a, isNot(equals(c)));
     });
 
-    test('copyWith', () {
-      const a = DanmakuItem(position: Duration(seconds: 5), text: '666');
+    test('copyWith 单字段更新保留其他字段', () {
+      const a = DanmakuItem(
+        position: Duration(seconds: 5),
+        text: '666',
+        fontSize: 24,
+        color: Color(0xFFFF0000),
+        mode: DanmakuMode.topFixed,
+        pool: 'vip',
+        metadata: 42,
+      );
       final b = a.copyWith(text: '777');
       expect(b.text, '777');
       expect(b.position, a.position);
+      expect(b.fontSize, a.fontSize);
+      expect(b.color, a.color);
+      expect(b.mode, a.mode);
+      expect(b.pool, a.pool);
+      expect(b.metadata, a.metadata);
+    });
+
+    test('copyWith() 无参数返回等值实例', () {
+      const a = DanmakuItem(
+        position: Duration(seconds: 5),
+        text: '666',
+        fontSize: 24,
+        mode: DanmakuMode.bottomFixed,
+        pool: 'vip',
+      );
+      expect(a.copyWith(), equals(a));
     });
   });
 
