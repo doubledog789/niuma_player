@@ -137,6 +137,29 @@ class NativeBackend implements PlayerBackend {
       _prepareWatchdog?.cancel();
       _prepareWatchdog = null;
     }
+    _startPipEventListening();
+  }
+
+  void _startPipEventListening() {
+    _pipEventSub = _pipEventChannel.receiveBroadcastStream().listen(
+      (dynamic data) {
+        if (data is! Map) return;
+        final event = data['event'];
+        if (event is! String) return;
+        switch (event) {
+          case 'pipStarted':
+            _eventController.add(const PipModeChanged(isInPip: true));
+          case 'pipStopped':
+            _eventController.add(const PipModeChanged(isInPip: false));
+          case 'playPauseToggle':
+            _eventController
+                .add(const PipRemoteAction(action: 'playPauseToggle'));
+        }
+      },
+      onError: (Object error) {
+        // 静默忽略——PiP 不可用时 EventChannel 也可能 error
+      },
+    );
   }
 
   void _bumpPrepareWatchdog() {
@@ -329,6 +352,10 @@ class NativeBackend implements PlayerBackend {
   }
 
   static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
+  static const EventChannel _pipEventChannel =
+      EventChannel('niuma_player/pip/events');
+
+  StreamSubscription<dynamic>? _pipEventSub;
 
   /// 进入 PiP（Android）。
   ///
@@ -388,6 +415,8 @@ class NativeBackend implements PlayerBackend {
     _prepareWatchdog?.cancel();
     _prepareWatchdog = null;
     await _eventSub?.cancel();
+    await _pipEventSub?.cancel();
+    _pipEventSub = null;
     final tid = _textureId;
     if (tid != null) {
       try {

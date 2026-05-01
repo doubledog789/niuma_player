@@ -531,6 +531,22 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // [_runInitialize] 内自己发出权威版本，所以这里把 backend 级
       // fallback 信号丢掉避免重复。
       if (e is FallbackTriggered) return;
+      if (e is PipModeChanged) {
+        value = value.copyWith(isInPictureInPicture: e.isInPip);
+        if (!_eventController.isClosed) _eventController.add(e);
+        return;
+      }
+      if (e is PipRemoteAction) {
+        if (e.action == 'playPauseToggle') {
+          if (value.phase == PlayerPhase.playing) {
+            unawaited(pause());
+          } else {
+            unawaited(play());
+          }
+        }
+        if (!_eventController.isClosed) _eventController.add(e);
+        return;
+      }
       if (!_eventController.isClosed) {
         _eventController.add(e);
       }

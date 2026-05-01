@@ -25,6 +25,10 @@ class VideoPlayerBackend implements PlayerBackend {
   bool _disposed = false;
 
   static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
+  static const EventChannel _pipEventChannel =
+      EventChannel('niuma_player/pip/events');
+
+  StreamSubscription<dynamic>? _pipEventSub;
 
   /// 底层 controller。对外暴露以便 [NiumaPlayerView] 把它交给
   /// `package:video_player` 的 `VideoPlayer` widget。
@@ -64,6 +68,29 @@ class VideoPlayerBackend implements PlayerBackend {
   Future<void> initialize() async {
     _inner.addListener(_onInnerChanged);
     await _inner.initialize();
+    _startPipEventListening();
+  }
+
+  void _startPipEventListening() {
+    _pipEventSub = _pipEventChannel.receiveBroadcastStream().listen(
+      (dynamic data) {
+        if (data is! Map) return;
+        final event = data['event'];
+        if (event is! String) return;
+        switch (event) {
+          case 'pipStarted':
+            _eventController.add(const PipModeChanged(isInPip: true));
+          case 'pipStopped':
+            _eventController.add(const PipModeChanged(isInPip: false));
+          case 'playPauseToggle':
+            _eventController
+                .add(const PipRemoteAction(action: 'playPauseToggle'));
+        }
+      },
+      onError: (Object error) {
+        // 静默忽略——PiP 不可用时 EventChannel 也可能 error
+      },
+    );
   }
 
   /// 从 [VideoPlayerValue] 推导 [PlayerPhase]。
@@ -228,6 +255,8 @@ class VideoPlayerBackend implements PlayerBackend {
     if (_disposed) return;
     _disposed = true;
     _inner.removeListener(_onInnerChanged);
+    await _pipEventSub?.cancel();
+    _pipEventSub = null;
     await _inner.dispose();
     await _valueController.close();
     await _eventController.close();

@@ -358,3 +358,25 @@ final class LineSwitchFailed extends NiumaPlayerEvent {
   @override
   String toString() => 'LineSwitchFailed(to: $toId, error: $error)';
 }
+
+/// PiP 模式状态变化事件——原生侧推送（iOS AVPictureInPictureControllerDelegate
+/// 或 Android Activity.onPictureInPictureModeChanged）。
+final class PipModeChanged extends NiumaPlayerEvent {
+  /// 构造一个事件。
+  const PipModeChanged({required this.isInPip});
+
+  /// 进入 PiP 时为 true，退出时为 false。
+  final bool isInPip;
+}
+
+/// PiP 窗内 RemoteAction（如 Android 系统 PiP 窗的 play/pause 按钮）触发事件。
+///
+/// iOS 端 PiP 强制使用 stock 控件，不通过此事件——AVPlayer 自己处理 play/pause。
+/// 只有 Android 通过 BroadcastReceiver 拦截 PendingIntent 后转此事件。
+final class PipRemoteAction extends NiumaPlayerEvent {
+  /// 构造一个事件。
+  const PipRemoteAction({required this.action});
+
+  /// 动作类型：当前仅 `'playPauseToggle'`。后续可能加 prev/next 等。
+  final String action;
+}
