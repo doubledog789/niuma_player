@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui' show Size;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/default_backend_factory.dart';
@@ -22,6 +21,7 @@ import '../orchestration/thumbnail_cache.dart';
 import '../orchestration/thumbnail_resolver.dart';
 import '../orchestration/thumbnail_track.dart';
 import '../orchestration/webvtt_parser.dart';
+import 'pip_lifecycle_observer.dart';
 
 /// 拉取 WebVTT body 的函数签名。
 ///
@@ -655,6 +655,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   // ────────────── M12 PiP（画中画） ──────────────
 
   bool _autoEnterPip = false;
+  PipLifecycleObserver? _pipObserver;
 
   /// 配置 app 切后台时是否自动进 PiP（默认 false）。
   ///
@@ -668,7 +669,19 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   set autoEnterPictureInPictureOnBackground(bool nextValue) {
     if (_autoEnterPip == nextValue) return;
     _autoEnterPip = nextValue;
-    // Task 6 在这里挂 / 摘 _PipLifecycleObserver。
+    if (nextValue) {
+      _pipObserver = PipLifecycleObserver(
+        shouldEnter: () =>
+            _autoEnterPip &&
+            value.phase == PlayerPhase.playing &&
+            !value.isInPictureInPicture,
+        enter: enterPictureInPicture,
+      );
+      WidgetsBinding.instance.addObserver(_pipObserver!);
+    } else if (_pipObserver != null) {
+      WidgetsBinding.instance.removeObserver(_pipObserver!);
+      _pipObserver = null;
+    }
   }
 
   /// 进入 PiP。返回 true 表示 SDK 已发起请求；不保证用户允许（系统层可能拒绝）。
@@ -714,6 +727,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    if (_pipObserver != null) {
+      WidgetsBinding.instance.removeObserver(_pipObserver!);
+      _pipObserver = null;
+    }
     await _disposeCurrentBackend();
     await _eventController.close();
     _thumbnailCache.clear();

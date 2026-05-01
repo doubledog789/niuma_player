@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:ui';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/data/default_backend_factory.dart';
-import 'package:niuma_player/src/domain/player_backend.dart';
 
 /// 简单的 PlayerBackend mock，专门给 PiP 测试用。
 /// 不复用 state_machine_test 的 FakePlayerBackend——那个是为状态机
@@ -13,12 +11,10 @@ class _PipFakeBackend implements PlayerBackend {
   _PipFakeBackend({
     this.enterPipResult = false,
     this.exitPipResult = false,
-    this.querySupportResult = false,
   });
 
   bool enterPipResult;
   bool exitPipResult;
-  bool querySupportResult;
 
   int enterPipCalled = 0;
   int exitPipCalled = 0;
@@ -91,7 +87,7 @@ class _PipFakeBackend implements PlayerBackend {
   }
 
   @override
-  Future<bool> queryPictureInPictureSupport() async => querySupportResult;
+  Future<bool> queryPictureInPictureSupport() async => false;
 
   @override
   Future<void> dispose() async {
@@ -191,6 +187,37 @@ void main() {
       c.autoEnterPictureInPictureOnBackground = true; // no-op
       c.autoEnterPictureInPictureOnBackground = false;
       expect(c.autoEnterPictureInPictureOnBackground, isFalse);
+      await c.dispose();
+    });
+
+    test('autoEnter=true → 注册 WidgetsBindingObserver；false → 摘除', () async {
+      final backend = _PipFakeBackend(enterPipResult: true);
+      final c = _makeController(backend);
+      await c.initialize();
+
+      // 模拟 phase=playing + 不在 PiP
+      c.value = c.value.copyWith(phase: PlayerPhase.playing);
+
+      // 通过 binding 广播 lifecycle，验证 observer 注册/摘除效果
+      final binding = WidgetsBinding.instance;
+
+      // false → false（默认）：不挂 observer，inactive 不触发
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      expect(backend.enterPipCalled, 0,
+          reason: 'autoEnter=false 时不应触发');
+
+      // 开 autoEnter
+      c.autoEnterPictureInPictureOnBackground = true;
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      expect(backend.enterPipCalled, 1,
+          reason: 'autoEnter=true + playing + !inPip → 触发一次');
+
+      // 关 autoEnter
+      c.autoEnterPictureInPictureOnBackground = false;
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      expect(backend.enterPipCalled, 1,
+          reason: 'autoEnter=false 后 observer 已摘除，不应再触发');
+
       await c.dispose();
     });
   });
