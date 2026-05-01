@@ -28,7 +28,12 @@ class DanmakuTrackAllocator {
   ///
   /// scroll 行数 = floor(height * areaPercent / rowHeight)；
   /// top / bottom 各占一半。
+  ///
+  /// **注意**：本方法**不**清空现有占用——shrink 时被截断的高 row 直接丢弃，
+  /// 留下的低 row 保留上一帧的占用快照。如需丢弃所有占用（如 seek / 模式
+  /// 切换），请显式调用 [clear]。Painter 的标准做法是 resize → clear → allocate。
   void resize({
+    /// 当前未使用，保留接口供未来按屏幕宽度做滚动速度归一化。
     required double width,
     required double height,
     required double rowHeight,
@@ -59,6 +64,8 @@ class DanmakuTrackAllocator {
     required int nowMs,
     double safeMargin = 8,
   }) {
+    assert(scrollDuration.inMilliseconds > 0,
+        'scrollDuration 必须 > 0；为 0 会导致进度计算除零产生 NaN/Infinity');
     for (var row = 0; row < _scroll.length; row++) {
       final slot = _scroll[row];
       if (slot == null) {

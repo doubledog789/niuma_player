@@ -111,6 +111,24 @@ void main() {
           fixedDuration: const Duration(seconds: 5), nowMs: 0);
       expect(r, 0);
     });
+
+    test('bottom 满轨返回 -1', () {
+      for (var i = 0; i < 3; i++) {
+        a.allocateBottomFixedTrack(
+            fixedDuration: const Duration(seconds: 5), nowMs: 0);
+      }
+      final r = a.allocateBottomFixedTrack(
+          fixedDuration: const Duration(seconds: 5), nowMs: 100);
+      expect(r, -1);
+    });
+
+    test('bottom 窗口外可复用', () {
+      a.allocateBottomFixedTrack(
+          fixedDuration: const Duration(seconds: 5), nowMs: 0);
+      final r = a.allocateBottomFixedTrack(
+          fixedDuration: const Duration(seconds: 5), nowMs: 6000);
+      expect(r, 0);
+    });
   });
 
   group('clear / resize', () {
