@@ -1,8 +1,13 @@
 package cn.niuma.niuma_player
 
+import android.app.Activity
 import android.content.Context
+import android.media.AudioManager
 import android.os.Build
+import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -12,12 +17,14 @@ import io.flutter.view.TextureRegistry
 import java.security.MessageDigest
 
 /** NiumaPlayerPlugin */
-class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
+class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private lateinit var channel: MethodChannel
+    private lateinit var systemChannel: MethodChannel
     private var messenger: BinaryMessenger? = null
     private var textureRegistry: TextureRegistry? = null
     private var applicationContext: Context? = null
+    private var activityBinding: ActivityPluginBinding? = null
 
     private val players: MutableMap<Long, PlayerSession> = mutableMapOf()
 
@@ -31,9 +38,32 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
 
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "cn.niuma/player")
         channel.setMethodCallHandler(this)
+
+        systemChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "niuma_player/system")
+        systemChannel.setMethodCallHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
+        // System channel methods (brightness + volume)
+        when (call.method) {
+            "getBrightness" -> {
+                handleGetBrightness(result)
+                return
+            }
+            "setBrightness" -> {
+                handleSetBrightness(call, result)
+                return
+            }
+            "getSystemVolume" -> {
+                handleGetSystemVolume(result)
+                return
+            }
+            "setSystemVolume" -> {
+                handleSetSystemVolume(call, result)
+                return
+            }
+        }
+
         // Preserved from scaffold so existing unit test keeps passing without
         // needing a FlutterPluginBinding.
         if (call.method == "getPlatformVersion") {
@@ -81,6 +111,9 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         channel.setMethodCallHandler(null)
+        if (::systemChannel.isInitialized) {
+            systemChannel.setMethodCallHandler(null)
+        }
         messenger = null
         textureRegistry = null
         applicationContext = null
@@ -286,5 +319,80 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
             sb.append(Integer.toHexString(v))
         }
         return sb.toString()
+    }
+
+    // ---------------------------------------------------------------------
+    // System channel handlers: brightness + volume
+    // ---------------------------------------------------------------------
+
+    private fun handleGetBrightness(result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.success(0.0)
+            return
+        }
+        val lp = activity.window.attributes
+        val v = lp.screenBrightness
+        // -1 = 跟随系统亮度，无法精确读，返 0.5 占位
+        result.success(if (v < 0) 0.5 else v.toDouble())
+    }
+
+    private fun handleSetBrightness(call: MethodCall, result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.success(false)
+            return
+        }
+        val value = (call.argument<Double>("value") ?: 0.5).coerceIn(0.0, 1.0)
+        val lp = activity.window.attributes
+        lp.screenBrightness = value.toFloat()
+        activity.window.attributes = lp
+        result.success(true)
+    }
+
+    private fun handleGetSystemVolume(result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.success(0.0)
+            return
+        }
+        val am = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        result.success(if (max > 0) cur.toDouble() / max else 0.0)
+    }
+
+    private fun handleSetSystemVolume(call: MethodCall, result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.success(false)
+            return
+        }
+        val value = (call.argument<Double>("value") ?: 0.5).coerceIn(0.0, 1.0)
+        val am = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val target = (value * max).toInt().coerceIn(0, max)
+        am.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+        result.success(true)
+    }
+
+    // ---------------------------------------------------------------------
+    // ActivityAware
+    // ---------------------------------------------------------------------
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activityBinding = binding
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activityBinding = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activityBinding = binding
+    }
+
+    override fun onDetachedFromActivity() {
+        activityBinding = null
     }
 }
