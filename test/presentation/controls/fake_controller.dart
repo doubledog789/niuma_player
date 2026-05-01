@@ -66,6 +66,12 @@ class FakeNiumaPlayerController extends NiumaPlayerController {
     // no-op for widget tests.
   }
 
+  /// 测试辅助：直接改 [value.position] 并触发 notifyListeners。
+  void setPosition(Duration p) {
+    value = value.copyWith(position: p);
+    notifyListeners();
+  }
+
   @override
   Future<void> dispose() async {
     // 父类 dispose 会动 _backend / event stream / thumbnail cache，
