@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
+import 'package:niuma_player/src/presentation/niuma_gesture_layer.dart';
 import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
@@ -608,6 +610,59 @@ void main() {
           find.byType(np_internal.NiumaPlayerConfigScope));
       expect(scopeFound.danmakuController, same(danmaku));
       danmaku.dispose();
+    });
+  });
+  group('M13 手势集成', () {
+    testWidgets('默认 inline 模式 NiumaGestureLayer enabled=false',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(controller: video),
+        ),
+      ));
+      final layer = tester.widget<NiumaGestureLayer>(
+        find.byType(NiumaGestureLayer),
+      );
+      expect(layer.enabled, isFalse);
+    });
+
+    testWidgets('gesturesEnabledInline=true 启用', (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            gesturesEnabledInline: true,
+          ),
+        ),
+      ));
+      final layer = tester.widget<NiumaGestureLayer>(
+        find.byType(NiumaGestureLayer),
+      );
+      expect(layer.enabled, isTrue);
+    });
+
+    testWidgets('disabledGestures 透传', (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            disabledGestures: const {GestureKind.brightness},
+          ),
+        ),
+      ));
+      final layer = tester.widget<NiumaGestureLayer>(
+        find.byType(NiumaGestureLayer),
+      );
+      expect(layer.disabledGestures, contains(GestureKind.brightness));
     });
   });
 }
