@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' show Size;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -650,6 +651,64 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// app 级"清缓存 / 重置"流程应调用此方法，让下次 initialize 重新
   /// 探测 ExoPlayer，而不是直接走 IJK。
   static Future<void> clearDeviceMemory() => DeviceMemory().clear();
+
+  // ────────────── M12 PiP（画中画） ──────────────
+
+  bool _autoEnterPip = false;
+
+  /// 配置 app 切后台时是否自动进 PiP（默认 false）。
+  ///
+  /// **触发条件**（Task 6 实现）：app 进入 inactive + 当前 phase=playing
+  /// + 不在 PiP 中。其他 phase（paused / buffering / idle / error / ended）
+  /// 不会触发。
+  bool get autoEnterPictureInPictureOnBackground => _autoEnterPip;
+
+  /// 设置 [autoEnterPictureInPictureOnBackground]。
+  /// 同值短路；不同值时（Task 6）注册 / 注销 [WidgetsBindingObserver]。
+  set autoEnterPictureInPictureOnBackground(bool nextValue) {
+    if (_autoEnterPip == nextValue) return;
+    _autoEnterPip = nextValue;
+    // Task 6 在这里挂 / 摘 _PipLifecycleObserver。
+  }
+
+  /// 进入 PiP。返回 true 表示 SDK 已发起请求；不保证用户允许（系统层可能拒绝）。
+  ///
+  /// 设备不支持 / video 未 initialize / 已在 PiP → 返回 false 不抛。
+  /// 状态实际变更由原生 EventChannel 推送（参见 Task 11）。
+  Future<bool> enterPictureInPicture() async {
+    final v = value;
+    if (!v.initialized) return false;
+    if (v.isInPictureInPicture) return false;
+    final backend = _backend;
+    if (backend == null) return false;
+    final aspect = _aspectInts(v.size);
+    return backend.enterPictureInPicture(
+      aspectNum: aspect.$1,
+      aspectDen: aspect.$2,
+    );
+  }
+
+  /// 退出 PiP。不在 PiP 是 no-op，返回 false。
+  Future<bool> exitPictureInPicture() async {
+    if (!value.isInPictureInPicture) return false;
+    final backend = _backend;
+    if (backend == null) return false;
+    return backend.exitPictureInPicture();
+  }
+
+  /// 计算 aspect 整数 (num, den)。fallback 16:9。
+  ///
+  /// 算法：×1000 整数化 + GCD 约分。
+  static (int, int) _aspectInts(Size size) {
+    if (size.width <= 0 || size.height <= 0) return (16, 9);
+    final w = (size.width * 1000).round();
+    final h = (size.height * 1000).round();
+    final g = _gcd(w, h);
+    if (g == 0) return (16, 9);
+    return (w ~/ g, h ~/ g);
+  }
+
+  static int _gcd(int a, int b) => b == 0 ? a : _gcd(b, a % b);
 
   @override
   Future<void> dispose() async {
