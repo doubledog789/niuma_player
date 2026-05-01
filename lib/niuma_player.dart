@@ -106,3 +106,10 @@ export 'src/observability/analytics_event.dart'
         AdCueType,
         AdDismissReason;
 export 'src/observability/analytics_emitter.dart' show AnalyticsEmitter;
+
+// M13 手势
+export 'src/domain/gesture_kind.dart' show GestureKind;
+export 'src/domain/gesture_feedback_state.dart' show GestureFeedbackState;
+export 'src/presentation/niuma_gesture_layer.dart'
+    show NiumaGestureLayer, GestureHudBuilder;
+export 'src/presentation/niuma_gesture_hud.dart' show NiumaGestureHud;

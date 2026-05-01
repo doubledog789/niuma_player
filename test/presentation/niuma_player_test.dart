@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/domain/gesture_kind.dart';
-import 'package:niuma_player/src/presentation/niuma_gesture_layer.dart';
 import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 

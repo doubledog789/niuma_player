@@ -1,8 +1,6 @@
 // test/presentation/niuma_player_controller_gesture_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
-import 'package:niuma_player/src/domain/gesture_kind.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
