@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/orchestration/danmaku_models.dart';
-import 'package:niuma_player/src/presentation/niuma_danmaku_controller.dart';
+import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/niuma_danmaku_overlay.dart';
 
 import 'controls/fake_controller.dart';
@@ -39,7 +38,6 @@ void main() {
       ),
     ));
     await tester.pump();
-    // visible=false 时 build 走的是 SizedBox.expand 分支，不挂 CustomPaint
     expect(
       find.descendant(
         of: find.byType(NiumaDanmakuOverlay),
@@ -69,19 +67,43 @@ void main() {
       ),
     ));
 
-    // 初始 position 0，跳到 100s（>1s 阈值）→ 触发 ensureLoadedFor
     video.setPosition(const Duration(seconds: 100));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    // 再跳回 5s
     video.setPosition(const Duration(seconds: 5));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byType(NiumaDanmakuOverlay), findsOneWidget);
-    // 至少触发过 1 次 loader（跨桶 / 大幅 seek 都会触发）
     expect(calls, isNotEmpty);
+    danmaku.dispose();
+  });
+
+  testWidgets('overlay tap 穿透到下方 GestureDetector', (tester) async {
+    final video = FakeNiumaPlayerController();
+    final danmaku = NiumaDanmakuController();
+    var underlyingTapped = 0;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 底层 click-catcher（NiumaPlayer 中那个）
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => underlyingTapped++,
+          ),
+          // overlay 在上层
+          NiumaDanmakuOverlay(video: video, danmaku: danmaku),
+        ],
+      ),
+    ));
+    await tester.pump();
+    await tester.tapAt(const Offset(100, 100));
+    await tester.pump();
+    expect(underlyingTapped, 1,
+        reason: 'overlay 必须 IgnorePointer 让 tap 穿透到下方 click-catcher');
     danmaku.dispose();
   });
 }

@@ -119,11 +119,13 @@ class _M11DanmakuDemoPageState extends State<M11DanmakuDemoPage> {
                 '验证清单：\n'
                 '1. 启动后弹幕按 60s 桶按需 lazy load（mock 100 条/桶）\n'
                 '2. 三模式同屏：scroll / topFixed / bottomFixed\n'
-                '3. 进度条 seek → 弹幕清空重算\n'
-                '4. 暂停 → 弹幕画面冻结\n'
-                '5. 顶栏齿轮：字号 / 不透明度 / 显示区域 / ON/OFF\n'
-                '6. 控件条 DanmakuButton 也能 toggle 开关\n'
-                '7. 「插一条 echo」按钮模拟 send 后回包',
+                '3. 滚动平滑（60fps，不跳跃）——Ticker 内插位置\n'
+                '4. tap 视频区切换控件显隐——overlay 不阻挡 hit test\n'
+                '5. 进度条 seek → 弹幕清空重算\n'
+                '6. 暂停 → 弹幕画面冻结（Ticker 停）\n'
+                '7. 顶栏齿轮：字号 / 不透明度 / 显示区域 / ON/OFF\n'
+                '8. 控件条 DanmakuButton 也能 toggle 开关\n'
+                '9. 「插一条 echo」按钮模拟 send 后回包',
                 style: TextStyle(fontSize: 12),
               ),
             ),
