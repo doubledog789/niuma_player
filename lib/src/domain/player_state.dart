@@ -124,6 +124,8 @@ class NiumaPlayerValue {
     required this.bufferedPosition,
     this.openingStage,
     this.error,
+    this.isInPictureInPicture = false,
+    this.isPictureInPictureSupported = false,
   });
 
   /// 空初始值（[PlayerBackend.initialize] 之前）。
@@ -152,6 +154,14 @@ class NiumaPlayerValue {
   /// 结构化错误信息；仅当 `phase == error` 时非 null。用
   /// [PlayerError.category] 驱动重试 / 回退 / UI 决策。
   final PlayerError? error;
+
+  /// 当前是否在 PiP 窗（小窗）模式中。
+  /// initialize 前为 false；进 / 出 PiP 时由原生侧推送状态变化。
+  final bool isInPictureInPicture;
+
+  /// 设备 + 当前视频是否支持 PiP（iOS 15+ / Android 8.0+，且已 initialize）。
+  /// initialize 前为 false。
+  final bool isPictureInPictureSupported;
 
   // ────────────── 兼容性 getter（由 phase 派生） ──────────────
 
@@ -198,6 +208,8 @@ class NiumaPlayerValue {
     // 用一个 sentinel 显式置 null：传 `clearError: true` 来重置。
     PlayerError? error,
     bool clearError = false,
+    bool? isInPictureInPicture,
+    bool? isPictureInPictureSupported,
   }) {
     return NiumaPlayerValue(
       phase: phase ?? this.phase,
@@ -209,6 +221,10 @@ class NiumaPlayerValue {
           ? null
           : (openingStage ?? this.openingStage),
       error: clearError ? null : (error ?? this.error),
+      isInPictureInPicture:
+          isInPictureInPicture ?? this.isInPictureInPicture,
+      isPictureInPictureSupported:
+          isPictureInPictureSupported ?? this.isPictureInPictureSupported,
     );
   }
 
@@ -222,7 +238,9 @@ class NiumaPlayerValue {
         other.size == size &&
         other.bufferedPosition == bufferedPosition &&
         other.openingStage == openingStage &&
-        other.error == error;
+        other.error == error &&
+        other.isInPictureInPicture == isInPictureInPicture &&
+        other.isPictureInPictureSupported == isPictureInPictureSupported;
   }
 
   @override
@@ -234,6 +252,8 @@ class NiumaPlayerValue {
         bufferedPosition,
         openingStage,
         error,
+        isInPictureInPicture,
+        isPictureInPictureSupported,
       );
 
   @override
@@ -245,7 +265,9 @@ class NiumaPlayerValue {
         'size: $size, '
         'bufferedPosition: $bufferedPosition, '
         'openingStage: $openingStage, '
-        'error: $error)';
+        'error: $error, '
+        'isInPictureInPicture: $isInPictureInPicture, '
+        'isPictureInPictureSupported: $isPictureInPictureSupported)';
   }
 }
 
