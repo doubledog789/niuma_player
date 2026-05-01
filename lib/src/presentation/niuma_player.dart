@@ -7,6 +7,7 @@ import '../domain/player_state.dart';
 import '../observability/analytics_emitter.dart';
 import '../orchestration/ad_schedule.dart';
 import '../orchestration/ad_scheduler.dart';
+import 'controls/pip_button.dart';
 import 'niuma_ad_overlay.dart';
 import 'niuma_control_bar.dart';
 import 'niuma_danmaku_controller.dart';
@@ -370,6 +371,23 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: NiumaControlBar(controller: widget.controller),
+                  ),
+                ),
+              ),
+              // M12: 右上角 PipButton 浮层，跟控件条 auto-hide 同步
+              AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: fadeDuration,
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: PipButton(controller: widget.controller),
+                      ),
+                    ),
                   ),
                 ),
               ),
