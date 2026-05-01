@@ -16,6 +16,7 @@ class _M11DanmakuDemoPageState extends State<M11DanmakuDemoPage> {
   late final NiumaPlayerController _video;
   late final NiumaDanmakuController _danmaku;
   final _random = math.Random(42);
+  Timer? _autoInjectTimer;
 
   @override
   void initState() {
@@ -34,6 +35,11 @@ class _M11DanmakuDemoPageState extends State<M11DanmakuDemoPage> {
       await _video.initialize();
       if (!mounted) return;
       await _video.play();
+      // 自动每 2.5s 注入一条新弹幕，让全屏页也能看到 add() 路径在跑
+      _autoInjectTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+        if (!mounted) return;
+        _injectNow();
+      });
     } catch (e) {
       debugPrint('init 失败：$e');
     }
@@ -58,16 +64,18 @@ class _M11DanmakuDemoPageState extends State<M11DanmakuDemoPage> {
   }
 
   void _injectNow() {
+    final mode = DanmakuMode.values[_random.nextInt(3)];
     _danmaku.add(DanmakuItem(
       position: _video.value.position,
       text: '我刚发的：${DateTime.now().millisecondsSinceEpoch % 10000}',
       color: const Color(0xFFFF8800),
-      mode: DanmakuMode.scroll,
+      mode: mode,
     ));
   }
 
   @override
   void dispose() {
+    _autoInjectTimer?.cancel();
     unawaited(_video.dispose());
     _danmaku.dispose();
     super.dispose();
@@ -125,7 +133,8 @@ class _M11DanmakuDemoPageState extends State<M11DanmakuDemoPage> {
                 '6. 暂停 → 弹幕画面冻结（Ticker 停）\n'
                 '7. 顶栏齿轮：字号 / 不透明度 / 显示区域 / ON/OFF\n'
                 '8. 控件条 DanmakuButton 也能 toggle 开关\n'
-                '9. 「插一条 echo」按钮模拟 send 后回包',
+                '9. 「插一条 echo」按钮模拟 send 后回包\n'
+                '10. 全屏后弹幕仍在飞 + 每 2.5s 自动加一条橙色弹幕（验证 add 在全屏内有效）',
                 style: TextStyle(fontSize: 12),
               ),
             ),

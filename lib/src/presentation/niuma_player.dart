@@ -398,6 +398,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       pauseVideoDuringAd: widget.pauseVideoDuringAd,
       controlsAutoHideAfter: widget.controlsAutoHideAfter,
       theme: widget.theme,
+      danmakuController: widget.danmakuController,
       child: content,
     );
 
@@ -445,6 +446,7 @@ class NiumaPlayerConfigScope extends InheritedWidget {
     required this.pauseVideoDuringAd,
     required this.controlsAutoHideAfter,
     required this.theme,
+    required this.danmakuController,
     required super.child,
   });
 
@@ -463,6 +465,10 @@ class NiumaPlayerConfigScope extends InheritedWidget {
   /// 外层 NiumaPlayer 配置的可选主题。
   final NiumaPlayerTheme? theme;
 
+  /// 可选弹幕 controller，由 [NiumaPlayer] 透传给 [FullscreenButton]，
+  /// push 全屏页时一并传到 [NiumaFullscreenPage] 内的 [NiumaPlayer]。
+  final NiumaDanmakuController? danmakuController;
+
   /// 找最近的 [NiumaPlayerConfigScope]——存在即返回；不存在返回 null。
   static NiumaPlayerConfigScope? maybeOf(BuildContext context) {
     return context
@@ -475,7 +481,8 @@ class NiumaPlayerConfigScope extends InheritedWidget {
       adAnalyticsEmitter != oldWidget.adAnalyticsEmitter ||
       pauseVideoDuringAd != oldWidget.pauseVideoDuringAd ||
       controlsAutoHideAfter != oldWidget.controlsAutoHideAfter ||
-      theme != oldWidget.theme;
+      theme != oldWidget.theme ||
+      danmakuController != oldWidget.danmakuController;
 }
 
 /// noop analytics emitter——用户不传 emitter 时把事件丢掉，避免广告

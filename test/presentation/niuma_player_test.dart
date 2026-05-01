@@ -586,6 +586,29 @@ void main() {
       );
       expect(ip, findsOneWidget);
     });
+
+    testWidgets('NiumaPlayer 传 danmakuController → ConfigScope.danmakuController 同步',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      final danmaku = NiumaDanmakuController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            danmakuController: danmaku,
+          ),
+        ),
+      ));
+      await tester.pump();
+      // ConfigScope 包在 NiumaPlayer 的 build 里——断言子树里有 ConfigScope
+      // 且它的 danmakuController 是同一实例。
+      final scopeFound = tester.widget<np_internal.NiumaPlayerConfigScope>(
+          find.byType(np_internal.NiumaPlayerConfigScope));
+      expect(scopeFound.danmakuController, same(danmaku));
+      danmaku.dispose();
+    });
   });
 }
 
