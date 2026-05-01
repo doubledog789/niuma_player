@@ -6,6 +6,9 @@ public class NiumaPlayerPlugin: NSObject, FlutterPlugin {
     let channel = FlutterMethodChannel(name: "niuma_player", binaryMessenger: registrar.messenger())
     let instance = NiumaPlayerPlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
+
+    // M12: 注册 PiP 子插件
+    NiumaPipPlugin.register(with: registrar)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
