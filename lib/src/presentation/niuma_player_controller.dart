@@ -315,7 +315,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     final completer = Completer<void>();
     _initCompleter = completer;
     _runInitialize().then(
-      (_) {
+      (_) async {
+        // 初始化成功后查 PiP 设备能力，写进 value.isPictureInPictureSupported。
+        // 没有这一步 PipButton 永远显示禁用——backend 不会主动推支持状态。
+        await _queryAndUpdatePipSupport();
         if (!completer.isCompleted) completer.complete();
       },
       onError: (Object e, StackTrace st) {
@@ -730,6 +733,21 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     final backend = _backend;
     if (backend == null) return false;
     return backend.exitPictureInPicture();
+  }
+
+  /// 查 backend 当前的 PiP 设备能力，把结果同步进 value。失败静默忽略。
+  Future<void> _queryAndUpdatePipSupport() async {
+    final backend = _backend;
+    if (backend == null) return;
+    try {
+      final supported = await backend.queryPictureInPictureSupport();
+      if (_disposed) return;
+      if (value.isPictureInPictureSupported != supported) {
+        value = value.copyWith(isPictureInPictureSupported: supported);
+      }
+    } catch (_) {
+      // 查询失败保持 false（默认值）
+    }
   }
 
   /// 计算 aspect 整数 (num, den)。fallback 16:9。
