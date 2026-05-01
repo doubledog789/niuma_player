@@ -86,24 +86,28 @@ class _M9DefaultDemoPageState extends State<M9DefaultDemoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('M9 NiumaPlayer 默认外观')),
-      body: Column(
-        children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ColoredBox(
-              color: Colors.black,
-              child: NiumaPlayer(
-                controller: _controller,
-                adSchedule: _schedule,
-                adAnalyticsEmitter: (event) {
-                  debugPrint('[ad] $event');
-                },
+      // SingleChildScrollView 防 overflow：横→竖屏过渡的瞬间 AspectRatio
+        // 在窄高度下会挤占下方文字空间，没 scroll 容器就报 RenderFlex
+        // overflow。容器化滚动后过渡期看着平滑，正常竖屏下无差别。
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ColoredBox(
+                color: Colors.black,
+                child: NiumaPlayer(
+                  controller: _controller,
+                  adSchedule: _schedule,
+                  adAnalyticsEmitter: (event) {
+                    debugPrint('[ad] $event');
+                  },
+                ),
               ),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
               '验证清单：\n'
               '1. 初始进入：底部控件条可见，开始播放后 5s 自动淡出\n'
               '2. 点击视频区切换控件显隐\n'
@@ -115,7 +119,8 @@ class _M9DefaultDemoPageState extends State<M9DefaultDemoPage> {
               style: TextStyle(fontSize: 12),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

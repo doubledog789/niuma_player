@@ -66,8 +66,11 @@ class _M9CustomDemoPageState extends State<M9CustomDemoPage> {
       backgroundColor: Colors.black87,
       body: NiumaPlayerThemeData(
         data: theme,
-        child: Column(
-          children: [
+        // SingleChildScrollView 防 overflow：横→竖屏过渡的瞬间布局
+        // 收紧，没 scroll 容器会 RenderFlex overflow。
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
             // 第一行：主操作（播放 + 时间显示）。
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -116,7 +119,8 @@ class _M9CustomDemoPageState extends State<M9CustomDemoPage> {
                 style: TextStyle(fontSize: 12, color: Colors.white70),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
