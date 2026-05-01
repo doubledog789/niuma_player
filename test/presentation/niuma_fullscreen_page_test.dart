@@ -203,4 +203,37 @@ void main() {
     );
     expect(scaffold.backgroundColor, Colors.black);
   });
+
+  testWidgets('NiumaFullscreenPage.route 透传 danmakuController 到内层 NiumaPlayer',
+      (tester) async {
+    final ctl = FakeNiumaPlayerController();
+    final danmaku = NiumaDanmakuController();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(ctx).push(
+              NiumaFullscreenPage.route(
+                controller: ctl,
+                danmakuController: danmaku,
+              ),
+            ),
+            child: const Text('go'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    final inner = tester.widget<NiumaPlayer>(
+      find.descendant(
+        of: find.byType(NiumaFullscreenPage),
+        matching: find.byType(NiumaPlayer),
+      ),
+    );
+    expect(inner.danmakuController, same(danmaku));
+    danmaku.dispose();
+  });
 }

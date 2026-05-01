@@ -538,6 +538,78 @@ void main() {
       });
     });
   });
+
+  group('NiumaPlayer + danmakuController 集成', () {
+    testWidgets('传 danmakuController 时子树注入 NiumaDanmakuScope',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      final danmaku = NiumaDanmakuController()
+        ..add(const DanmakuItem(position: Duration(seconds: 1), text: 'hi'));
+
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            danmakuController: danmaku,
+          ),
+        ),
+      ));
+      await tester.pump();
+      // ControlBar 内的 DanmakuButton 应能找到 scope 注入的 controller
+      final button = find.byType(DanmakuButton);
+      expect(button, findsOneWidget);
+      expect(danmaku.settings.visible, isTrue);
+      // tap 改 visible
+      await tester.tap(button);
+      await tester.pump();
+      expect(danmaku.settings.visible, isFalse);
+      danmaku.dispose();
+    });
+
+    testWidgets('不传 danmakuController 时 DanmakuButton 是禁用态',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(controller: video),
+        ),
+      ));
+      final ip = find.descendant(
+        of: find.byType(DanmakuButton),
+        matching: find.byWidgetPredicate(
+          (w) => w is IgnorePointer && w.ignoring == true,
+        ),
+      );
+      expect(ip, findsOneWidget);
+    });
+
+    testWidgets('NiumaPlayer 传 danmakuController → ConfigScope.danmakuController 同步',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      final danmaku = NiumaDanmakuController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            danmakuController: danmaku,
+          ),
+        ),
+      ));
+      await tester.pump();
+      // ConfigScope 包在 NiumaPlayer 的 build 里——断言子树里有 ConfigScope
+      // 且它的 danmakuController 是同一实例。
+      final scopeFound = tester.widget<np_internal.NiumaPlayerConfigScope>(
+          find.byType(np_internal.NiumaPlayerConfigScope));
+      expect(scopeFound.danmakuController, same(danmaku));
+      danmaku.dispose();
+    });
+  });
 }
 
 Widget _adBuilder(BuildContext _, AdController __) =>

@@ -3,7 +3,7 @@ description: >-
   Production-grade Flutter video player with a unified API across iOS, Android,
   and Web, plus an automatic ExoPlayer → IJK fallback path on Android for
   devices without working hardware decoders.
-version: 0.4.0
+version: 0.5.0
 homepage: https://github.com/axin789/niuma_player
 repository: https://github.com/axin789/niuma_player
 issue_tracker: https://github.com/axin789/niuma_player/issues

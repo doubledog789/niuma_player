@@ -59,6 +59,7 @@ class FullscreenButton extends StatelessWidget {
           pauseVideoDuringAd: cfg?.pauseVideoDuringAd ?? true,
           controlsAutoHideAfter:
               cfg?.controlsAutoHideAfter ?? const Duration(seconds: 5),
+          danmakuController: cfg?.danmakuController,
         ),
       );
     }

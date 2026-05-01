@@ -197,6 +197,68 @@ Column(children: [
 
 完整 demo 见 [`example/lib/m9_default_demo_page.dart`](example/lib/m9_default_demo_page.dart) 和 [`example/lib/m9_custom_demo_page.dart`](example/lib/m9_custom_demo_page.dart)。
 
+## M11 特性（弹幕 / barrage）
+
+纯 Dart 渲染的弹幕层，三模式（scroll / topFixed / bottomFixed）+ 60s 桶 lazy load + 可选设置面板。零原生改动，三端一致。
+
+接入只需 3 步：构造 `NiumaDanmakuController`，把它和 `NiumaPlayerController` 一起塞进 `NiumaPlayer`：
+
+```dart
+final danmaku = NiumaDanmakuController(
+  loader: (start, end) async {
+    // 60s 桶 lazy load，业务自己实现（你的 /api/danmaku/list 等）
+    final raw = await api.fetchDanmaku(videoId, start, end);
+    return raw.map((e) => DanmakuItem(
+      position: Duration(seconds: e.pos),
+      text: e.content,
+      fontSize: e.size.toDouble(),
+      color: Color(0xFF000000 | e.color),
+      mode: DanmakuMode.scroll,
+      pool: e.pool,        // 透传字段
+      metadata: e.id,      // 业务任意字段
+    )).toList();
+  },
+);
+
+NiumaPlayer(
+  controller: videoCtrl,
+  danmakuController: danmaku,   // 传入即自动叠加 NiumaDanmakuOverlay
+);
+
+// 用户自己 send 后回包 echo 一条本地（SDK 不碰网络）
+final pos = videoCtrl.value.position;
+await api.sendDanmaku(pos, '我发的');
+danmaku.add(DanmakuItem(position: pos, text: '我发的'));
+```
+
+**三种集成形态：**
+
+1. **`NiumaPlayer` 自动接管**（默认）——传 `danmakuController` 即激活
+2. **`NiumaDanmakuOverlay` 积木件**——自定义布局自己 Stack
+3. **`NiumaDanmakuScope` + `DanmakuButton`**——独立布局也能让按钮可点
+
+**设置面板**（可选）独立暴露：
+
+```dart
+showModalBottomSheet(
+  context: context,
+  builder: (_) => DanmakuSettingsPanel(danmaku: danmaku),
+);
+// 4 项：visible / fontScale / opacity / displayAreaPercent
+```
+
+**渲染策略：**
+
+- CustomPainter 单 paint pass + TextPainter LRU cache（256 上限）
+- 三模式 first-fit 轨道分配，满轨直接丢弃自然降密度（防 seek 后 backlog）
+- 暂停 = 弹幕画面冻结（零代码，video.position 停推 painter 不 repaint）
+- seek > 1s = 自动清空飞行 + 触发对应桶 lazy load
+- 60fps@200 同屏弹幕（中端 Android 目标）
+
+**SDK 不做的事：** 网络 / 输入框 / 屏蔽词 / 持久化设置——全留给业务层。
+
+完整 demo 见 [`example/lib/m11_danmaku_demo_page.dart`](example/lib/m11_danmaku_demo_page.dart)。
+
 ## 监听后端选择
 
 ```dart
