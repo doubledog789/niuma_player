@@ -9,6 +9,9 @@ import '../orchestration/ad_schedule.dart';
 import '../orchestration/ad_scheduler.dart';
 import 'niuma_ad_overlay.dart';
 import 'niuma_control_bar.dart';
+import 'niuma_danmaku_controller.dart';
+import 'niuma_danmaku_overlay.dart';
+import 'niuma_danmaku_scope.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
 import 'niuma_player_view.dart';
@@ -44,6 +47,7 @@ class NiumaPlayer extends StatefulWidget {
     this.adAnalyticsEmitter,
     this.pauseVideoDuringAd = true,
     this.controlsAutoHideAfter = const Duration(seconds: 5),
+    this.danmakuController,
   });
 
   /// 实际驱动播放的 controller。所有内部子组件共享同一实例。
@@ -67,6 +71,10 @@ class NiumaPlayer extends StatefulWidget {
   /// 进入 `playing` 后多久没有用户交互自动隐藏控件。默认 5s。
   /// 设为 [Duration.zero] 视为"永不自动隐藏"——控件永远可见。
   final Duration controlsAutoHideAfter;
+
+  /// 可选弹幕 controller。传入即自动叠加 [NiumaDanmakuOverlay] 与
+  /// 注入 [NiumaDanmakuScope]，让控件条里的 [DanmakuButton] 可点。
+  final NiumaDanmakuController? danmakuController;
 
   @override
   State<NiumaPlayer> createState() => _NiumaPlayerState();
@@ -347,6 +355,13 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   onTap: _onTapVideo,
                 ),
               ),
+              if (widget.danmakuController != null)
+                Positioned.fill(
+                  child: NiumaDanmakuOverlay(
+                    video: widget.controller,
+                    danmaku: widget.danmakuController!,
+                  ),
+                ),
               AnimatedOpacity(
                 opacity: _controlsVisible ? 1.0 : 0.0,
                 duration: fadeDuration,
@@ -385,6 +400,13 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       theme: widget.theme,
       child: content,
     );
+
+    if (widget.danmakuController != null) {
+      content = NiumaDanmakuScope(
+        controller: widget.danmakuController!,
+        child: content,
+      );
+    }
 
     if (widget.theme != null) {
       content = NiumaPlayerThemeData(data: widget.theme!, child: content);

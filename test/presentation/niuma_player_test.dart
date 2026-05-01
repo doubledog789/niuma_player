@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/orchestration/danmaku_models.dart';
+import 'package:niuma_player/src/presentation/niuma_danmaku_controller.dart';
 import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
@@ -536,6 +538,55 @@ void main() {
         async.elapse(const Duration(seconds: 2));
         expect(fired, isTrue);
       });
+    });
+  });
+
+  group('NiumaPlayer + danmakuController 集成', () {
+    testWidgets('传 danmakuController 时子树注入 NiumaDanmakuScope',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      final danmaku = NiumaDanmakuController()
+        ..add(const DanmakuItem(position: Duration(seconds: 1), text: 'hi'));
+
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            danmakuController: danmaku,
+          ),
+        ),
+      ));
+      await tester.pump();
+      // ControlBar 内的 DanmakuButton 应能找到 scope 注入的 controller
+      final button = find.byType(DanmakuButton);
+      expect(button, findsOneWidget);
+      expect(danmaku.settings.visible, isTrue);
+      // tap 改 visible
+      await tester.tap(button);
+      await tester.pump();
+      expect(danmaku.settings.visible, isFalse);
+      danmaku.dispose();
+    });
+
+    testWidgets('不传 danmakuController 时 DanmakuButton 是禁用态',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(controller: video),
+        ),
+      ));
+      final ip = find.descendant(
+        of: find.byType(DanmakuButton),
+        matching: find.byWidgetPredicate(
+          (w) => w is IgnorePointer && w.ignoring == true,
+        ),
+      );
+      expect(ip, findsOneWidget);
     });
   });
 }
