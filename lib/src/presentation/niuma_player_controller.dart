@@ -10,6 +10,7 @@ import '../data/default_platform_bridge.dart';
 import '../data/device_memory.dart' show DeviceMemory;
 import '../data/native_backend.dart';
 import '../domain/backend_factory.dart';
+import '../domain/gesture_feedback_state.dart';
 import '../domain/data_source.dart';
 import '../domain/platform_bridge.dart';
 import '../domain/player_backend.dart';
@@ -651,6 +652,25 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 探测 ExoPlayer，而不是直接走 IJK。
   static Future<void> clearDeviceMemory() => DeviceMemory().clear();
 
+  // ────────────── M13 手势 HUD ──────────────
+
+  final ValueNotifier<GestureFeedbackState?> _gestureFeedback =
+      ValueNotifier<GestureFeedbackState?>(null);
+
+  /// 当前手势 HUD 状态。null = 无手势进行中。
+  ///
+  /// [NiumaGestureLayer]（M13）通过 [debugSetGestureFeedback] 推送状态变化；
+  /// 业务监听 `controller.gestureFeedback.value` 即可拿到当前手势 + 进度。
+  ValueListenable<GestureFeedbackState?> get gestureFeedback =>
+      _gestureFeedback;
+
+  /// SDK 内部用：[NiumaGestureLayer] 推 HUD 状态。
+  /// 业务层一般不直接调（不公开导出）。
+  @visibleForTesting
+  void debugSetGestureFeedback(GestureFeedbackState? state) {
+    _gestureFeedback.value = state;
+  }
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
@@ -658,6 +678,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     await _disposeCurrentBackend();
     await _eventController.close();
     _thumbnailCache.clear();
+    _gestureFeedback.dispose();
     super.dispose();
   }
 }
