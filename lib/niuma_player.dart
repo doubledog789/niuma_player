@@ -53,6 +53,7 @@ export 'src/presentation/controls/subtitle_button.dart' show SubtitleButton;
 export 'src/presentation/controls/danmaku_button.dart' show DanmakuButton;
 export 'src/presentation/controls/fullscreen_button.dart'
     show FullscreenButton;
+export 'src/presentation/controls/pip_button.dart' show PipButton;
 
 // 编排
 export 'src/orchestration/multi_source.dart'
