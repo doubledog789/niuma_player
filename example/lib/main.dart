@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'diagnostics_page.dart';
 import 'm11_danmaku_demo_page.dart';
+import 'm13_gesture_demo_page.dart';
 import 'm9_custom_demo_page.dart';
 import 'm9_default_demo_page.dart';
 import 'multi_line_page.dart';
@@ -106,6 +107,27 @@ class HomeScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute<void>(
                   builder: (_) => const M11DanmakuDemoPage(),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          const _SectionHeader('M13 手势 demo'),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.touch_app),
+              title: const Text('视频手势 demo'),
+              subtitle: const Text(
+                '双击/seek/亮度/音量/长按倍速 5 项手势 + inline 开关',
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const M13GestureDemoPage(),
                 ),
               ),
             ),
