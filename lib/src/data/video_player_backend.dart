@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../domain/data_source.dart';
@@ -22,6 +23,9 @@ class VideoPlayerBackend implements PlayerBackend {
       StreamController<NiumaPlayerEvent>.broadcast();
 
   bool _disposed = false;
+
+  static const MethodChannel _systemChannel =
+      MethodChannel('niuma_player/system');
 
   /// 底层 controller。对外暴露以便 [NiumaPlayerView] 把它交给
   /// `package:video_player` 的 `VideoPlayer` widget。
@@ -145,15 +149,55 @@ class VideoPlayerBackend implements PlayerBackend {
   @override
   Future<void> setLooping(bool looping) => _inner.setLooping(looping);
 
-  // M13 stub — Task 3 替换为真 channel 调度。
+  /// 读当前窗口亮度（0..1）。失败返 0。
   @override
-  Future<double> getBrightness() async => 0.0;
+  Future<double> getBrightness() async {
+    try {
+      final r = await _systemChannel.invokeMethod<double>('getBrightness');
+      return r ?? 0.0;
+    } on PlatformException {
+      return 0.0;
+    }
+  }
+
+  /// 设置窗口亮度（0..1）。失败返 false。
   @override
-  Future<bool> setBrightness(double value) async => false;
+  Future<bool> setBrightness(double value) async {
+    try {
+      final r = await _systemChannel.invokeMethod<bool>(
+        'setBrightness',
+        {'value': value.clamp(0.0, 1.0)},
+      );
+      return r ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// 读系统媒体音量（0..1）。失败返 0。
   @override
-  Future<double> getSystemVolume() async => 0.0;
+  Future<double> getSystemVolume() async {
+    try {
+      final r = await _systemChannel.invokeMethod<double>('getSystemVolume');
+      return r ?? 0.0;
+    } on PlatformException {
+      return 0.0;
+    }
+  }
+
+  /// 设置系统媒体音量（0..1）。失败返 false。
   @override
-  Future<bool> setSystemVolume(double value) async => false;
+  Future<bool> setSystemVolume(double value) async {
+    try {
+      final r = await _systemChannel.invokeMethod<bool>(
+        'setSystemVolume',
+        {'value': value.clamp(0.0, 1.0)},
+      );
+      return r ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
 
   @override
   Future<void> dispose() async {
