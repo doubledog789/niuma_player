@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
+import 'package:niuma_player/src/presentation/niuma_gesture_layer.dart';
 
 import 'controls/fake_controller.dart';
 
@@ -235,5 +237,63 @@ void main() {
     );
     expect(inner.danmakuController, same(danmaku));
     danmaku.dispose();
+  });
+
+  testWidgets('NiumaFullscreenPage.route 透传 disabledGestures', (tester) async {
+    final ctl = FakeNiumaPlayerController();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(ctx).push(
+              NiumaFullscreenPage.route(
+                controller: ctl,
+                disabledGestures: const {GestureKind.brightness},
+              ),
+            ),
+            child: const Text('go'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    final inner = tester.widget<NiumaPlayer>(
+      find.descendant(
+        of: find.byType(NiumaFullscreenPage),
+        matching: find.byType(NiumaPlayer),
+      ),
+    );
+    expect(inner.disabledGestures, contains(GestureKind.brightness));
+  });
+
+  testWidgets('NiumaPlayer 在全屏 scope 内 enabled=true（不需 gesturesEnabledInline）',
+      (tester) async {
+    final ctl = FakeNiumaPlayerController();
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(ctx).push(
+              NiumaFullscreenPage.route(controller: ctl),
+            ),
+            child: const Text('go'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    final layer = tester.widget<NiumaGestureLayer>(
+      find.descendant(
+        of: find.byType(NiumaFullscreenPage),
+        matching: find.byType(NiumaGestureLayer),
+      ),
+    );
+    expect(layer.enabled, isTrue,
+        reason: '全屏页内 enabled 应该自动 true，无需 inline opt-in');
   });
 }

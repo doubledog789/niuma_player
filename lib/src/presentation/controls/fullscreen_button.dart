@@ -60,6 +60,8 @@ class FullscreenButton extends StatelessWidget {
           controlsAutoHideAfter:
               cfg?.controlsAutoHideAfter ?? const Duration(seconds: 5),
           danmakuController: cfg?.danmakuController,
+          disabledGestures: cfg?.disabledGestures ?? const {},
+          gestureHudBuilder: cfg?.gestureHudBuilder,
         ),
       );
     }
