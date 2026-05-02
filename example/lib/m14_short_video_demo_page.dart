@@ -11,10 +11,12 @@ class M14ShortVideoDemoPage extends StatefulWidget {
 }
 
 class _M14ShortVideoDemoPageState extends State<M14ShortVideoDemoPage> {
+  // 用 test-videos.co.uk 的样本（与项目其他 demo 同源）。
+  // 三个不同分辨率/编码，模拟短视频流多样性。
   static const _samples = [
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_5MB.mp4',
+    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
+    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h265/1080/Big_Buck_Bunny_1080_10s_1MB.mp4',
   ];
 
   late final List<NiumaPlayerController> _controllers;
