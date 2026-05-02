@@ -43,36 +43,47 @@ class NiumaControlBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: theme.controlsBackgroundGradient,
-        ),
-      ),
-      padding: theme.controlBarPadding,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ScrubBar(controller: controller),
-          const SizedBox(height: 4),
-          Row(
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        // 8 个按钮 + Spacer 至少需要 ~420dp。在 PiP 迷你窗 / 极小 inline
+        // 容器里塞不下时直接降级到只渲染 ScrubBar——避免 RenderFlex
+        // overflow assertion。这一层是纯布局兜底，无关 isInPictureInPicture
+        // 状态时序，确保任何情况下不报错。
+        final compact = constraints.maxWidth < 420;
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: theme.controlsBackgroundGradient,
+            ),
+          ),
+          padding: theme.controlBarPadding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              PlayPauseButton(controller: controller),
-              const SizedBox(width: 8),
-              TimeDisplay(controller: controller),
-              const Spacer(),
-              const DanmakuButton(),
-              const SubtitleButton(),
-              SpeedSelector(controller: controller),
-              QualitySelector(controller: controller),
-              VolumeButton(controller: controller),
-              FullscreenButton(controller: controller),
+              ScrubBar(controller: controller),
+              if (!compact) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    PlayPauseButton(controller: controller),
+                    const SizedBox(width: 8),
+                    TimeDisplay(controller: controller),
+                    const Spacer(),
+                    const DanmakuButton(),
+                    const SubtitleButton(),
+                    SpeedSelector(controller: controller),
+                    QualitySelector(controller: controller),
+                    VolumeButton(controller: controller),
+                    FullscreenButton(controller: controller),
+                  ],
+                ),
+              ],
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

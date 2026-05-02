@@ -5,6 +5,29 @@ import 'package:niuma_player/niuma_player.dart';
 import 'controls/fake_controller.dart';
 
 void main() {
+  testWidgets(
+      '宽度 <420（PiP 迷你窗）→ 只渲染 ScrubBar，藏 Row 避免 RenderFlex overflow',
+      (tester) async {
+    final ctl = FakeNiumaPlayerController();
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 240, // 模拟 Android PiP 迷你窗
+          height: 135,
+          child: NiumaControlBar(controller: ctl),
+        ),
+      ),
+    ));
+
+    expect(find.byType(ScrubBar), findsOneWidget,
+        reason: '窄宽下 ScrubBar 仍渲染（只有一根条不会 overflow）');
+    expect(find.byType(PlayPauseButton), findsNothing,
+        reason: '窄宽下 Row 整体不渲染——8 按钮 + Spacer 塞不下');
+    expect(find.byType(FullscreenButton), findsNothing);
+    // 关键：不应该有 RenderFlex overflow assertion 抛出。
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('NiumaControlBar 包含 ScrubBar + 全部 9 个原子控件', (tester) async {
     final ctl = FakeNiumaPlayerController(
       source: NiumaMediaSource.lines(
