@@ -54,6 +54,10 @@ class _M14ShortVideoDemoPageState extends State<M14ShortVideoDemoPage> {
         itemBuilder: (ctx, idx) => NiumaShortVideoPlayer(
           controller: _controllers[idx],
           isActive: idx == _currentPage,
+          // 默认是 cover（抖音风裁切填满）；但样本是 16:9 横屏，
+          // cover 会把两侧裁掉。这里改 contain 保留比例（上下黑边）。
+          // 真实抖音内容（竖屏 9:16）不需要改这个，cover 默认值就对。
+          fit: BoxFit.contain,
           overlayBuilder: (ctx, value) => Padding(
             padding: const EdgeInsets.only(right: 12, bottom: 60),
             child: Align(
