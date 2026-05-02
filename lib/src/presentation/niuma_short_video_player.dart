@@ -1,8 +1,10 @@
 // lib/src/presentation/niuma_short_video_player.dart
 import 'package:flutter/material.dart';
 
+import '../domain/gesture_kind.dart';
 import '../domain/niuma_short_video_theme.dart';
 import '../domain/player_state.dart';
+import 'niuma_gesture_layer.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_view.dart';
 import 'niuma_short_video_pause_indicator.dart';
@@ -112,18 +114,41 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
     }
   }
 
+  void _handleSingleTap() {
+    if (widget.onSingleTap != null) {
+      widget.onSingleTap!(widget.controller);
+      return;
+    }
+    if (widget.controller.value.phase == PlayerPhase.playing) {
+      widget.controller.pause();
+    } else {
+      widget.controller.play();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // [1] 视频画面
-        FittedBox(
-          fit: widget.fit,
-          child: SizedBox(
-            width: 16,
-            height: 9,
-            child: NiumaPlayerView(widget.controller),
+        // [1+2] 视频画面 + 单击/长按手势层（GestureLayer 在 child 上挂事件）
+        NiumaGestureLayer(
+          controller: widget.controller,
+          enabled: true,
+          disabledGestures: const {
+            GestureKind.doubleTap,
+            GestureKind.horizontalSeek,
+            GestureKind.brightness,
+            GestureKind.volume,
+          },
+          onTap: _handleSingleTap,
+          child: FittedBox(
+            fit: widget.fit,
+            child: SizedBox(
+              width: 16,
+              height: 9,
+              child: NiumaPlayerView(widget.controller),
+            ),
           ),
         ),
         // [3] 粘性暂停图标

@@ -201,4 +201,97 @@ void main() {
       expect(box.fit, BoxFit.contain);
     });
   });
+
+  group('单击 toggle + 长按 2x', () {
+    testWidgets('单击 phase=playing → pause', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(phase: PlayerPhase.playing);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: NiumaShortVideoPlayer(controller: c),
+          ),
+        ),
+      ));
+
+      await tester.tap(find.byType(NiumaShortVideoPlayer));
+      await tester.pump();
+      expect(c.pauseCount, 1);
+    });
+
+    testWidgets('单击 phase=paused → play', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(phase: PlayerPhase.paused);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: NiumaShortVideoPlayer(controller: c),
+          ),
+        ),
+      ));
+      final beforeTap = c.playCount;
+
+      await tester.tap(find.byType(NiumaShortVideoPlayer));
+      await tester.pump();
+      expect(c.playCount, greaterThan(beforeTap));
+    });
+
+    testWidgets('onSingleTap != null → 调 callback 且不调 controller play/pause',
+        (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(phase: PlayerPhase.playing);
+
+      var callbackCalls = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: NiumaShortVideoPlayer(
+              controller: c,
+              onSingleTap: (_) => callbackCalls++,
+            ),
+          ),
+        ),
+      ));
+      final pauseBefore = c.pauseCount;
+      final playBefore = c.playCount;
+
+      await tester.tap(find.byType(NiumaShortVideoPlayer));
+      await tester.pump();
+      expect(callbackCalls, 1);
+      expect(c.pauseCount, pauseBefore);   // 没调 pause
+      expect(c.playCount, playBefore);     // 没调 play
+    });
+
+    testWidgets('长按 → setSpeed(2.0)，松手恢复原速', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(playbackSpeed: 1.0);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: NiumaShortVideoPlayer(controller: c),
+          ),
+        ),
+      ));
+
+      final center = tester.getCenter(find.byType(NiumaShortVideoPlayer));
+      final gesture = await tester.startGesture(center);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(c.lastSpeed, 2.0);
+
+      await gesture.up();
+      await tester.pump();
+      expect(c.lastSpeed, 1.0);
+    });
+  });
 }

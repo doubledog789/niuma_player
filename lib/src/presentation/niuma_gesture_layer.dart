@@ -273,7 +273,9 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: _onTap,
-            onDoubleTap: widget.enabled ? _onDoubleTap : null,
+            onDoubleTap: (widget.enabled && !_isDisabled(GestureKind.doubleTap))
+              ? _onDoubleTap
+              : null,
             onLongPressStart:
                 widget.enabled ? _onLongPressStart : null,
             onLongPressEnd: widget.enabled ? _onLongPressEnd : null,
