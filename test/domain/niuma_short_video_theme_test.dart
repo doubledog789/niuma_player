@@ -29,9 +29,12 @@ void main() {
       final b = NiumaShortVideoTheme.defaults();
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
+      // identical short-circuit
+      expect(a, equals(a));
     });
 
     test('每个字段不同都被检测出 (== false)', () {
+      // 13 字段任一变化都应让 == 返回 false。
       final base = NiumaShortVideoTheme.defaults();
       expect(base, isNot(equals(base.copyWith(progressIdleHeight: 2))));
       expect(base, isNot(equals(base.copyWith(progressActiveHeight: 4))));

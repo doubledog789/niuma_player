@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 /// 嵌套，所以本类不走 `InheritedWidget`，直接通过 `theme` 字段传入。
 @immutable
 class NiumaShortVideoTheme {
-  /// 构造一个 theme。
+  /// 所有字段均为必填——通常使用 [NiumaShortVideoTheme.defaults] 而非直接构造。
   const NiumaShortVideoTheme({
     required this.progressIdleHeight,
     required this.progressActiveHeight,
@@ -25,6 +25,9 @@ class NiumaShortVideoTheme {
   });
 
   /// 文档默认值（抖音风）。
+  ///
+  /// 每次调用分配新实例——默认色含 [Color.withValues] 调用，
+  /// 无法 const。host 可以在 build 之外缓存实例避免重复分配。
   factory NiumaShortVideoTheme.defaults() => NiumaShortVideoTheme(
         progressIdleHeight: 1.5,
         progressActiveHeight: 3.5,
@@ -118,23 +121,23 @@ class NiumaShortVideoTheme {
       );
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is NiumaShortVideoTheme &&
-          progressIdleHeight == other.progressIdleHeight &&
-          progressActiveHeight == other.progressActiveHeight &&
-          progressPlayedColor == other.progressPlayedColor &&
-          progressTrackColor == other.progressTrackColor &&
-          progressBufferedColor == other.progressBufferedColor &&
-          progressThumbColor == other.progressThumbColor &&
-          progressThumbRadius == other.progressThumbRadius &&
-          pauseIndicatorBackgroundColor ==
-              other.pauseIndicatorBackgroundColor &&
-          pauseIndicatorIconColor == other.pauseIndicatorIconColor &&
-          pauseIndicatorSize == other.pauseIndicatorSize &&
-          pauseIndicatorIconSize == other.pauseIndicatorIconSize &&
-          scrubLabelTextColor == other.scrubLabelTextColor &&
-          scrubLabelBackgroundColor == other.scrubLabelBackgroundColor;
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! NiumaShortVideoTheme) return false;
+    return progressIdleHeight == other.progressIdleHeight &&
+        progressActiveHeight == other.progressActiveHeight &&
+        progressPlayedColor == other.progressPlayedColor &&
+        progressTrackColor == other.progressTrackColor &&
+        progressBufferedColor == other.progressBufferedColor &&
+        progressThumbColor == other.progressThumbColor &&
+        progressThumbRadius == other.progressThumbRadius &&
+        pauseIndicatorBackgroundColor == other.pauseIndicatorBackgroundColor &&
+        pauseIndicatorIconColor == other.pauseIndicatorIconColor &&
+        pauseIndicatorSize == other.pauseIndicatorSize &&
+        pauseIndicatorIconSize == other.pauseIndicatorIconSize &&
+        scrubLabelTextColor == other.scrubLabelTextColor &&
+        scrubLabelBackgroundColor == other.scrubLabelBackgroundColor;
+  }
 
   @override
   int get hashCode => Object.hash(
