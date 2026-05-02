@@ -294,4 +294,126 @@ void main() {
       expect(c.lastSpeed, 1.0);
     });
   });
+
+  group('overlayBuilder + scrub flow', () {
+    testWidgets('overlayBuilder=null → 不挂', (tester) async {
+      final c = FakeNiumaPlayerController();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c),
+        ),
+      ));
+
+      expect(find.byKey(const ValueKey('test-overlay')), findsNothing);
+    });
+
+    testWidgets('overlayBuilder != null → 挂到树上', (tester) async {
+      final c = FakeNiumaPlayerController();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(
+            controller: c,
+            overlayBuilder: (ctx, value) =>
+                const SizedBox.expand(child: ColoredBox(
+                    color: Color(0x80FF0000),
+                    child: SizedBox.expand(
+                        key: ValueKey('test-overlay')))),
+          ),
+        ),
+      ));
+
+      expect(find.byKey(const ValueKey('test-overlay')), findsOneWidget);
+    });
+
+    testWidgets('拖动开始时 controller.pause + 显示 scrubLabel', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        duration: const Duration(seconds: 100),
+        phase: PlayerPhase.playing,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: NiumaShortVideoPlayer(controller: c),
+          ),
+        ),
+      ));
+
+      // 找到 progressBar 并拖动
+      final barCenter =
+          tester.getCenter(find.byType(NiumaShortVideoProgressBar));
+      final gesture = await tester.startGesture(barCenter);
+      addTearDown(() async => gesture.up());
+      await tester.pump();
+
+      expect(c.pauseCount, greaterThan(0));
+      expect(find.byType(NiumaShortVideoScrubLabel), findsOneWidget);
+    });
+
+    testWidgets('松手时 seekTo + 恢复 play（如之前 playing）', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        duration: const Duration(seconds: 100),
+        phase: PlayerPhase.playing,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: NiumaShortVideoPlayer(controller: c),
+          ),
+        ),
+      ));
+
+      final barLeft =
+          tester.getTopLeft(find.byType(NiumaShortVideoProgressBar));
+      final gesture = await tester.startGesture(
+        Offset(barLeft.dx + 100, barLeft.dy + 12),
+      );
+      await gesture.moveTo(Offset(barLeft.dx + 200, barLeft.dy + 12));
+      final playBeforeUp = c.playCount;
+      await gesture.up();
+      await tester.pump();
+
+      expect(c.lastSeek?.inSeconds, 50);
+      expect(c.playCount, greaterThan(playBeforeUp));
+      expect(find.byType(NiumaShortVideoScrubLabel), findsNothing);
+    });
+
+    testWidgets('松手时若之前 paused → 不恢复 play', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        duration: const Duration(seconds: 100),
+        phase: PlayerPhase.paused,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: NiumaShortVideoPlayer(controller: c),
+          ),
+        ),
+      ));
+
+      final barLeft =
+          tester.getTopLeft(find.byType(NiumaShortVideoProgressBar));
+      final gesture = await tester.startGesture(
+        Offset(barLeft.dx + 100, barLeft.dy + 12),
+      );
+      final playBeforeUp = c.playCount;
+      await gesture.up();
+      await tester.pump();
+
+      expect(c.playCount, playBeforeUp);   // 未恢复 play
+    });
+  });
 }

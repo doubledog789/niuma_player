@@ -163,6 +163,14 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
             },
           ),
         ),
+        // [4] 业务 overlay
+        if (widget.overlayBuilder != null)
+          Positioned.fill(
+            child: ValueListenableBuilder(
+              valueListenable: widget.controller,
+              builder: (ctx, value, _) => widget.overlayBuilder!(ctx, value),
+            ),
+          ),
         // [5] 拖动时大字时间
         Center(
           child: ValueListenableBuilder<bool>(
