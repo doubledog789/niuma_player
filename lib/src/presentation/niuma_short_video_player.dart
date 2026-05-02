@@ -87,12 +87,19 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
   void initState() {
     super.initState();
     _theme = widget.theme ?? NiumaShortVideoTheme.defaults();
-    // isActive=false 启动时立即 pause（PageView 滑入瞬间不抖）
-    if (!widget.isActive) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) widget.controller.pause();
-      });
-    }
+    // isActive 决定首屏 play/pause：
+    //   - true  → 当前页/默认页应自动播
+    //   - false → PageView 上下相邻页应保持暂停，滑入瞬间不抖
+    // 用 postFrame 是因为 controller 可能还在 initialize，立即 play
+    // 会被忽略；postFrame 确保第一帧之后再调，concurrent init 已就绪。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.isActive) {
+        widget.controller.play();
+      } else {
+        widget.controller.pause();
+      }
+    });
     widget.controller.addListener(_onValueChanged);
     if (widget.muted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

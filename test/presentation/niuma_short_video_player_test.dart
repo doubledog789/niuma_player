@@ -51,6 +51,20 @@ void main() {
   });
 
   group('isActive 协调', () {
+    testWidgets('isActive=true 初始化时调 controller.play', (tester) async {
+      final c = FakeNiumaPlayerController();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, isActive: true),
+        ),
+      ));
+      await tester.pump();
+
+      // initState（postFrame）应触发 play——首屏自动播
+      expect(c.playCount, greaterThanOrEqualTo(1));
+    });
+
     testWidgets('isActive=false 初始化时调 controller.pause', (tester) async {
       final c = FakeNiumaPlayerController();
       c.value = c.value.copyWith(phase: PlayerPhase.playing);
