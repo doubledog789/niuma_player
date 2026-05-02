@@ -66,6 +66,22 @@ class FakeNiumaPlayerController extends NiumaPlayerController {
     // no-op for widget tests.
   }
 
+  /// PiP 测试计数。
+  int enterPictureInPictureCalled = 0;
+  int exitPictureInPictureCalled = 0;
+
+  @override
+  Future<bool> enterPictureInPicture() async {
+    enterPictureInPictureCalled++;
+    return true;
+  }
+
+  @override
+  Future<bool> exitPictureInPicture() async {
+    exitPictureInPictureCalled++;
+    return true;
+  }
+
   /// 测试辅助：直接改 [value.position] 并触发 notifyListeners。
   void setPosition(Duration p) {
     value = value.copyWith(position: p);

@@ -259,6 +259,103 @@ showModalBottomSheet(
 
 完整 demo 见 [`example/lib/m11_danmaku_demo_page.dart`](example/lib/m11_danmaku_demo_page.dart)。
 
+## M12 特性（PiP 画中画 / Picture-in-Picture）
+
+iOS 15+ / Android 8.0+ 真机原生 PiP。按钮触发 + 可选自动后台触发，状态完全集成进 `NiumaPlayerController`。
+
+5 行接入（默认行为已经够好）：
+
+```dart
+NiumaPlayer(controller: videoCtrl);  // 右上角自动有 PipButton
+```
+
+业务编程式触发：
+
+```dart
+// 设备支持判断
+if (videoCtrl.value.isPictureInPictureSupported) {
+  await videoCtrl.enterPictureInPicture();
+}
+
+// 退出
+await videoCtrl.exitPictureInPicture();
+
+// 当前状态读
+videoCtrl.value.isInPictureInPicture;
+```
+
+业务想要后台自动 PiP（默认关）：
+
+```dart
+// 用户设置开关里调一行
+videoCtrl.autoEnterPictureInPictureOnBackground = true;
+// app 切后台时自动进 PiP（仅当 phase=playing）
+```
+
+监听 PiP 事件：
+
+```dart
+videoCtrl.events.listen((e) {
+  if (e is PipModeChanged) {
+    debugPrint(e.isInPip ? '进入 PiP' : '退出 PiP');
+  }
+  if (e is PipRemoteAction) {
+    // Android PiP 窗内 play/pause 按钮触发——SDK 已自动调 play/pause，
+    // 业务一般不需要拦截，除非要做埋点 / 自定义行为
+    debugPrint('PiP 远程操作: ${e.action}');
+  }
+});
+```
+
+**用户必须配置两处**（SDK 不能自动改 host app）：
+
+**Android** — `android/app/src/main/AndroidManifest.xml`，Launcher Activity：
+
+```xml
+<activity
+    android:name=".MainActivity"
+    android:supportsPictureInPicture="true"
+    android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
+    ...>
+```
+
+`MainActivity.kt`：
+
+```kotlin
+import android.content.res.Configuration
+import cn.niuma.niuma_player.NiumaPlayerPlugin
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity() {
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration?,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        NiumaPlayerPlugin.reportPipModeChanged(isInPictureInPictureMode)
+    }
+}
+```
+
+**iOS** — `ios/Runner/Info.plist`：
+
+```xml
+<key>UIBackgroundModes</key>
+<array>
+  <string>audio</string>
+</array>
+```
+
+**特性：**
+
+- iOS 用 AVPictureInPictureController + AVPlayerLayer（反射桥接 video_player 的 AVPlayer）
+- Android 用 Activity.enterPictureInPictureMode + RemoteAction
+- 跟 `controlsAutoHideAfter` 联动——5 秒不操作 PipButton 跟控件条一起淡出
+- 全屏页内 PipButton 自然继承（同 controller 共享 value）
+- 不支持设备：PipButton 灰禁，方法返 false 不抛
+
+完整 demo 见 [`example/lib/m12_pip_demo_page.dart`](example/lib/m12_pip_demo_page.dart)。
+
 ## M13 特性（手势交互）
 
 视频区 5 项核心手势——B 站 / YouTube 标配。零新增 pubspec 依赖（自家原生）。

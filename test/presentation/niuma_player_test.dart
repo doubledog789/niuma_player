@@ -91,7 +91,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 1.0);
     });
@@ -117,7 +117,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 1.0);
 
@@ -127,7 +127,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 0.0);
     });
@@ -152,7 +152,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 0.0);
 
@@ -163,7 +163,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 1.0);
     });
@@ -178,7 +178,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 1.0);
 
@@ -189,7 +189,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 0.0);
 
@@ -200,7 +200,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 1.0);
     });
@@ -224,7 +224,7 @@ void main() {
         find.descendant(
           of: find.byType(NiumaPlayer),
           matching: find.byType(AnimatedOpacity),
-        ),
+        ).first,
       );
       expect(opacity.opacity, 1.0);
     });
@@ -248,7 +248,7 @@ void main() {
             .widget<AnimatedOpacity>(find.descendant(
               of: find.byType(NiumaPlayer),
               matching: find.byType(AnimatedOpacity),
-            ))
+            ).first)
             .opacity,
         1.0,
       );
@@ -266,7 +266,7 @@ void main() {
             .widget<AnimatedOpacity>(find.descendant(
               of: find.byType(NiumaPlayer),
               matching: find.byType(AnimatedOpacity),
-            ))
+            ).first)
             .opacity,
         1.0,
       );
@@ -279,7 +279,7 @@ void main() {
             .widget<AnimatedOpacity>(find.descendant(
               of: find.byType(NiumaPlayer),
               matching: find.byType(AnimatedOpacity),
-            ))
+            ).first)
             .opacity,
         0.0,
         reason: '新 controller 的 playing 状态应当驱动 auto-hide',
@@ -329,7 +329,7 @@ void main() {
             find.descendant(
               of: find.byType(NiumaPlayer),
               matching: find.byType(AnimatedOpacity),
-            ),
+            ).first,
           );
       expect(readOpacity().opacity, 1.0);
 
@@ -506,7 +506,7 @@ void main() {
             find.descendant(
               of: find.byType(NiumaPlayer),
               matching: find.byType(AnimatedOpacity),
-            ),
+            ).first,
           );
       expect(readOpacity().opacity, 1.0, reason: '1s 时仍可见');
 
@@ -610,6 +610,55 @@ void main() {
       danmaku.dispose();
     });
   });
+
+  group('NiumaPlayer 右上角 PipButton 自动叠', () {
+    testWidgets('默认渲染 PipButton 在右半 + 上半', (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(controller: video),
+        ),
+      ));
+      await tester.pump();
+      expect(find.byType(PipButton), findsOneWidget);
+      // 验位置：button 中心点应在右半 + 上半
+      final pipCenter = tester.getCenter(find.byType(PipButton));
+      final playerCenter = tester.getCenter(find.byType(NiumaPlayer));
+      expect(pipCenter.dx, greaterThan(playerCenter.dx),
+          reason: 'PipButton 应在右半屏');
+      expect(pipCenter.dy, lessThan(playerCenter.dy),
+          reason: 'PipButton 应在上半屏');
+    });
+
+    testWidgets('PipButton 跟控件条 auto-hide 同步', (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            controlsAutoHideAfter: const Duration(seconds: 5),
+          ),
+        ),
+      ));
+      // 进 playing → 5s 后 controls + PipButton 一起隐藏
+      video.value = video.value.copyWith(phase: PlayerPhase.playing);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 6));
+      // 找包 PipButton 的最近 AnimatedOpacity 祖先，opacity 应为 0
+      final pipOpacity = tester.widget<AnimatedOpacity>(
+        find.ancestor(
+          of: find.byType(PipButton),
+          matching: find.byType(AnimatedOpacity),
+        ).first,
+      );
+      expect(pipOpacity.opacity, 0.0);
+    });
+  });
+
   group('M13 手势集成', () {
     testWidgets('默认 inline 模式 NiumaGestureLayer enabled=false',
         (tester) async {
