@@ -73,6 +73,11 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
       });
     }
     widget.controller.addListener(_onValueChanged);
+    if (widget.muted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.controller.setVolume(0);
+      });
+    }
   }
 
   @override

@@ -155,4 +155,50 @@ void main() {
       expect(c.playCount, playBeforeEnd);
     });
   });
+
+  group('muted + fit', () {
+    testWidgets('muted=true → initState 调 setVolume(0)', (tester) async {
+      final c = FakeNiumaPlayerController();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, muted: true),
+        ),
+      ));
+      await tester.pump();
+
+      expect(c.lastVolume, 0.0);
+    });
+
+    testWidgets('muted=false → 不调 setVolume', (tester) async {
+      final c = FakeNiumaPlayerController();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, muted: false),
+        ),
+      ));
+      await tester.pump();
+
+      expect(c.lastVolume, isNull);
+    });
+
+    testWidgets('fit prop 透传到 FittedBox', (tester) async {
+      final c = FakeNiumaPlayerController();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, fit: BoxFit.contain),
+        ),
+      ));
+
+      final box = tester.widget<FittedBox>(
+        find.descendant(
+          of: find.byType(NiumaShortVideoPlayer),
+          matching: find.byType(FittedBox),
+        ),
+      );
+      expect(box.fit, BoxFit.contain);
+    });
+  });
 }
