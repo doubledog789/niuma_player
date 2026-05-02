@@ -113,3 +113,10 @@ export 'src/domain/gesture_feedback_state.dart' show GestureFeedbackState;
 export 'src/presentation/niuma_gesture_layer.dart'
     show NiumaGestureLayer, GestureHudBuilder;
 export 'src/presentation/niuma_gesture_hud.dart' show NiumaGestureHud;
+
+// M14 短视频
+export 'src/presentation/niuma_short_video_player.dart' show NiumaShortVideoPlayer;
+export 'src/presentation/niuma_short_video_progress_bar.dart' show NiumaShortVideoProgressBar;
+export 'src/presentation/niuma_short_video_pause_indicator.dart' show NiumaShortVideoPauseIndicator;
+export 'src/presentation/niuma_short_video_scrub_label.dart' show NiumaShortVideoScrubLabel;
+export 'src/domain/niuma_short_video_theme.dart' show NiumaShortVideoTheme;

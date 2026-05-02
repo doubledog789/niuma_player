@@ -2,8 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
-import 'package:niuma_player/src/presentation/niuma_short_video_progress_bar.dart';
 
 import 'controls/fake_controller.dart';
 
