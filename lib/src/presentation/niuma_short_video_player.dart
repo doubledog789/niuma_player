@@ -187,13 +187,27 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
             GestureKind.volume,
           },
           onTap: _handleSingleTap,
-          child: FittedBox(
-            fit: widget.fit,
-            child: SizedBox(
-              width: 16,
-              height: 9,
-              child: NiumaPlayerView(widget.controller),
-            ),
+          // 用 ValueListenableBuilder 监听 controller.value.size，拿真实视频
+          // 像素尺寸喂给 SizedBox——FittedBox 是矢量缩放、纹理不会糊。
+          // 之前写 SizedBox(16, 9) 是 16x9 逻辑像素的微小 box，纹理被
+          // 压成 16x9 再放大 25 倍 → 视频画面"花掉"。
+          child: ValueListenableBuilder<NiumaPlayerValue>(
+            valueListenable: widget.controller,
+            builder: (ctx, value, _) {
+              final w = value.size.width > 0 ? value.size.width : 1920.0;
+              final h = value.size.height > 0 ? value.size.height : 1080.0;
+              return FittedBox(
+                fit: widget.fit,
+                child: SizedBox(
+                  width: w,
+                  height: h,
+                  child: NiumaPlayerView(
+                    widget.controller,
+                    aspectRatio: w / h,
+                  ),
+                ),
+              );
+            },
           ),
         ),
         // [2] 弹幕层（IgnorePointer：让 tap 透传给底下 GestureLayer 的单击 toggle）
