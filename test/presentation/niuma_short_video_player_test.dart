@@ -416,4 +416,43 @@ void main() {
       expect(c.playCount, playBeforeUp);   // 未恢复 play
     });
   });
+
+  group('leftCenterBuilder slot', () {
+    testWidgets('null → 不挂', (tester) async {
+      final c = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c),
+        ),
+      ));
+      expect(find.byKey(const ValueKey('left-center-test')), findsNothing);
+    });
+
+    testWidgets('非 null → 挂在树上、左侧、垂直居中', (tester) async {
+      final c = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: NiumaShortVideoPlayer(
+              controller: c,
+              leftCenterBuilder: (ctx, c) => const SizedBox(
+                key: ValueKey('left-center-test'),
+                width: 36,
+                height: 36,
+              ),
+            ),
+          ),
+        ),
+      ));
+
+      expect(find.byKey(const ValueKey('left-center-test')), findsOneWidget);
+      final pos = tester.getCenter(find.byKey(const ValueKey('left-center-test')));
+      // 垂直居中（容器 600 中心 = 300）
+      expect(pos.dy, 300);
+      // 左侧（小于宽度的一半）
+      expect(pos.dx, lessThan(200));
+    });
+  });
 }

@@ -28,6 +28,7 @@ class NiumaShortVideoPlayer extends StatefulWidget {
     this.overlayBuilder,
     this.onSingleTap,
     this.theme,
+    this.leftCenterBuilder,
   });
 
   /// 被驱动的 controller。
@@ -53,6 +54,11 @@ class NiumaShortVideoPlayer extends StatefulWidget {
 
   /// 主题——null 时走 [NiumaShortVideoTheme.defaults]。
   final NiumaShortVideoTheme? theme;
+
+  /// 左中浮层 slot——业务可在此塞按钮（如全屏按钮）。
+  /// 位置：左侧 12px 偏移，垂直居中。
+  /// 典型用法：传 [NiumaShortVideoFullscreenButton] 实现抖音风全屏切换。
+  final Widget Function(BuildContext, NiumaPlayerController)? leftCenterBuilder;
 
   @override
   State<NiumaShortVideoPlayer> createState() => _NiumaShortVideoPlayerState();
@@ -169,6 +175,16 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
             child: ValueListenableBuilder(
               valueListenable: widget.controller,
               builder: (ctx, value, _) => widget.overlayBuilder!(ctx, value),
+            ),
+          ),
+        // [4.5] 左中 slot（典型：全屏按钮）
+        if (widget.leftCenterBuilder != null)
+          Positioned(
+            left: 12,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: widget.leftCenterBuilder!(context, widget.controller),
             ),
           ),
         // [5] 拖动时大字时间

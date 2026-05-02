@@ -58,6 +58,8 @@ class _M14ShortVideoDemoPageState extends State<M14ShortVideoDemoPage> {
           // cover 会把两侧裁掉。这里改 contain 保留比例（上下黑边）。
           // 真实抖音内容（竖屏 9:16）不需要改这个，cover 默认值就对。
           fit: BoxFit.contain,
+          leftCenterBuilder: (ctx, c) =>
+              NiumaShortVideoFullscreenButton(controller: c),
           overlayBuilder: (ctx, value) => Padding(
             padding: const EdgeInsets.only(right: 12, bottom: 60),
             child: Align(
