@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
+import 'package:niuma_player/src/presentation/glass_card.dart';
 import 'package:niuma_player/src/presentation/niuma_short_video_scrub_label.dart';
 
 void main() {
@@ -44,14 +45,13 @@ void main() {
         ),
       ),
     ));
-    final container = tester.widget<Container>(
+    final glass = tester.widget<GlassCard>(
       find.descendant(
         of: find.byType(NiumaShortVideoScrubLabel),
-        matching: find.byType(Container),
+        matching: find.byType(GlassCard),
       ),
     );
-    final dec = container.decoration as BoxDecoration;
-    expect(dec.color, const Color(0xFF112233));
+    expect(glass.color, const Color(0xFF112233));
   });
 
   testWidgets('使用 theme.scrubLabelTextColor', (tester) async {

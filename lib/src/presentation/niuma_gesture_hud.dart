@@ -1,9 +1,8 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../domain/gesture_feedback_state.dart';
 import '../domain/gesture_kind.dart';
+import 'glass_card.dart';
 
 /// 默认手势 HUD（B 站 / YouTube 风）。
 ///
@@ -38,40 +37,6 @@ class NiumaGestureHud extends StatelessWidget {
   }
 }
 
-class _Glass extends StatelessWidget {
-  const _Glass({
-    required this.child,
-    this.padding = const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-    this.radius = 14,
-  });
-
-  final Widget child;
-  final EdgeInsets padding;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08),
-              width: 0.5,
-            ),
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
 class _ProgressBar extends StatelessWidget {
   const _ProgressBar({required this.value, required this.color, this.width = 150});
 
@@ -102,7 +67,7 @@ class _SeekCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Glass(
+    return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -135,7 +100,7 @@ class _ValueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isBrightness = state.kind == GestureKind.brightness;
     final accent = isBrightness ? const Color(0xFFFCD34D) : Colors.white;
-    return _Glass(
+    return GlassCard(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -168,7 +133,7 @@ class _SpeedPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Glass(
+    return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       radius: 999,
       child: Row(

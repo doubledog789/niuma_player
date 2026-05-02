@@ -7,6 +7,7 @@ import '../domain/gesture_kind.dart';
 import '../domain/player_state.dart';
 import 'niuma_gesture_hud.dart';
 import 'niuma_player_controller.dart';
+import 'video_time_format.dart';
 
 /// HUD 自定义 builder 类型。
 typedef GestureHudBuilder = Widget Function(
@@ -199,7 +200,7 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
           progress:
               clamped.inMilliseconds / duration.inMilliseconds.clamp(1, 1 << 30),
           label: '${seekDeltaMs >= 0 ? '+' : ''}${seekDeltaMs ~/ 1000}s '
-              '/ ${_fmt(clamped)} / ${_fmt(duration)}',
+              '/ ${formatVideoTime(clamped)} / ${formatVideoTime(duration)}',
           icon: Icons.fast_forward,
         ));
       case GestureKind.brightness:
@@ -251,12 +252,6 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
     }
     _lockedKind = null;
     _scheduleHide();
-  }
-
-  static String _fmt(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return d.inHours > 0 ? '${d.inHours}:$m:$s' : '$m:$s';
   }
 
   @override
