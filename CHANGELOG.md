@@ -25,7 +25,7 @@
 - **新公开类型**：`NiumaShortVideoProgressBar` / `NiumaShortVideoPauseIndicator` / `NiumaShortVideoScrubLabel`（全部可被业务直接复用）
 - **共享内部工具**：`GlassCard`（毛玻璃卡片）+ `formatVideoTime`（时间格式化）抽出到 `lib/src/presentation/`，被 M13 HUD / 手势层 / M14 ScrubLabel 共用
 - **不渲染**：ControlBar / 全屏按钮 / 弹幕 / 字幕 / 倍速画质选择器（设计上不在短视频沉浸 UX 范围）
-- **`NiumaShortVideoFullscreenButton` + `NiumaShortVideoFullscreenPage`**：抖音风"切横屏全屏"按钮 + 横屏沉浸 route，与 M9 `FullscreenButton` 同套交互（push 进 / 再点 pop 出）。配合 `leftCenterBuilder` slot 灵活塞按钮位置。
+- **`NiumaShortVideoFullscreenButton`**：抖音风短视频全屏按钮——点击 push 进 M9 长视频风格全屏页（`NiumaFullscreenPage`，含完整 ControlBar + M13 全手势），与正常长视频全屏 UX 一致；scope 内自动显示 `fullscreen_exit` + pop 退出。配合 `leftCenterBuilder` slot 灵活塞按钮位置。
 - **`NiumaShortVideoPlayer.leftCenterBuilder`**：左中悬浮 slot，业务可塞任意 widget（典型：全屏按钮 / 视频信息）。
 - **新 demo**：`example/lib/m14_short_video_demo_page.dart`（PageView 3 个样本视频）
 

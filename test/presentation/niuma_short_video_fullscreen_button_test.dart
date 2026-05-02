@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/presentation/niuma_short_video_fullscreen_page.dart';
+import 'package:niuma_player/src/presentation/niuma_fullscreen_page.dart'
+    show NiumaFullscreenScope;
 
 import 'controls/fake_controller.dart';
 
@@ -21,12 +22,13 @@ void main() {
     expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
   });
 
-  testWidgets('在 fullscreen scope 内显示 Icons.fullscreen_exit', (tester) async {
+  testWidgets('在 M9 NiumaFullscreenScope 内显示 Icons.fullscreen_exit',
+      (tester) async {
     final c = FakeNiumaPlayerController();
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: NiumaShortVideoFullscreenScope(
+        body: NiumaFullscreenScope(
           child: NiumaShortVideoFullscreenButton(controller: c),
         ),
       ),
@@ -56,7 +58,8 @@ void main() {
     expect(pushedRoutes.length, greaterThan(before));
   });
 
-  testWidgets('在 scope 内点击 pop（maybePop 返回 true）', (tester) async {
+  testWidgets('在 M9 NiumaFullscreenScope 内点击 pop（退回上一 route）',
+      (tester) async {
     final c = FakeNiumaPlayerController();
     final navKey = GlobalKey<NavigatorState>();
 
@@ -69,7 +72,7 @@ void main() {
             onPressed: () => Navigator.of(ctx).push(
               MaterialPageRoute<void>(
                 builder: (_) => Scaffold(
-                  body: NiumaShortVideoFullscreenScope(
+                  body: NiumaFullscreenScope(
                     child: NiumaShortVideoFullscreenButton(controller: c),
                   ),
                 ),

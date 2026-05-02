@@ -121,4 +121,3 @@ export 'src/presentation/niuma_short_video_pause_indicator.dart' show NiumaShort
 export 'src/presentation/niuma_short_video_scrub_label.dart' show NiumaShortVideoScrubLabel;
 export 'src/domain/niuma_short_video_theme.dart' show NiumaShortVideoTheme;
 export 'src/presentation/niuma_short_video_fullscreen_button.dart' show NiumaShortVideoFullscreenButton;
-export 'src/presentation/niuma_short_video_fullscreen_page.dart' show NiumaShortVideoFullscreenPage;
