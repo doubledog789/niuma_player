@@ -558,23 +558,4 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         result.success(true)
     }
 
-    // ---------------------------------------------------------------------
-    // ActivityAware
-    // ---------------------------------------------------------------------
-
-    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
-        activityBinding = binding
-    }
-
-    override fun onDetachedFromActivityForConfigChanges() {
-        activityBinding = null
-    }
-
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
-        activityBinding = binding
-    }
-
-    override fun onDetachedFromActivity() {
-        activityBinding = null
-    }
 }
