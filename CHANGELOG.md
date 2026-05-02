@@ -5,10 +5,6 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
-> **注**：v0.6.0 是 M12 PiP 画中画里程碑，与 M13 手势在不同分支并行开发；
-> 两个版本最终按合并顺序确定 v0.6.0 / v0.7.0 哪个先发。本 CHANGELOG 假设
-> M13 在 v0.7.0 发布。
-
 ## [0.8.0] — 2026-05-XX
 
 ### Added — M14 短视频组件
@@ -87,6 +83,75 @@
 - 双击屏幕**边缘** ±10s（YouTube 特有）留 M13.1
 - 长按倍速值固定 2x，业务想自定义倍数留 M13.2
 - 系统级亮度（影响 SDK 之外的 app）不支持，需要 WRITE_SETTINGS 权限
+
+## [0.6.0] - 2026-05-01
+
+### 新增（M12 PiP 画中画）
+
+- **`controller.enterPictureInPicture()` / `exitPictureInPicture()`**——一行
+  进 / 出 PiP；未 initialize / 已在 PiP / 设备不支持时返 false 不抛
+- **`controller.value.isInPictureInPicture`** 状态读取（由原生 EventChannel
+  推送，业务任意位置可读）
+- **`controller.value.isPictureInPictureSupported`** 设备能力查询
+- **`controller.autoEnterPictureInPictureOnBackground` setter**——opt-in
+  后台自动 PiP（默认关，开启时只在 phase=playing 触发）
+- **`PipButton`** widget——`NiumaPlayer` 默认自动叠在右上角浮层，跟控件条
+  auto-hide 同步；三档可达：不支持灰禁 / 普通 / 在 PiP 高亮
+- **iOS 15+ AVPictureInPictureController 集成**——通过 Obj-C runtime 反射
+  桥接 `video_player_avfoundation` 的 AVPlayer 实例
+- **Android 26+ Activity.enterPictureInPictureMode 集成**——自家
+  `NiumaPlayerPlugin` 加 PiP method channel + EventChannel
+- **Android PiP 窗内 play/pause RemoteAction**——通过
+  `PipBroadcastReceiver` 接 `PendingIntent.getBroadcast`，转
+  `PipRemoteAction` 事件 → controller 自动调 play()/pause()
+- **公开 event：`PipModeChanged` / `PipRemoteAction`**——业务也能监听
+  `controller.events`，做自定义状态联动（如统计 / 拒绝 PiP / 切到自家
+  小窗）
+- **Aspect ratio 自动跟随** `controller.value.size`，GCD 约分整数化，
+  fallback 16:9
+
+### 用户必须配置的两处（无法自动）
+
+**Android：** `android/app/src/main/AndroidManifest.xml`，Launcher Activity 加：
+```xml
+android:supportsPictureInPicture="true"
+android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
+```
+
+`MainActivity.kt` 重写：
+```kotlin
+override fun onPictureInPictureModeChanged(
+    isInPictureInPictureMode: Boolean,
+    newConfig: Configuration?,
+) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    NiumaPlayerPlugin.reportPipModeChanged(isInPictureInPictureMode)
+}
+```
+
+**iOS：** `ios/Runner/Info.plist` 加：
+```xml
+<key>UIBackgroundModes</key>
+<array>
+  <string>audio</string>
+</array>
+```
+
+### 不变
+
+- 不新增 pubspec 依赖；M3-M11 既有 API 全兼容
+- `NiumaPlayer` 不传 PiP 任何配置默认行为不变（PipButton 在不支持设备
+  上自动灰禁，零开销）
+
+### 已知限制
+
+- Web PiP 不实现（浏览器自带原生 PiP 入口，用户右键 video 元素即可）
+- iOS PiP 窗强制 stock 控件（AVPlayer 限制，不能自定义）
+- Android PiP 自定义 actions 仅 play/pause 一个（prev/next/skip 留 M12.1）
+- iOS 反射桥接依赖 `video_player_avfoundation` 内部字段 `playersByIdentifier`
+  / `player`，video_player 升级时可能失效——pubspec 锁
+  `video_player: ">=2.8.0 <3.0.0"` 范围
+- iOS deployment target 升至 13.0（PiP API + AVPlayer 兼容要求）
 
 ## [0.5.0] - 2026-05-01
 

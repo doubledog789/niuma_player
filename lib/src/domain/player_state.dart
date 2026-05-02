@@ -125,6 +125,8 @@ class NiumaPlayerValue {
     this.openingStage,
     this.error,
     this.playbackSpeed = 1.0,
+    this.isInPictureInPicture = false,
+    this.isPictureInPictureSupported = false,
   });
 
   /// 空初始值（[PlayerBackend.initialize] 之前）。
@@ -156,6 +158,14 @@ class NiumaPlayerValue {
 
   /// 当前倍速（默认 1.0）。由 [NiumaPlayerController.setPlaybackSpeed] 更新。
   final double playbackSpeed;
+
+  /// 当前是否在 PiP 窗（小窗）模式中。
+  /// initialize 前为 false；进 / 出 PiP 时由原生侧推送状态变化。
+  final bool isInPictureInPicture;
+
+  /// 设备 + 当前视频是否支持 PiP（iOS 15+ / Android 8.0+，且已 initialize）。
+  /// initialize 前为 false。
+  final bool isPictureInPictureSupported;
 
   // ────────────── 兼容性 getter（由 phase 派生） ──────────────
 
@@ -203,6 +213,8 @@ class NiumaPlayerValue {
     PlayerError? error,
     bool clearError = false,
     double? playbackSpeed,
+    bool? isInPictureInPicture,
+    bool? isPictureInPictureSupported,
   }) {
     return NiumaPlayerValue(
       phase: phase ?? this.phase,
@@ -215,6 +227,10 @@ class NiumaPlayerValue {
           : (openingStage ?? this.openingStage),
       error: clearError ? null : (error ?? this.error),
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      isInPictureInPicture:
+          isInPictureInPicture ?? this.isInPictureInPicture,
+      isPictureInPictureSupported:
+          isPictureInPictureSupported ?? this.isPictureInPictureSupported,
     );
   }
 
@@ -229,7 +245,9 @@ class NiumaPlayerValue {
         other.bufferedPosition == bufferedPosition &&
         other.openingStage == openingStage &&
         other.error == error &&
-        other.playbackSpeed == playbackSpeed;
+        other.playbackSpeed == playbackSpeed &&
+        other.isInPictureInPicture == isInPictureInPicture &&
+        other.isPictureInPictureSupported == isPictureInPictureSupported;
   }
 
   @override
@@ -242,6 +260,8 @@ class NiumaPlayerValue {
         openingStage,
         error,
         playbackSpeed,
+        isInPictureInPicture,
+        isPictureInPictureSupported,
       );
 
   @override
@@ -254,7 +274,9 @@ class NiumaPlayerValue {
         'bufferedPosition: $bufferedPosition, '
         'openingStage: $openingStage, '
         'error: $error, '
-        'playbackSpeed: $playbackSpeed)';
+        'playbackSpeed: $playbackSpeed, '
+        'isInPictureInPicture: $isInPictureInPicture, '
+        'isPictureInPictureSupported: $isPictureInPictureSupported)';
   }
 }
 
@@ -344,4 +366,26 @@ final class LineSwitchFailed extends NiumaPlayerEvent {
 
   @override
   String toString() => 'LineSwitchFailed(to: $toId, error: $error)';
+}
+
+/// PiP 模式状态变化事件——原生侧推送（iOS AVPictureInPictureControllerDelegate
+/// 或 Android Activity.onPictureInPictureModeChanged）。
+final class PipModeChanged extends NiumaPlayerEvent {
+  /// 构造一个事件。
+  const PipModeChanged({required this.isInPip});
+
+  /// 进入 PiP 时为 true，退出时为 false。
+  final bool isInPip;
+}
+
+/// PiP 窗内 RemoteAction（如 Android 系统 PiP 窗的 play/pause 按钮）触发事件。
+///
+/// iOS 端 PiP 强制使用 stock 控件，不通过此事件——AVPlayer 自己处理 play/pause。
+/// 只有 Android 通过 BroadcastReceiver 拦截 PendingIntent 后转此事件。
+final class PipRemoteAction extends NiumaPlayerEvent {
+  /// 构造一个事件。
+  const PipRemoteAction({required this.action});
+
+  /// 动作类型：当前仅 `'playPauseToggle'`。后续可能加 prev/next 等。
+  final String action;
 }
