@@ -9,6 +9,33 @@
 > 两个版本最终按合并顺序确定 v0.6.0 / v0.7.0 哪个先发。本 CHANGELOG 假设
 > M13 在 v0.7.0 发布。
 
+## [0.8.0] — 2026-05-XX
+
+### Added — M14 短视频组件
+
+- **`NiumaShortVideoPlayer`**：与 `NiumaPlayer` 并列的独立短视频外壳，专为竖屏 PageView 流场景设计。
+  - 单击 toggle play/pause（`onSingleTap` 可 override）
+  - 长按 2x 倍速（复用 M13 `NiumaGestureLayer`）
+  - 抖音式底部进度条：常态 1.5px 细线、触摸变粗、拖动暂停 + 中央大字时间、松手 seek + 恢复
+  - 中央粘性暂停图标：`phase=paused` 常驻、`play()` 立即消失
+  - `overlayBuilder` slot：业务叠爱心/评论/分享/作者信息
+  - `isActive` prop：PageView 协调，true→play、false→pause
+  - 默认行为：`loop=true / muted=false / fit=cover`，全部可被 props 覆盖
+- **`NiumaShortVideoTheme`**：13 字段独立主题（与 `NiumaPlayerTheme` 平行）
+- **新公开类型**：`NiumaShortVideoProgressBar` / `NiumaShortVideoPauseIndicator` / `NiumaShortVideoScrubLabel`（全部可被业务直接复用）
+- **共享内部工具**：`GlassCard`（毛玻璃卡片）+ `formatVideoTime`（时间格式化）抽出到 `lib/src/presentation/`，被 M13 HUD / 手势层 / M14 ScrubLabel 共用
+- **不渲染**：ControlBar / 全屏按钮 / 弹幕 / 字幕 / 倍速画质选择器（设计上不在短视频沉浸 UX 范围）
+- **新 demo**：`example/lib/m14_short_video_demo_page.dart`（PageView 3 个样本视频）
+
+### Fixed
+
+- `NiumaGestureLayer`：当 `disabledGestures` 包含 `GestureKind.doubleTap` 时移除 GestureDetector 的 onDoubleTap recognizer，避免单击响应有 ~300ms 双击消歧延迟（影响 M14 单击 toggle 体验）
+
+### Notes
+
+- 0 新增 pubspec 依赖、0 原生改动（纯 Dart 实现）。
+- M14 与 M3-M13 完全向后兼容——业务想用 `NiumaPlayer` 还是 `NiumaShortVideoPlayer` 自选。
+
 ## [0.7.0] - 2026-05-01
 
 ### 新增（M13 手势交互层）

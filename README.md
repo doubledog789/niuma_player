@@ -292,6 +292,32 @@ videoCtrl.gestureFeedback.addListener(() {
 
 完整 demo：[`example/lib/m13_gesture_demo_page.dart`](example/lib/m13_gesture_demo_page.dart)。
 
+### 短视频模式（M14）
+
+针对竖屏短视频流（抖音/快手/视频号）场景的独立组件 `NiumaShortVideoPlayer`：
+
+```dart
+PageView.builder(
+  scrollDirection: Axis.vertical,
+  itemCount: videos.length,
+  onPageChanged: (idx) => setState(() => _currentPage = idx),
+  itemBuilder: (ctx, idx) => NiumaShortVideoPlayer(
+    controller: controllers[idx],
+    isActive: idx == _currentPage,         // PageView 协调
+    overlayBuilder: (ctx, value) => Align(  // 叠爱心/评论/分享
+      alignment: Alignment.bottomRight,
+      child: ActionsColumn(),
+    ),
+  ),
+),
+```
+
+**默认行为**：`loop=true / muted=false / fit=cover`（贴抖音风），可通过 props 覆盖。
+
+**手势**：单击 toggle play/pause + 长按 2x（其他手势全 disable，不与 PageView 翻页冲突）。
+
+**进度条**：常态 1.5px 细线贴底，触摸变粗到 3.5px + 出现 thumb，拖动期间暂停 + 中央显示大字时间，松手 seek + 恢复 play 状态。
+
 ## 监听后端选择
 
 ```dart
