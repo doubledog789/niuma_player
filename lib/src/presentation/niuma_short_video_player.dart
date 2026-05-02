@@ -66,6 +66,12 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
   void initState() {
     super.initState();
     _theme = widget.theme ?? NiumaShortVideoTheme.defaults();
+    // isActive=false 启动时立即 pause（PageView 滑入瞬间不抖）
+    if (!widget.isActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.controller.pause();
+      });
+    }
   }
 
   @override
@@ -73,6 +79,13 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.theme != widget.theme) {
       _theme = widget.theme ?? NiumaShortVideoTheme.defaults();
+    }
+    if (oldWidget.isActive != widget.isActive) {
+      if (widget.isActive) {
+        widget.controller.play();
+      } else {
+        widget.controller.pause();
+      }
     }
   }
 
