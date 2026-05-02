@@ -108,4 +108,51 @@ void main() {
       expect(c.playCount, greaterThan(beforeSwitch));
     });
   });
+
+  group('loop=true 循环', () {
+    testWidgets('phase=ended → seekTo(0) + play', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        duration: const Duration(seconds: 30),
+        position: const Duration(seconds: 30),
+        phase: PlayerPhase.playing,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c),  // loop=true 默认
+        ),
+      ));
+
+      // 模拟视频结束
+      c.value = c.value.copyWith(phase: PlayerPhase.ended);
+      await tester.pump();
+
+      expect(c.lastSeek, Duration.zero);
+      expect(c.playCount, greaterThan(0));
+    });
+
+    testWidgets('loop=false → 不自动循环', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        duration: const Duration(seconds: 30),
+        position: const Duration(seconds: 30),
+        phase: PlayerPhase.playing,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, loop: false),
+        ),
+      ));
+      final playBeforeEnd = c.playCount;
+
+      c.value = c.value.copyWith(phase: PlayerPhase.ended);
+      await tester.pump();
+
+      // 没自动循环：seekTo(0) 不应被调，play() 也不应被再次调
+      expect(c.lastSeek, isNull);
+      expect(c.playCount, playBeforeEnd);
+    });
+  });
 }

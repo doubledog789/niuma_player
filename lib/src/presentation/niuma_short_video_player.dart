@@ -72,6 +72,7 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
         if (mounted) widget.controller.pause();
       });
     }
+    widget.controller.addListener(_onValueChanged);
   }
 
   @override
@@ -91,9 +92,19 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onValueChanged);
     _isScrubbing.dispose();
     _scrubPosition.dispose();
     super.dispose();
+  }
+
+  void _onValueChanged() {
+    if (widget.loop &&
+        widget.controller.value.phase == PlayerPhase.ended &&
+        widget.isActive) {
+      widget.controller.seekTo(Duration.zero);
+      widget.controller.play();
+    }
   }
 
   @override
