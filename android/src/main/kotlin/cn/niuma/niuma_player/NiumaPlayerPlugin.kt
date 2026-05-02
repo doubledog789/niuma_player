@@ -123,6 +123,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 handleQueryPipSupport(result)
                 return
             }
+            "updatePictureInPictureActions" -> {
+                handleUpdatePipActions(call, result)
+                return
+            }
         }
 
         // Preserved from scaffold so existing unit test keeps passing without
@@ -206,7 +210,9 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         val aspectNum = (call.argument<Int>("aspectNum") ?: 16).coerceAtLeast(1)
         val aspectDen = (call.argument<Int>("aspectDen") ?: 9).coerceAtLeast(1)
 
-        val playPauseAction = createPlayPauseRemoteAction(activity)
+        // 进 PiP 时 isPlaying 默认 true（用户通常在播放中点 PiP 按钮）——
+        // Dart 侧紧接着会调 updatePictureInPictureActions 把真实状态推过来。
+        val playPauseAction = createPlayPauseRemoteAction(activity, isPlaying = true)
         val params = PictureInPictureParams.Builder()
             .setAspectRatio(Rational(aspectNum, aspectDen))
             .setActions(listOf(playPauseAction))
@@ -219,6 +225,29 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             false
         }
         result.success(ok)
+    }
+
+    /// 重新设置 PiP RemoteAction 图标——`isPlaying=true` → pause 图标，
+    /// 反之 play 图标。Activity 已 detach / 非 PiP 状态下静默 no-op。
+    private fun handleUpdatePipActions(call: MethodCall, result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            result.success(null)
+            return
+        }
+        val isPlaying = call.argument<Boolean>("isPlaying") ?: true
+        try {
+            val action = createPlayPauseRemoteAction(activity, isPlaying = isPlaying)
+            val params = PictureInPictureParams.Builder()
+                .setActions(listOf(action))
+                .build()
+            // setPictureInPictureParams 在非 PiP 状态调也是合法的——只是
+            // 把"下次进 PiP 用的 params"设了，不会副作用。
+            activity.setPictureInPictureParams(params)
+        } catch (e: Throwable) {
+            Log.w(TAG, "updatePictureInPictureActions failed", e)
+        }
+        result.success(null)
     }
 
     private fun handleExitPip(result: Result) {
@@ -238,7 +267,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         result.success(supported)
     }
 
-    private fun createPlayPauseRemoteAction(ctx: Context): RemoteAction {
+    private fun createPlayPauseRemoteAction(
+        ctx: Context,
+        isPlaying: Boolean,
+    ): RemoteAction {
         val intent = Intent(ACTION_PIP_PLAY_PAUSE)
             .setPackage(ctx.packageName)
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -246,11 +278,25 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         } else {
             0
         }
-        val pi = PendingIntent.getBroadcast(ctx, 0, intent, flags)
+        // 同 requestCode + FLAG_UPDATE_CURRENT 让多次 createPlayPauseRemoteAction
+        // 共享同一个 PendingIntent 槽位；setPictureInPictureParams 会按内容
+        // diff 决定是否换图标——确保 update 调用真正生效。
+        val pi = PendingIntent.getBroadcast(
+            ctx,
+            0,
+            intent,
+            flags or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val iconRes = if (isPlaying) {
+            android.R.drawable.ic_media_pause
+        } else {
+            android.R.drawable.ic_media_play
+        }
+        val label = if (isPlaying) "Pause" else "Play"
         return RemoteAction(
-            Icon.createWithResource(ctx, android.R.drawable.ic_media_play),
-            "Play/Pause",
-            "Toggle play/pause",
+            Icon.createWithResource(ctx, iconRes),
+            label,
+            label,
             pi,
         )
     }

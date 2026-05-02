@@ -461,6 +461,21 @@ class NativeBackend implements PlayerBackend {
     }
   }
 
+  /// 更新 PiP 窗 RemoteAction 图标。播 → pause icon；停 → play icon。
+  /// 通过 'niuma_player/pip' channel 让 native 重新调
+  /// `setPictureInPictureParams`。失败静默忽略——不影响视频播放。
+  @override
+  Future<void> updatePictureInPictureActions({required bool isPlaying}) async {
+    try {
+      await _pipChannel.invokeMethod<void>(
+        'updatePictureInPictureActions',
+        <String, dynamic>{'isPlaying': isPlaying},
+      );
+    } on PlatformException {
+      // 设备不支持 / Activity 已 detach 等：忽略。
+    }
+  }
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;

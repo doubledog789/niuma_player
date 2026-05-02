@@ -523,6 +523,29 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     ));
   }
 
+  /// 上一次推到 native PiP 的 isPlaying 状态——避免每次 position 更新都
+  /// 重复发 method channel 调用，只在 playing↔paused 边沿同步。
+  bool? _lastPipActionsIsPlaying;
+
+  @override
+  set value(NiumaPlayerValue newValue) {
+    final wasPlaying = value.isPlaying;
+    final wasInPip = value.isInPictureInPicture;
+    super.value = newValue;
+    final inPip = newValue.isInPictureInPicture;
+    final isPlaying = newValue.isPlaying;
+    // 在 PiP 中且（play↔pause 边沿 OR 刚进 PiP 还没 push 过）就同步
+    // RemoteAction 图标。出 PiP 时 reset 缓存，下次进 PiP 重新初始化。
+    if (inPip && (isPlaying != wasPlaying || _lastPipActionsIsPlaying != isPlaying)) {
+      _lastPipActionsIsPlaying = isPlaying;
+      unawaited(
+        _backend?.updatePictureInPictureActions(isPlaying: isPlaying),
+      );
+    } else if (!inPip && wasInPip) {
+      _lastPipActionsIsPlaying = null;
+    }
+  }
+
   Future<void> _attachBackend(PlayerBackend backend) async {
     await _detachBackend();
     _backend = backend;

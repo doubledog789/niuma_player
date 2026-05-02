@@ -83,5 +83,12 @@ abstract class PlayerBackend {
   /// 查询当前设备 + 视频是否支持 PiP。默认返 false。
   Future<bool> queryPictureInPictureSupport() async => false;
 
+  /// 更新 PiP 窗内播放/暂停 RemoteAction 的图标——仅 Android 需要。
+  /// iOS 系统 PiP 控件由 AVPictureInPictureController 自动同步 AVPlayer
+  /// 状态，无需介入；默认实现 no-op。
+  ///
+  /// [isPlaying]=true → 显示 pause 图标；false → 显示 play 图标。
+  Future<void> updatePictureInPictureActions({required bool isPlaying}) async {}
+
   Future<void> dispose();
 }

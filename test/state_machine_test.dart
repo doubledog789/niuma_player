@@ -161,6 +161,11 @@ class FakePlayerBackend implements PlayerBackend {
   Future<bool> queryPictureInPictureSupport() async => false;
 
   @override
+  Future<void> updatePictureInPictureActions({
+    required bool isPlaying,
+  }) async {}
+
+  @override
   Future<void> dispose() async {
     disposed = true;
     await _valueController.close();

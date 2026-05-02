@@ -89,6 +89,18 @@ class _PipFakeBackend implements PlayerBackend {
   @override
   Future<bool> queryPictureInPictureSupport() async => false;
 
+  /// 测试用：记录最近一次推到 native PiP 的 isPlaying 状态。
+  bool? lastPipActionsIsPlaying;
+  int updatePipActionsCalled = 0;
+
+  @override
+  Future<void> updatePictureInPictureActions({
+    required bool isPlaying,
+  }) async {
+    updatePipActionsCalled++;
+    lastPipActionsIsPlaying = isPlaying;
+  }
+
   @override
   Future<double> getBrightness() async => 0.0;
   @override
@@ -188,6 +200,49 @@ void main() {
       expect(r, isFalse);
       expect(backend.enterPipCalled, 0,
           reason: '已在 PiP 时不应再调 backend');
+      await c.dispose();
+    });
+
+    test('PiP 中 phase 翻 playing↔paused 会推 updatePictureInPictureActions', () async {
+      final backend = _PipFakeBackend(enterPipResult: true);
+      final c = _makeController(backend);
+      await c.initialize();
+      // 进 PiP——乐观更新立刻把 inPip=true 写进 value，但此时 phase=ready
+      // 不是 playing，所以推 isPlaying=false。
+      await c.enterPictureInPicture();
+      expect(backend.lastPipActionsIsPlaying, isFalse);
+      final initialCount = backend.updatePipActionsCalled;
+
+      // 模拟 backend 推 phase=playing（用户点了 PiP 窗里的 play 按钮）。
+      c.value = c.value.copyWith(phase: PlayerPhase.playing);
+      expect(backend.lastPipActionsIsPlaying, isTrue);
+      expect(backend.updatePipActionsCalled, initialCount + 1);
+
+      // 翻回 paused → 推 isPlaying=false。
+      c.value = c.value.copyWith(phase: PlayerPhase.paused);
+      expect(backend.lastPipActionsIsPlaying, isFalse);
+      expect(backend.updatePipActionsCalled, initialCount + 2);
+
+      // position 更新（playing 不变）→ 不应再调（去重边沿）。
+      c.value = c.value.copyWith(position: const Duration(seconds: 5));
+      expect(backend.updatePipActionsCalled, initialCount + 2);
+
+      await c.dispose();
+    });
+
+    test('退出 PiP 后 phase 翻不再推 updatePictureInPictureActions', () async {
+      final backend = _PipFakeBackend(enterPipResult: true);
+      final c = _makeController(backend);
+      await c.initialize();
+      await c.enterPictureInPicture();
+      // 模拟系统 PiP 关闭。
+      c.value = c.value.copyWith(isInPictureInPicture: false);
+      final countAfterExit = backend.updatePipActionsCalled;
+      // 退出后 play/pause 不再推到 native PiP（控件已不可见）。
+      c.value = c.value.copyWith(phase: PlayerPhase.playing);
+      c.value = c.value.copyWith(phase: PlayerPhase.paused);
+      expect(backend.updatePipActionsCalled, countAfterExit);
+
       await c.dispose();
     });
 

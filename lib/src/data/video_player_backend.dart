@@ -302,6 +302,14 @@ class VideoPlayerBackend implements PlayerBackend {
     }
   }
 
+  /// iOS 系统 PiP 用 AVPictureInPictureController + AVPlayer，stock
+  /// play/pause 控件由 AVKit 自动同步——这里 no-op，跟 PlayerBackend
+  /// 默认行为一致，只是显式标记表明"已知不需要做事"。
+  @override
+  Future<void> updatePictureInPictureActions({
+    required bool isPlaying,
+  }) async {}
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
