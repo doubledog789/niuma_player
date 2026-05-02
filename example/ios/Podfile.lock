@@ -33,10 +33,10 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
-  niuma_player: 56cdb376d243e290dcde7759205de0dca1416c9f
+  niuma_player: 251f33424928beac8d34de49401eb1e1af975be2
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
   video_player_avfoundation: 2cef49524dd1f16c5300b9cd6efd9611ce03639b
 
-PODFILE CHECKSUM: 819463e6a0290f5a72f145ba7cde16e8b6ef0796
+PODFILE CHECKSUM: 3ec8f6c3faa9251b8e2dccbd5d8624c0eba1fbac
 
 COCOAPODS: 1.16.2

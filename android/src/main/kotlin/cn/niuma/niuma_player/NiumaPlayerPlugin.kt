@@ -1,9 +1,24 @@
 package cn.niuma.niuma_player
 
+import android.app.Activity
+import android.app.PendingIntent
+import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.drawable.Icon
 import android.os.Build
+import android.util.Log
+import android.util.Rational
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -12,9 +27,14 @@ import io.flutter.view.TextureRegistry
 import java.security.MessageDigest
 
 /** NiumaPlayerPlugin */
-class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
+class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private lateinit var channel: MethodChannel
+    private lateinit var pipChannel: MethodChannel
+    private lateinit var pipEventChannel: EventChannel
+    private var activityBinding: ActivityPluginBinding? = null
+    private var pipReceiver: PipBroadcastReceiver? = null
+
     private var messenger: BinaryMessenger? = null
     private var textureRegistry: TextureRegistry? = null
     private var applicationContext: Context? = null
@@ -22,6 +42,27 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
     private val players: MutableMap<Long, PlayerSession> = mutableMapOf()
 
     private var deviceMemory: DeviceMemoryStore? = null
+
+    companion object {
+        const val ACTION_PIP_PLAY_PAUSE = "cn.niuma.niuma_player.ACTION_PIP_PLAY_PAUSE"
+        const val PIP_EVENT_CHANNEL = "niuma_player/pip/events"
+        const val PIP_METHOD_CHANNEL = "niuma_player/pip"
+        const val TAG = "NiumaPlayerPlugin"
+
+        /// EventSink 静态字段——PipBroadcastReceiver 静态访问，
+        /// host Activity 的 onPictureInPictureModeChanged 也通过这个推。
+        @JvmStatic
+        var pipEventSink: EventChannel.EventSink? = null
+            private set
+
+        /// 提供给 host MainActivity 的 onPictureInPictureModeChanged 重写调用。
+        @JvmStatic
+        fun reportPipModeChanged(isInPictureInPictureMode: Boolean) {
+            pipEventSink?.success(
+                mapOf("event" to if (isInPictureInPictureMode) "pipStarted" else "pipStopped")
+            )
+        }
+    }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         messenger = flutterPluginBinding.binaryMessenger
@@ -31,9 +72,38 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
 
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "cn.niuma/player")
         channel.setMethodCallHandler(this)
+
+        pipChannel = MethodChannel(flutterPluginBinding.binaryMessenger, PIP_METHOD_CHANNEL)
+        pipChannel.setMethodCallHandler(this)
+
+        pipEventChannel = EventChannel(flutterPluginBinding.binaryMessenger, PIP_EVENT_CHANNEL)
+        pipEventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(args: Any?, sink: EventChannel.EventSink) {
+                pipEventSink = sink
+            }
+            override fun onCancel(args: Any?) {
+                pipEventSink = null
+            }
+        })
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
+        // PiP 方法分流——优先处理，不影响既有 channel 行为
+        when (call.method) {
+            "enterPictureInPicture" -> {
+                handleEnterPip(call, result)
+                return
+            }
+            "exitPictureInPicture" -> {
+                handleExitPip(result)
+                return
+            }
+            "queryPictureInPictureSupport" -> {
+                handleQueryPipSupport(result)
+                return
+            }
+        }
+
         // Preserved from scaffold so existing unit test keeps passing without
         // needing a FlutterPluginBinding.
         if (call.method == "getPlatformVersion") {
@@ -70,6 +140,14 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        if (::pipChannel.isInitialized) {
+            pipChannel.setMethodCallHandler(null)
+        }
+        if (::pipEventChannel.isInitialized) {
+            pipEventChannel.setStreamHandler(null)
+        }
+        pipEventSink = null
+
         // Release every active player instance.
         val snapshot = players.values.toList()
         players.clear()
@@ -85,6 +163,119 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler {
         textureRegistry = null
         applicationContext = null
         deviceMemory = null
+    }
+
+    // ---------------------------------------------------------------------
+    // PiP Handlers
+    // ---------------------------------------------------------------------
+
+    private fun handleEnterPip(call: MethodCall, result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.success(false)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            result.success(false)
+            return
+        }
+        val aspectNum = (call.argument<Int>("aspectNum") ?: 16).coerceAtLeast(1)
+        val aspectDen = (call.argument<Int>("aspectDen") ?: 9).coerceAtLeast(1)
+
+        val playPauseAction = createPlayPauseRemoteAction(activity)
+        val params = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(aspectNum, aspectDen))
+            .setActions(listOf(playPauseAction))
+            .build()
+
+        val ok = try {
+            activity.enterPictureInPictureMode(params)
+        } catch (e: Throwable) {
+            Log.e(TAG, "enterPictureInPictureMode failed", e)
+            false
+        }
+        result.success(ok)
+    }
+
+    private fun handleExitPip(result: Result) {
+        // Android 系统 PiP 没有"主动退出"API——用户拖回主 app 即退出。
+        // 保留接口仅对称性。
+        result.success(false)
+    }
+
+    private fun handleQueryPipSupport(result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.success(false)
+            return
+        }
+        val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            && activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        result.success(supported)
+    }
+
+    private fun createPlayPauseRemoteAction(ctx: Context): RemoteAction {
+        val intent = Intent(ACTION_PIP_PLAY_PAUSE)
+            .setPackage(ctx.packageName)
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_IMMUTABLE
+        } else {
+            0
+        }
+        val pi = PendingIntent.getBroadcast(ctx, 0, intent, flags)
+        return RemoteAction(
+            Icon.createWithResource(ctx, android.R.drawable.ic_media_play),
+            "Play/Pause",
+            "Toggle play/pause",
+            pi,
+        )
+    }
+
+    // ---------------------------------------------------------------------
+    // ActivityAware
+    // ---------------------------------------------------------------------
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activityBinding = binding
+        registerPipReceiver(binding.activity)
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        unregisterPipReceiver()
+        activityBinding = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activityBinding = binding
+        registerPipReceiver(binding.activity)
+    }
+
+    override fun onDetachedFromActivity() {
+        unregisterPipReceiver()
+        activityBinding = null
+    }
+
+    private fun registerPipReceiver(activity: Activity) {
+        if (pipReceiver != null) return
+        val receiver = PipBroadcastReceiver()
+        val filter = IntentFilter(ACTION_PIP_PLAY_PAUSE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            activity.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            activity.registerReceiver(receiver, filter)
+        }
+        pipReceiver = receiver
+    }
+
+    private fun unregisterPipReceiver() {
+        val receiver = pipReceiver ?: return
+        val activity = activityBinding?.activity ?: return
+        try {
+            activity.unregisterReceiver(receiver)
+        } catch (_: Throwable) {
+            // ignore
+        }
+        pipReceiver = null
     }
 
     // ---------------------------------------------------------------------

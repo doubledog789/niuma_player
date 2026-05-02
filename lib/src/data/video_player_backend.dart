@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../domain/data_source.dart';
@@ -22,6 +23,12 @@ class VideoPlayerBackend implements PlayerBackend {
       StreamController<NiumaPlayerEvent>.broadcast();
 
   bool _disposed = false;
+
+  static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
+  static const EventChannel _pipEventChannel =
+      EventChannel('niuma_player/pip/events');
+
+  StreamSubscription<dynamic>? _pipEventSub;
 
   /// 底层 controller。对外暴露以便 [NiumaPlayerView] 把它交给
   /// `package:video_player` 的 `VideoPlayer` widget。
@@ -61,6 +68,29 @@ class VideoPlayerBackend implements PlayerBackend {
   Future<void> initialize() async {
     _inner.addListener(_onInnerChanged);
     await _inner.initialize();
+    _startPipEventListening();
+  }
+
+  void _startPipEventListening() {
+    _pipEventSub = _pipEventChannel.receiveBroadcastStream().listen(
+      (dynamic data) {
+        if (data is! Map) return;
+        final event = data['event'];
+        if (event is! String) return;
+        switch (event) {
+          case 'pipStarted':
+            _eventController.add(const PipModeChanged(isInPip: true));
+          case 'pipStopped':
+            _eventController.add(const PipModeChanged(isInPip: false));
+          case 'playPauseToggle':
+            _eventController
+                .add(const PipRemoteAction(action: 'playPauseToggle'));
+        }
+      },
+      onError: (Object error) {
+        // 静默忽略——PiP 不可用时 EventChannel 也可能 error
+      },
+    );
   }
 
   /// 从 [VideoPlayerValue] 推导 [PlayerPhase]。
@@ -145,11 +175,88 @@ class VideoPlayerBackend implements PlayerBackend {
   @override
   Future<void> setLooping(bool looping) => _inner.setLooping(looping);
 
+  /// 进入 PiP（iOS）。
+  ///
+  /// 通过 `niuma_player/pip` channel 发到 NiumaPipPlugin（iOS 原生）。
+  ///
+  /// [aspectNum] / [aspectDen] 为视频宽高比的整数分子/分母，传给原生侧
+  /// `AVPictureInPictureController` 设置首选比例。
+  ///
+  /// 实现细节：video_player 2.10+ 将内部播放器 ID 从 `textureId` 改名为
+  /// `playerId`（`@visibleForTesting`）。iOS 原生 NiumaPipPlugin（Task 10）
+  /// 通过该 ID 在 `playersByIdentifier` 字典里查找对应的 `FVPVideoPlayer`
+  /// 进而拿到 `AVPlayer`。channel 参数键名保持 `textureId` 以与协议约定
+  /// 保持一致（Task 10 按同名解析）。
+  ///
+  /// 失败 / 不支持返 `false` 不抛。
+  @override
+  Future<bool> enterPictureInPicture({
+    required int aspectNum,
+    required int aspectDen,
+  }) async {
+    // ignore: invalid_use_of_visible_for_testing_member
+    final tid = _inner.playerId;
+    // kUninitializedPlayerId == -1；未初始化时不能 PiP
+    if (tid < 0) return false;
+    try {
+      final result = await _pipChannel.invokeMethod<bool>(
+        'enterPictureInPicture',
+        <String, dynamic>{
+          'textureId': tid,
+          'aspectNum': aspectNum,
+          'aspectDen': aspectDen,
+        },
+      );
+      return result ?? false;
+    } on PlatformException catch (e, st) {
+      // 不抛——失败默默返 false，让上层决定 UX
+      assert(() {
+        // ignore: avoid_print
+        print('[VideoPlayerBackend] enterPip failed: $e\n$st');
+        return true;
+      }());
+      return false;
+    }
+  }
+
+  /// 退出 PiP（iOS）。
+  ///
+  /// 通过 `niuma_player/pip` channel 通知 NiumaPipPlugin 退出画中画。
+  /// 失败 / 不支持返 `false` 不抛。
+  @override
+  Future<bool> exitPictureInPicture() async {
+    try {
+      final result =
+          await _pipChannel.invokeMethod<bool>('exitPictureInPicture');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// 查询设备 + video_player 是否支持 PiP（iOS 15+）。
+  ///
+  /// 通过 `niuma_player/pip` channel 查询 NiumaPipPlugin。
+  /// 不支持 / 查询失败返 `false` 不抛。
+  @override
+  Future<bool> queryPictureInPictureSupport() async {
+    try {
+      final result = await _pipChannel.invokeMethod<bool>(
+        'queryPictureInPictureSupport',
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
     _inner.removeListener(_onInnerChanged);
+    await _pipEventSub?.cancel();
+    _pipEventSub = null;
     await _inner.dispose();
     await _valueController.close();
     await _eventController.close();

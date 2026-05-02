@@ -140,6 +140,18 @@ class FakePlayerBackend implements PlayerBackend {
   Future<void> setLooping(bool looping) async {}
 
   @override
+  Future<bool> enterPictureInPicture({
+    required int aspectNum,
+    required int aspectDen,
+  }) async => false;
+
+  @override
+  Future<bool> exitPictureInPicture() async => false;
+
+  @override
+  Future<bool> queryPictureInPictureSupport() async => false;
+
+  @override
   Future<void> dispose() async {
     disposed = true;
     await _valueController.close();
@@ -1629,6 +1641,41 @@ sprite.jpg#xywh=128,0,128,72
       expect(controller.thumbnailLoadState, ThumbnailLoadState.ready);
 
       await controller.dispose();
+    });
+  });
+
+  group('NiumaPlayerValue M12 PiP 字段', () {
+    test('默认 isInPictureInPicture = false', () {
+      final v = NiumaPlayerValue.uninitialized();
+      expect(v.isInPictureInPicture, isFalse);
+    });
+
+    test('默认 isPictureInPictureSupported = false', () {
+      final v = NiumaPlayerValue.uninitialized();
+      expect(v.isPictureInPictureSupported, isFalse);
+    });
+
+    test('copyWith(isInPictureInPicture: true) 翻位', () {
+      final a = NiumaPlayerValue.uninitialized();
+      final b = a.copyWith(isInPictureInPicture: true);
+      expect(b.isInPictureInPicture, isTrue);
+      expect(a.isInPictureInPicture, isFalse);
+    });
+
+    test('copyWith(isPictureInPictureSupported: true) 翻位', () {
+      final a = NiumaPlayerValue.uninitialized();
+      final b = a.copyWith(isPictureInPictureSupported: true);
+      expect(b.isPictureInPictureSupported, isTrue);
+      expect(a.isPictureInPictureSupported, isFalse);
+    });
+
+    test('equality 包含两个新字段', () {
+      final a = NiumaPlayerValue.uninitialized();
+      final b = a.copyWith(isInPictureInPicture: true);
+      expect(a, isNot(equals(b)));
+      final c = a.copyWith(isInPictureInPicture: true);
+      expect(b, equals(c));
+      expect(b.hashCode, equals(c.hashCode));
     });
   });
 }

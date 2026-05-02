@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/default_backend_factory.dart';
@@ -21,6 +21,7 @@ import '../orchestration/thumbnail_cache.dart';
 import '../orchestration/thumbnail_resolver.dart';
 import '../orchestration/thumbnail_track.dart';
 import '../orchestration/webvtt_parser.dart';
+import 'pip_lifecycle_observer.dart';
 
 /// 拉取 WebVTT body 的函数签名。
 ///
@@ -314,7 +315,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     final completer = Completer<void>();
     _initCompleter = completer;
     _runInitialize().then(
-      (_) {
+      (_) async {
+        // 初始化成功后查 PiP 设备能力，写进 value.isPictureInPictureSupported。
+        // 没有这一步 PipButton 永远显示禁用——backend 不会主动推支持状态。
+        await _queryAndUpdatePipSupport();
         if (!completer.isCompleted) completer.complete();
       },
       onError: (Object e, StackTrace st) {
@@ -530,6 +534,29 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // [_runInitialize] 内自己发出权威版本，所以这里把 backend 级
       // fallback 信号丢掉避免重复。
       if (e is FallbackTriggered) return;
+      if (e is PipModeChanged) {
+        value = value.copyWith(isInPictureInPicture: e.isInPip);
+        // 退出 PiP（X 按钮 / restore 回 app / 系统自动关）默认暂停播放——
+        // 与 B 站 / YouTube mobile 行为一致。业务想"退出 PiP 后继续放"
+        // 自己监听 controller.events 拦 PipModeChanged(isInPip:false) 调
+        // play() 即可。
+        if (!e.isInPip && value.phase == PlayerPhase.playing) {
+          unawaited(pause());
+        }
+        if (!_eventController.isClosed) _eventController.add(e);
+        return;
+      }
+      if (e is PipRemoteAction) {
+        if (e.action == 'playPauseToggle') {
+          if (value.phase == PlayerPhase.playing) {
+            unawaited(pause());
+          } else {
+            unawaited(play());
+          }
+        }
+        if (!_eventController.isClosed) _eventController.add(e);
+        return;
+      }
       if (!_eventController.isClosed) {
         _eventController.add(e);
       }
@@ -651,10 +678,100 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 探测 ExoPlayer，而不是直接走 IJK。
   static Future<void> clearDeviceMemory() => DeviceMemory().clear();
 
+  // ────────────── M12 PiP（画中画） ──────────────
+
+  bool _autoEnterPip = false;
+  PipLifecycleObserver? _pipObserver;
+
+  /// 配置 app 切后台时是否自动进 PiP（默认 false）。
+  ///
+  /// **触发条件**（Task 6 实现）：app 进入 inactive + 当前 phase=playing
+  /// + 不在 PiP 中。其他 phase（paused / buffering / idle / error / ended）
+  /// 不会触发。
+  bool get autoEnterPictureInPictureOnBackground => _autoEnterPip;
+
+  /// 设置 [autoEnterPictureInPictureOnBackground]。
+  /// 同值短路；不同值时（Task 6）注册 / 注销 [WidgetsBindingObserver]。
+  set autoEnterPictureInPictureOnBackground(bool nextValue) {
+    if (_autoEnterPip == nextValue) return;
+    _autoEnterPip = nextValue;
+    if (nextValue) {
+      _pipObserver = PipLifecycleObserver(
+        shouldEnter: () =>
+            _autoEnterPip &&
+            value.phase == PlayerPhase.playing &&
+            !value.isInPictureInPicture,
+        enter: enterPictureInPicture,
+      );
+      WidgetsBinding.instance.addObserver(_pipObserver!);
+    } else if (_pipObserver != null) {
+      WidgetsBinding.instance.removeObserver(_pipObserver!);
+      _pipObserver = null;
+    }
+  }
+
+  /// 进入 PiP。返回 true 表示 SDK 已发起请求；不保证用户允许（系统层可能拒绝）。
+  ///
+  /// 设备不支持 / video 未 initialize / 已在 PiP → 返回 false 不抛。
+  /// 状态实际变更由原生 EventChannel 推送（参见 Task 11）。
+  Future<bool> enterPictureInPicture() async {
+    final v = value;
+    if (!v.initialized) return false;
+    if (v.isInPictureInPicture) return false;
+    final backend = _backend;
+    if (backend == null) return false;
+    final aspect = _aspectInts(v.size);
+    return backend.enterPictureInPicture(
+      aspectNum: aspect.$1,
+      aspectDen: aspect.$2,
+    );
+  }
+
+  /// 退出 PiP。不在 PiP 是 no-op，返回 false。
+  Future<bool> exitPictureInPicture() async {
+    if (!value.isInPictureInPicture) return false;
+    final backend = _backend;
+    if (backend == null) return false;
+    return backend.exitPictureInPicture();
+  }
+
+  /// 查 backend 当前的 PiP 设备能力，把结果同步进 value。失败静默忽略。
+  Future<void> _queryAndUpdatePipSupport() async {
+    final backend = _backend;
+    if (backend == null) return;
+    try {
+      final supported = await backend.queryPictureInPictureSupport();
+      if (_disposed) return;
+      if (value.isPictureInPictureSupported != supported) {
+        value = value.copyWith(isPictureInPictureSupported: supported);
+      }
+    } catch (_) {
+      // 查询失败保持 false（默认值）
+    }
+  }
+
+  /// 计算 aspect 整数 (num, den)。fallback 16:9。
+  ///
+  /// 算法：×1000 整数化 + GCD 约分。
+  static (int, int) _aspectInts(Size size) {
+    if (size.width <= 0 || size.height <= 0) return (16, 9);
+    final w = (size.width * 1000).round();
+    final h = (size.height * 1000).round();
+    final g = _gcd(w, h);
+    if (g == 0) return (16, 9);
+    return (w ~/ g, h ~/ g);
+  }
+
+  static int _gcd(int a, int b) => b == 0 ? a : _gcd(b, a % b);
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    if (_pipObserver != null) {
+      WidgetsBinding.instance.removeObserver(_pipObserver!);
+      _pipObserver = null;
+    }
     await _disposeCurrentBackend();
     await _eventController.close();
     _thumbnailCache.clear();

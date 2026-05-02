@@ -18,7 +18,9 @@ export 'src/domain/player_state.dart'
         FallbackReason,
         LineSwitching,
         LineSwitched,
-        LineSwitchFailed;
+        LineSwitchFailed,
+        PipModeChanged,
+        PipRemoteAction;
 export 'src/presentation/niuma_player_controller.dart'
     show NiumaPlayerController, NiumaPlayerOptions, ThumbnailFetcher;
 export 'src/presentation/niuma_player_view.dart';
@@ -53,6 +55,7 @@ export 'src/presentation/controls/subtitle_button.dart' show SubtitleButton;
 export 'src/presentation/controls/danmaku_button.dart' show DanmakuButton;
 export 'src/presentation/controls/fullscreen_button.dart'
     show FullscreenButton;
+export 'src/presentation/controls/pip_button.dart' show PipButton;
 
 // 编排
 export 'src/orchestration/multi_source.dart'

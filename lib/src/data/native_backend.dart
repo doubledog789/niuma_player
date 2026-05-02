@@ -137,6 +137,29 @@ class NativeBackend implements PlayerBackend {
       _prepareWatchdog?.cancel();
       _prepareWatchdog = null;
     }
+    _startPipEventListening();
+  }
+
+  void _startPipEventListening() {
+    _pipEventSub = _pipEventChannel.receiveBroadcastStream().listen(
+      (dynamic data) {
+        if (data is! Map) return;
+        final event = data['event'];
+        if (event is! String) return;
+        switch (event) {
+          case 'pipStarted':
+            _eventController.add(const PipModeChanged(isInPip: true));
+          case 'pipStopped':
+            _eventController.add(const PipModeChanged(isInPip: false));
+          case 'playPauseToggle':
+            _eventController
+                .add(const PipRemoteAction(action: 'playPauseToggle'));
+        }
+      },
+      onError: (Object error) {
+        // 静默忽略——PiP 不可用时 EventChannel 也可能 error
+      },
+    );
   }
 
   void _bumpPrepareWatchdog() {
@@ -328,6 +351,63 @@ class NativeBackend implements PlayerBackend {
     );
   }
 
+  static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
+  static const EventChannel _pipEventChannel =
+      EventChannel('niuma_player/pip/events');
+
+  StreamSubscription<dynamic>? _pipEventSub;
+
+  /// 进入 PiP（Android）。
+  ///
+  /// 通过 'niuma_player/pip' channel 发到 NiumaPlayerPlugin（Android 原生）。
+  /// 调用 Activity.enterPictureInPictureMode 不依赖 texture，故不传 textureId。
+  /// 失败 / 不支持返 false 不抛。
+  @override
+  Future<bool> enterPictureInPicture({
+    required int aspectNum,
+    required int aspectDen,
+  }) async {
+    try {
+      final result = await _pipChannel.invokeMethod<bool>(
+        'enterPictureInPicture',
+        <String, dynamic>{
+          'aspectNum': aspectNum,
+          'aspectDen': aspectDen,
+        },
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// 退出 PiP（Android）。
+  ///
+  /// **注意：** Android 系统 PiP 没有"主动退出"API——用户拖回主 app 即退出。
+  /// 本方法常返 false，仅保留接口对称性。
+  @override
+  Future<bool> exitPictureInPicture() async {
+    try {
+      final result = await _pipChannel.invokeMethod<bool>('exitPictureInPicture');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// 查询设备 + Activity 是否支持 PiP（Android 8.0+ + manifest 声明）。
+  @override
+  Future<bool> queryPictureInPictureSupport() async {
+    try {
+      final result = await _pipChannel.invokeMethod<bool>(
+        'queryPictureInPictureSupport',
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
@@ -335,6 +415,8 @@ class NativeBackend implements PlayerBackend {
     _prepareWatchdog?.cancel();
     _prepareWatchdog = null;
     await _eventSub?.cancel();
+    await _pipEventSub?.cancel();
+    _pipEventSub = null;
     final tid = _textureId;
     if (tid != null) {
       try {
