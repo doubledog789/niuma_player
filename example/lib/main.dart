@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'diagnostics_page.dart';
 import 'm11_danmaku_demo_page.dart';
 import 'm13_gesture_demo_page.dart';
+import 'm14_short_video_demo_page.dart';
 import 'm9_custom_demo_page.dart';
 import 'm9_default_demo_page.dart';
 import 'multi_line_page.dart';
@@ -128,6 +129,27 @@ class HomeScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute<void>(
                   builder: (_) => const M13GestureDemoPage(),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          const _SectionHeader('M14 短视频 demo'),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.video_collection),
+              title: const Text('M14: 短视频流（PageView）'),
+              subtitle: const Text(
+                'PageView 竖向滑动 · 3 个样本视频 · 爱心/评论/分享 overlay',
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const M14ShortVideoDemoPage(),
                 ),
               ),
             ),
