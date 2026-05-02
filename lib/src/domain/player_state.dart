@@ -124,6 +124,7 @@ class NiumaPlayerValue {
     required this.bufferedPosition,
     this.openingStage,
     this.error,
+    this.playbackSpeed = 1.0,
     this.isInPictureInPicture = false,
     this.isPictureInPictureSupported = false,
   });
@@ -154,6 +155,9 @@ class NiumaPlayerValue {
   /// 结构化错误信息；仅当 `phase == error` 时非 null。用
   /// [PlayerError.category] 驱动重试 / 回退 / UI 决策。
   final PlayerError? error;
+
+  /// 当前倍速（默认 1.0）。由 [NiumaPlayerController.setPlaybackSpeed] 更新。
+  final double playbackSpeed;
 
   /// 当前是否在 PiP 窗（小窗）模式中。
   /// initialize 前为 false；进 / 出 PiP 时由原生侧推送状态变化。
@@ -208,6 +212,7 @@ class NiumaPlayerValue {
     // 用一个 sentinel 显式置 null：传 `clearError: true` 来重置。
     PlayerError? error,
     bool clearError = false,
+    double? playbackSpeed,
     bool? isInPictureInPicture,
     bool? isPictureInPictureSupported,
   }) {
@@ -221,6 +226,7 @@ class NiumaPlayerValue {
           ? null
           : (openingStage ?? this.openingStage),
       error: clearError ? null : (error ?? this.error),
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       isInPictureInPicture:
           isInPictureInPicture ?? this.isInPictureInPicture,
       isPictureInPictureSupported:
@@ -239,6 +245,7 @@ class NiumaPlayerValue {
         other.bufferedPosition == bufferedPosition &&
         other.openingStage == openingStage &&
         other.error == error &&
+        other.playbackSpeed == playbackSpeed &&
         other.isInPictureInPicture == isInPictureInPicture &&
         other.isPictureInPictureSupported == isPictureInPictureSupported;
   }
@@ -252,6 +259,7 @@ class NiumaPlayerValue {
         bufferedPosition,
         openingStage,
         error,
+        playbackSpeed,
         isInPictureInPicture,
         isPictureInPictureSupported,
       );
@@ -266,6 +274,7 @@ class NiumaPlayerValue {
         'bufferedPosition: $bufferedPosition, '
         'openingStage: $openingStage, '
         'error: $error, '
+        'playbackSpeed: $playbackSpeed, '
         'isInPictureInPicture: $isInPictureInPicture, '
         'isPictureInPictureSupported: $isPictureInPictureSupported)';
   }

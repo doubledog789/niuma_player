@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../domain/gesture_kind.dart';
 import '../observability/analytics_emitter.dart';
 import '../orchestration/ad_schedule.dart';
 import 'niuma_danmaku_controller.dart';
+import 'niuma_gesture_layer.dart' show GestureHudBuilder;
 import 'niuma_player.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
@@ -40,6 +42,8 @@ class NiumaFullscreenPage extends StatefulWidget {
     this.pauseVideoDuringAd = true,
     this.controlsAutoHideAfter = const Duration(seconds: 5),
     this.danmakuController,
+    this.disabledGestures = const {},
+    this.gestureHudBuilder,
   });
 
   /// 与外部 page 共享的 [NiumaPlayerController]。
@@ -65,6 +69,12 @@ class NiumaFullscreenPage extends StatefulWidget {
   /// 透传给内层 [NiumaPlayer] 的弹幕 controller；为空则不渲染弹幕层。
   final NiumaDanmakuController? danmakuController;
 
+  /// M13: 透传给内层 [NiumaPlayer] 的手势黑名单。
+  final Set<GestureKind> disabledGestures;
+
+  /// M13: 透传给内层 [NiumaPlayer] 的 HUD builder。
+  final GestureHudBuilder? gestureHudBuilder;
+
   /// page route 的 settings.name，保留作为子树反向识别的辅助手段；
   /// 但 `FullscreenButton` 现在主要通过内部的 InheritedWidget marker
   /// 判定（不再依赖 settings.name），避免子 route 嵌套时漏判 / 误判。
@@ -86,6 +96,8 @@ class NiumaFullscreenPage extends StatefulWidget {
     bool pauseVideoDuringAd = true,
     Duration controlsAutoHideAfter = const Duration(seconds: 5),
     NiumaDanmakuController? danmakuController,
+    Set<GestureKind> disabledGestures = const {},
+    GestureHudBuilder? gestureHudBuilder,
   }) {
     return PageRouteBuilder<void>(
       settings: const RouteSettings(name: routeName),
@@ -99,6 +111,8 @@ class NiumaFullscreenPage extends StatefulWidget {
         pauseVideoDuringAd: pauseVideoDuringAd,
         controlsAutoHideAfter: controlsAutoHideAfter,
         danmakuController: danmakuController,
+        disabledGestures: disabledGestures,
+        gestureHudBuilder: gestureHudBuilder,
       ),
       transitionsBuilder: (_, animation, __, child) =>
           FadeTransition(opacity: animation, child: child),
@@ -188,6 +202,9 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
             pauseVideoDuringAd: widget.pauseVideoDuringAd,
             controlsAutoHideAfter: widget.controlsAutoHideAfter,
             danmakuController: widget.danmakuController,
+            gesturesEnabledInline: false,
+            disabledGestures: widget.disabledGestures,
+            gestureHudBuilder: widget.gestureHudBuilder,
           ),
         ),
       ),

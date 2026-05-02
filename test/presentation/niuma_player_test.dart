@@ -658,6 +658,60 @@ void main() {
       expect(pipOpacity.opacity, 0.0);
     });
   });
+
+  group('M13 手势集成', () {
+    testWidgets('默认 inline 模式 NiumaGestureLayer enabled=false',
+        (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(controller: video),
+        ),
+      ));
+      final layer = tester.widget<NiumaGestureLayer>(
+        find.byType(NiumaGestureLayer),
+      );
+      expect(layer.enabled, isFalse);
+    });
+
+    testWidgets('gesturesEnabledInline=true 启用', (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            gesturesEnabledInline: true,
+          ),
+        ),
+      ));
+      final layer = tester.widget<NiumaGestureLayer>(
+        find.byType(NiumaGestureLayer),
+      );
+      expect(layer.enabled, isTrue);
+    });
+
+    testWidgets('disabledGestures 透传', (tester) async {
+      final video = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(
+          width: 360,
+          height: 200,
+          child: NiumaPlayer(
+            controller: video,
+            disabledGestures: const {GestureKind.brightness},
+          ),
+        ),
+      ));
+      final layer = tester.widget<NiumaGestureLayer>(
+        find.byType(NiumaGestureLayer),
+      );
+      expect(layer.disabledGestures, contains(GestureKind.brightness));
+    });
+  });
 }
 
 Widget _adBuilder(BuildContext _, AdController __) =>

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../domain/gesture_kind.dart';
 import '../domain/player_state.dart';
 import '../observability/analytics_emitter.dart';
 import '../orchestration/ad_schedule.dart';
@@ -13,6 +14,8 @@ import 'niuma_control_bar.dart';
 import 'niuma_danmaku_controller.dart';
 import 'niuma_danmaku_overlay.dart';
 import 'niuma_danmaku_scope.dart';
+import 'niuma_fullscreen_page.dart' show NiumaFullscreenScope;
+import 'niuma_gesture_layer.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
 import 'niuma_player_view.dart';
@@ -49,6 +52,9 @@ class NiumaPlayer extends StatefulWidget {
     this.pauseVideoDuringAd = true,
     this.controlsAutoHideAfter = const Duration(seconds: 5),
     this.danmakuController,
+    this.gesturesEnabledInline = false,
+    this.disabledGestures = const {},
+    this.gestureHudBuilder,
   });
 
   /// 实际驱动播放的 controller。所有内部子组件共享同一实例。
@@ -76,6 +82,15 @@ class NiumaPlayer extends StatefulWidget {
   /// 可选弹幕 controller。传入即自动叠加 [NiumaDanmakuOverlay] 与
   /// 注入 [NiumaDanmakuScope]，让控件条里的 [DanmakuButton] 可点。
   final NiumaDanmakuController? danmakuController;
+
+  /// 是否在 inline 场景启用手势（默认 false）。全屏页内永远启用（M13 默认行为）。
+  final bool gesturesEnabledInline;
+
+  /// 黑名单：不触发的手势类型。
+  final Set<GestureKind> disabledGestures;
+
+  /// HUD 自定义 builder。null = 用默认 [NiumaGestureHud]。
+  final GestureHudBuilder? gestureHudBuilder;
 
   @override
   State<NiumaPlayer> createState() => _NiumaPlayerState();
@@ -344,16 +359,18 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
             fit: StackFit.expand,
             children: [
               NiumaPlayerView(widget.controller),
-              // 透明 click-catcher：放在视频之上、控件之下。
-              // 在 Flutter web 上 package:video_player 走 HtmlElementView
-              // （HTML <video> 元素），DOM click 被该元素直接吃掉不冒泡到
-              // 外层 Flutter GestureDetector。这一层是 Flutter widget，
-              // hit test 永远命中（opaque），保证 tap 切换控件可见的逻辑
-              // 在 web / native 都能跑。
+              // 手势层：放在视频之上、控件之下。
+              // M9 既有"单击切控件显隐"行为通过 onTap: _onTapVideo 透传保留。
+              // enabled：全屏 scope 内永远 true；inline 场景看 gesturesEnabledInline。
               Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
+                child: NiumaGestureLayer(
+                  controller: widget.controller,
+                  enabled: NiumaFullscreenScope.maybeOf(innerContext) != null ||
+                      widget.gesturesEnabledInline,
+                  disabledGestures: widget.disabledGestures,
+                  hudBuilder: widget.gestureHudBuilder,
                   onTap: _onTapVideo,
+                  child: const SizedBox.expand(),
                 ),
               ),
               if (widget.danmakuController != null)
@@ -417,6 +434,9 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       controlsAutoHideAfter: widget.controlsAutoHideAfter,
       theme: widget.theme,
       danmakuController: widget.danmakuController,
+      disabledGestures: widget.disabledGestures,
+      gestureHudBuilder: widget.gestureHudBuilder,
+      gesturesEnabledInline: widget.gesturesEnabledInline,
       child: content,
     );
 
@@ -465,6 +485,9 @@ class NiumaPlayerConfigScope extends InheritedWidget {
     required this.controlsAutoHideAfter,
     required this.theme,
     required this.danmakuController,
+    required this.disabledGestures,
+    required this.gestureHudBuilder,
+    required this.gesturesEnabledInline,
     required super.child,
   });
 
@@ -487,6 +510,15 @@ class NiumaPlayerConfigScope extends InheritedWidget {
   /// push 全屏页时一并传到 [NiumaFullscreenPage] 内的 [NiumaPlayer]。
   final NiumaDanmakuController? danmakuController;
 
+  /// M13: 手势黑名单（透给全屏页）。
+  final Set<GestureKind> disabledGestures;
+
+  /// M13: HUD builder（透给全屏页）。
+  final GestureHudBuilder? gestureHudBuilder;
+
+  /// M13: inline 启用手势（全屏页通常不读这字段——全屏永远开）。
+  final bool gesturesEnabledInline;
+
   /// 找最近的 [NiumaPlayerConfigScope]——存在即返回；不存在返回 null。
   static NiumaPlayerConfigScope? maybeOf(BuildContext context) {
     return context
@@ -500,7 +532,10 @@ class NiumaPlayerConfigScope extends InheritedWidget {
       pauseVideoDuringAd != oldWidget.pauseVideoDuringAd ||
       controlsAutoHideAfter != oldWidget.controlsAutoHideAfter ||
       theme != oldWidget.theme ||
-      danmakuController != oldWidget.danmakuController;
+      danmakuController != oldWidget.danmakuController ||
+      oldWidget.disabledGestures != disabledGestures ||
+      oldWidget.gestureHudBuilder != gestureHudBuilder ||
+      oldWidget.gesturesEnabledInline != gesturesEnabledInline;
 }
 
 /// noop analytics emitter——用户不传 emitter 时把事件丢掉，避免广告

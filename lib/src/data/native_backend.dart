@@ -45,6 +45,9 @@ class NativeBackend implements PlayerBackend {
   bool _fromMemory = false;
   bool get fromMemory => _fromMemory;
 
+  static const MethodChannel _systemChannel =
+      MethodChannel('niuma_player/system');
+
   MethodChannel? _instanceChannel;
   EventChannel? _eventChannel;
   StreamSubscription<dynamic>? _eventSub;
@@ -349,6 +352,56 @@ class NativeBackend implements PlayerBackend {
       'setLooping',
       _argsWithId(<String, dynamic>{'looping': looping}),
     );
+  }
+
+  /// 读当前窗口亮度（0..1）。
+  @override
+  Future<double> getBrightness() async {
+    try {
+      final r = await _systemChannel.invokeMethod<double>('getBrightness');
+      return r ?? 0.0;
+    } on PlatformException {
+      return 0.0;
+    }
+  }
+
+  /// 设置窗口亮度（0..1）。
+  @override
+  Future<bool> setBrightness(double value) async {
+    try {
+      final r = await _systemChannel.invokeMethod<bool>(
+        'setBrightness',
+        {'value': value.clamp(0.0, 1.0)},
+      );
+      return r ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// 读系统媒体音量（0..1）。
+  @override
+  Future<double> getSystemVolume() async {
+    try {
+      final r = await _systemChannel.invokeMethod<double>('getSystemVolume');
+      return r ?? 0.0;
+    } on PlatformException {
+      return 0.0;
+    }
+  }
+
+  /// 设置系统媒体音量（0..1）。
+  @override
+  Future<bool> setSystemVolume(double value) async {
+    try {
+      final r = await _systemChannel.invokeMethod<bool>(
+        'setSystemVolume',
+        {'value': value.clamp(0.0, 1.0)},
+      );
+      return r ?? false;
+    } on PlatformException {
+      return false;
+    }
   }
 
   static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');

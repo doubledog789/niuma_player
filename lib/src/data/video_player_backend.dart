@@ -24,6 +24,8 @@ class VideoPlayerBackend implements PlayerBackend {
 
   bool _disposed = false;
 
+  static const MethodChannel _systemChannel =
+      MethodChannel('niuma_player/system');
   static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
   static const EventChannel _pipEventChannel =
       EventChannel('niuma_player/pip/events');
@@ -174,6 +176,56 @@ class VideoPlayerBackend implements PlayerBackend {
 
   @override
   Future<void> setLooping(bool looping) => _inner.setLooping(looping);
+
+  /// 读当前窗口亮度（0..1）。失败返 0。
+  @override
+  Future<double> getBrightness() async {
+    try {
+      final r = await _systemChannel.invokeMethod<double>('getBrightness');
+      return r ?? 0.0;
+    } on PlatformException {
+      return 0.0;
+    }
+  }
+
+  /// 设置窗口亮度（0..1）。失败返 false。
+  @override
+  Future<bool> setBrightness(double value) async {
+    try {
+      final r = await _systemChannel.invokeMethod<bool>(
+        'setBrightness',
+        {'value': value.clamp(0.0, 1.0)},
+      );
+      return r ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// 读系统媒体音量（0..1）。失败返 0。
+  @override
+  Future<double> getSystemVolume() async {
+    try {
+      final r = await _systemChannel.invokeMethod<double>('getSystemVolume');
+      return r ?? 0.0;
+    } on PlatformException {
+      return 0.0;
+    }
+  }
+
+  /// 设置系统媒体音量（0..1）。失败返 false。
+  @override
+  Future<bool> setSystemVolume(double value) async {
+    try {
+      final r = await _systemChannel.invokeMethod<bool>(
+        'setSystemVolume',
+        {'value': value.clamp(0.0, 1.0)},
+      );
+      return r ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
 
   /// 进入 PiP（iOS）。
   ///

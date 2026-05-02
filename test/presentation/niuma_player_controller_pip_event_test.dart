@@ -67,6 +67,14 @@ class _PipEmittingFakeBackend implements PlayerBackend {
   @override
   Future<bool> queryPictureInPictureSupport() async => false;
   @override
+  Future<double> getBrightness() async => 0.0;
+  @override
+  Future<bool> setBrightness(double value) async => false;
+  @override
+  Future<double> getSystemVolume() async => 0.0;
+  @override
+  Future<bool> setSystemVolume(double value) async => false;
+  @override
   Future<void> dispose() async {
     await _valueCtrl.close();
     await _eventCtrl.close();

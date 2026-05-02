@@ -9,6 +9,8 @@ public class NiumaPlayerPlugin: NSObject, FlutterPlugin {
 
     // M12: 注册 PiP 子插件
     NiumaPipPlugin.register(with: registrar)
+    // M13: 注册 NiumaSystemPlugin
+    NiumaSystemPlugin.register(with: registrar)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
