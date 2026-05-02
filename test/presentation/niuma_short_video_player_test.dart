@@ -51,8 +51,10 @@ void main() {
   });
 
   group('isActive 协调', () {
-    testWidgets('isActive=true 初始化时调 controller.play', (tester) async {
+    testWidgets('isActive=true，controller 已 ready → 自动 play', (tester) async {
       final c = FakeNiumaPlayerController();
+      // 模拟 controller 已 initialize 完毕进入 ready
+      c.value = c.value.copyWith(phase: PlayerPhase.ready);
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -61,8 +63,54 @@ void main() {
       ));
       await tester.pump();
 
-      // initState（postFrame）应触发 play——首屏自动播
+      // postFrame _maybeAutoPlay 检查到 ready 触发 play
       expect(c.playCount, greaterThanOrEqualTo(1));
+    });
+
+    testWidgets('isActive=true，phase=idle 时不 play；phase 变 ready 后才 play',
+        (tester) async {
+      // 这是真实场景：业务调 c.initialize() 后立即 mount，此时还在 idle/opening
+      final c = FakeNiumaPlayerController();
+      // 初始 idle
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, isActive: true),
+        ),
+      ));
+      await tester.pump();
+
+      // idle 阶段不应 play
+      expect(c.playCount, 0);
+
+      // 模拟 controller 终于 init 完——phase → ready，触发 listener
+      c.value = c.value.copyWith(phase: PlayerPhase.ready);
+      await tester.pump();
+
+      // 此时 _onValueChanged 应触发 _maybeAutoPlay → play
+      expect(c.playCount, greaterThanOrEqualTo(1));
+    });
+
+    testWidgets('isActive=true，自动 play 后用户手动 pause 不会被复活',
+        (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(phase: PlayerPhase.ready);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, isActive: true),
+        ),
+      ));
+      await tester.pump();
+
+      final firstPlayCount = c.playCount;
+      expect(firstPlayCount, greaterThanOrEqualTo(1));
+
+      // 模拟用户主动暂停后，即使 phase 又回 paused，listener 不应再 play
+      c.value = c.value.copyWith(phase: PlayerPhase.paused);
+      await tester.pump();
+      // playCount 应未变（_autoPlayDone=true 阻止重复）
+      expect(c.playCount, firstPlayCount);
     });
 
     testWidgets('isActive=false 初始化时调 controller.pause', (tester) async {

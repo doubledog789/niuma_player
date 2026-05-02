@@ -82,6 +82,7 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
   final ValueNotifier<bool> _isScrubbing = ValueNotifier(false);
   final ValueNotifier<Duration> _scrubPosition =
       ValueNotifier(Duration.zero);
+  bool _autoPlayDone = false;
 
   @override
   void initState() {
@@ -90,13 +91,16 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
     // isActive 决定首屏 play/pause：
     //   - true  → 当前页/默认页应自动播
     //   - false → PageView 上下相邻页应保持暂停，滑入瞬间不抖
-    // 用 postFrame 是因为 controller 可能还在 initialize，立即 play
-    // 会被忽略；postFrame 确保第一帧之后再调，concurrent init 已就绪。
+    //
+    // 注意 controller 可能还在 initialize（业务通常 fire-and-forget 调
+    // controller.initialize() 不 await）。此时 play() 会被忽略——
+    // [_onValueChanged] 监听 phase 变化，一旦达到 ready / paused
+    // 就会兜底触发自动播。这里 postFrame 只对"已经 init 完的 controller"
+    // 起作用（业务复用场景）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (widget.isActive) {
-        widget.controller.play();
-      } else {
+      _maybeAutoPlay();
+      if (!widget.isActive) {
         widget.controller.pause();
       }
     });
@@ -131,7 +135,22 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
     super.dispose();
   }
 
+  /// 一旦 controller 进入 ready / paused（已 initialize 完），且本组件
+  /// isActive=true，自动 play 一次。重复 phase 变化不再触发——业务/用户
+  /// 后续手动 pause 不会被复活。
+  void _maybeAutoPlay() {
+    if (_autoPlayDone) return;
+    if (!widget.isActive) return;
+    final phase = widget.controller.value.phase;
+    // ready：刚 init 完未播过；paused：业务可能复用已用过的 controller。
+    if (phase == PlayerPhase.ready || phase == PlayerPhase.paused) {
+      _autoPlayDone = true;
+      widget.controller.play();
+    }
+  }
+
   void _onValueChanged() {
+    _maybeAutoPlay();
     if (widget.loop &&
         widget.controller.value.phase == PlayerPhase.ended &&
         widget.isActive) {
