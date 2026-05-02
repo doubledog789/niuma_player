@@ -88,6 +88,12 @@ class FakeNiumaPlayerController extends NiumaPlayerController {
     notifyListeners();
   }
 
+  /// 测试辅助：模拟 backend 推 `PipModeChanged`，把 PiP 状态写进 value。
+  void setPipState(bool inPip) {
+    value = value.copyWith(isInPictureInPicture: inPip);
+    notifyListeners();
+  }
+
   @override
   Future<void> dispose() async {
     // 父类 dispose 会动 _backend / event stream / thumbnail cache，

@@ -351,6 +351,77 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         // controller.value 变化以外的交互（仅本地 widget state 变化的拖动）
         // 才需要这一层兜底；不做的话 ScrubBar drag 期间 _onValueChanged
         // 不 fire，timer 一直跑到底。
+        // PiP 模式下整个浮层组（手势层 / 弹幕 / 控件条 / PipButton / 广告）
+        // 隐藏，只剩裸 NiumaPlayerView——
+        //   1. 行为契合"画中画窗只放画面"的产品语义；
+        //   2. Android PiP 把 Activity 缩到极小尺寸时 NiumaControlBar 的
+        //      Row（8 按钮+Spacer）会 RenderFlex overflow，藏掉就不报错。
+        // 用 ValueListenableBuilder 的 child 优化：浮层 Stack 只 build 一次，
+        // builder 仅在 PiP 状态翻转时切 child↔SizedBox，避免每帧都重建浮层。
+        final overlays = Stack(
+          fit: StackFit.expand,
+          children: [
+            // 手势层：放在视频之上、控件之下。
+            // M9 既有"单击切控件显隐"行为通过 onTap: _onTapVideo 透传保留。
+            // enabled：全屏 scope 内永远 true；inline 场景看 gesturesEnabledInline。
+            Positioned.fill(
+              child: NiumaGestureLayer(
+                controller: widget.controller,
+                enabled: NiumaFullscreenScope.maybeOf(innerContext) != null ||
+                    widget.gesturesEnabledInline,
+                disabledGestures: widget.disabledGestures,
+                hudBuilder: widget.gestureHudBuilder,
+                onTap: _onTapVideo,
+                child: const SizedBox.expand(),
+              ),
+            ),
+            if (widget.danmakuController != null)
+              Positioned.fill(
+                child: NiumaDanmakuOverlay(
+                  video: widget.controller,
+                  danmaku: widget.danmakuController!,
+                ),
+              ),
+            AnimatedOpacity(
+              opacity: _controlsVisible ? 1.0 : 0.0,
+              duration: fadeDuration,
+              child: IgnorePointer(
+                ignoring: !_controlsVisible,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: NiumaControlBar(controller: widget.controller),
+                ),
+              ),
+            ),
+            // M12: 右上角 PipButton 浮层，跟控件条 auto-hide 同步
+            AnimatedOpacity(
+              opacity: _controlsVisible ? 1.0 : 0.0,
+              duration: fadeDuration,
+              child: IgnorePointer(
+                ignoring: !_controlsVisible,
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: PipButton(controller: widget.controller),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_orchestrator != null)
+              Positioned.fill(
+                child: NiumaAdOverlay(
+                  orchestrator: _orchestrator!,
+                  videoController: widget.controller,
+                  emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
+                  pauseVideoWhileShowing: widget.pauseVideoDuringAd,
+                ),
+              ),
+          ],
+        );
+
         return Listener(
           behavior: HitTestBehavior.deferToChild,
           onPointerDown: (_) => _onUserActivity(),
@@ -359,64 +430,12 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
             fit: StackFit.expand,
             children: [
               NiumaPlayerView(widget.controller),
-              // 手势层：放在视频之上、控件之下。
-              // M9 既有"单击切控件显隐"行为通过 onTap: _onTapVideo 透传保留。
-              // enabled：全屏 scope 内永远 true；inline 场景看 gesturesEnabledInline。
-              Positioned.fill(
-                child: NiumaGestureLayer(
-                  controller: widget.controller,
-                  enabled: NiumaFullscreenScope.maybeOf(innerContext) != null ||
-                      widget.gesturesEnabledInline,
-                  disabledGestures: widget.disabledGestures,
-                  hudBuilder: widget.gestureHudBuilder,
-                  onTap: _onTapVideo,
-                  child: const SizedBox.expand(),
-                ),
+              ValueListenableBuilder<NiumaPlayerValue>(
+                valueListenable: widget.controller,
+                child: overlays,
+                builder: (ctx, v, child) =>
+                    v.isInPictureInPicture ? const SizedBox.shrink() : child!,
               ),
-              if (widget.danmakuController != null)
-                Positioned.fill(
-                  child: NiumaDanmakuOverlay(
-                    video: widget.controller,
-                    danmaku: widget.danmakuController!,
-                  ),
-                ),
-              AnimatedOpacity(
-                opacity: _controlsVisible ? 1.0 : 0.0,
-                duration: fadeDuration,
-                child: IgnorePointer(
-                  ignoring: !_controlsVisible,
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: NiumaControlBar(controller: widget.controller),
-                  ),
-                ),
-              ),
-              // M12: 右上角 PipButton 浮层，跟控件条 auto-hide 同步
-              AnimatedOpacity(
-                opacity: _controlsVisible ? 1.0 : 0.0,
-                duration: fadeDuration,
-                child: IgnorePointer(
-                  ignoring: !_controlsVisible,
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: PipButton(controller: widget.controller),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (_orchestrator != null)
-                Positioned.fill(
-                  child: NiumaAdOverlay(
-                    orchestrator: _orchestrator!,
-                    videoController: widget.controller,
-                    emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
-                    pauseVideoWhileShowing: widget.pauseVideoDuringAd,
-                  ),
-                ),
             ],
           ),
         );

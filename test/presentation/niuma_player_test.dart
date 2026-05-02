@@ -78,6 +78,42 @@ void main() {
       ));
       expect(find.byType(NiumaAdOverlay), findsOneWidget);
     });
+
+    testWidgets('isInPictureInPicture=true 时所有浮层（含 NiumaControlBar）隐藏，'
+        '只剩 NiumaPlayerView', (tester) async {
+      final ctl = FakeNiumaPlayerController();
+      const schedule = NiumaAdSchedule();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaPlayer(controller: ctl, adSchedule: schedule),
+        ),
+      ));
+      // Inline 状态：浮层全部存在。
+      expect(find.byType(NiumaControlBar), findsOneWidget);
+      expect(find.byType(NiumaAdOverlay), findsOneWidget);
+
+      ctl.setPipState(true);
+      await tester.pump();
+
+      // PiP 状态：浮层都不渲染，避免 Android PiP 缩到极小尺寸时
+      // NiumaControlBar 的 Row overflow。
+      expect(find.byType(NiumaControlBar), findsNothing);
+      expect(find.byType(NiumaAdOverlay), findsNothing);
+    });
+
+    testWidgets('退出 PiP 后浮层恢复', (tester) async {
+      final ctl = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: NiumaPlayer(controller: ctl)),
+      ));
+      ctl.setPipState(true);
+      await tester.pump();
+      expect(find.byType(NiumaControlBar), findsNothing);
+
+      ctl.setPipState(false);
+      await tester.pump();
+      expect(find.byType(NiumaControlBar), findsOneWidget);
+    });
   });
 
   group('auto-hide 状态机', () {
