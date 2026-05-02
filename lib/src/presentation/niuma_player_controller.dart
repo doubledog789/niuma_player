@@ -743,17 +743,33 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   ///
   /// 设备不支持 / video 未 initialize / 已在 PiP → 返回 false 不抛。
   /// 状态实际变更由原生 EventChannel 推送（参见 Task 11）。
+  ///
+  /// **乐观更新**：调 backend 之前先把 `value.isInPictureInPicture` 翻成 true，
+  /// 让监听 controller 的 UI 在 Activity 真正缩成 PiP 小窗的瞬间就已经把控件
+  /// 藏起来——否则 Android 上"先 resize，后回 onPictureInPictureModeChanged"
+  /// 的时序会让 [NiumaControlBar] 在迷你窗里渲染一帧 → RenderFlex overflow。
+  /// backend 返回 false（请求失败）时回滚 value。
   Future<bool> enterPictureInPicture() async {
     final v = value;
     if (!v.initialized) return false;
     if (v.isInPictureInPicture) return false;
     final backend = _backend;
     if (backend == null) return false;
+    value = v.copyWith(isInPictureInPicture: true);
     final aspect = _aspectInts(v.size);
-    return backend.enterPictureInPicture(
-      aspectNum: aspect.$1,
-      aspectDen: aspect.$2,
-    );
+    try {
+      final ok = await backend.enterPictureInPicture(
+        aspectNum: aspect.$1,
+        aspectDen: aspect.$2,
+      );
+      if (!ok) {
+        value = value.copyWith(isInPictureInPicture: false);
+      }
+      return ok;
+    } catch (_) {
+      value = value.copyWith(isInPictureInPicture: false);
+      rethrow;
+    }
   }
 
   /// 退出 PiP。不在 PiP 是 no-op，返回 false。

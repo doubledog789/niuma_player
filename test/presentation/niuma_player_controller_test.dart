@@ -152,6 +152,32 @@ void main() {
       await c.dispose();
     });
 
+    test('enterPictureInPicture 调 backend 之前先把 value 乐观翻成 inPip=true', () async {
+      // 防 Android PiP 转场时 NiumaControlBar 在迷你窗里渲染一帧 overflow。
+      final backend = _PipFakeBackend(enterPipResult: true);
+      final c = _makeController(backend);
+      await c.initialize();
+      expect(c.value.isInPictureInPicture, isFalse);
+      final f = c.enterPictureInPicture();
+      // 还没 await——value 应该已经被乐观翻成 true（同步先于 backend 调用前发生）。
+      expect(c.value.isInPictureInPicture, isTrue,
+          reason: 'enterPictureInPicture 调 backend 前已乐观翻 value');
+      await f;
+      expect(c.value.isInPictureInPicture, isTrue);
+      await c.dispose();
+    });
+
+    test('enterPictureInPicture 失败时 value 回滚到 inPip=false', () async {
+      final backend = _PipFakeBackend(enterPipResult: false);
+      final c = _makeController(backend);
+      await c.initialize();
+      final r = await c.enterPictureInPicture();
+      expect(r, isFalse);
+      expect(c.value.isInPictureInPicture, isFalse,
+          reason: 'backend 返 false 应该回滚 value');
+      await c.dispose();
+    });
+
     test('enterPictureInPicture 已在 PiP → 返 false 不重入', () async {
       final backend = _PipFakeBackend(enterPipResult: true);
       final c = _makeController(backend);
