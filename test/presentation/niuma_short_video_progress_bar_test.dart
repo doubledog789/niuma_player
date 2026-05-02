@@ -10,7 +10,7 @@ import 'controls/fake_controller.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Widget _wrap(Widget child) => MaterialApp(
+  Widget wrap(Widget child) => MaterialApp(
         home: Scaffold(
           body: SizedBox(width: 400, height: 400, child: child),
         ),
@@ -20,7 +20,7 @@ void main() {
     final c = FakeNiumaPlayerController();
     final theme = NiumaShortVideoTheme.defaults().copyWith(progressIdleHeight: 2);
 
-    await tester.pumpWidget(_wrap(
+    await tester.pumpWidget(wrap(
       Align(
         alignment: Alignment.bottomCenter,
         child: NiumaShortVideoProgressBar(
@@ -45,7 +45,7 @@ void main() {
     var startCalls = 0;
     final theme = NiumaShortVideoTheme.defaults();
 
-    await tester.pumpWidget(_wrap(
+    await tester.pumpWidget(wrap(
       Align(
         alignment: Alignment.bottomCenter,
         child: NiumaShortVideoProgressBar(
@@ -75,7 +75,7 @@ void main() {
     c.value = c.value.copyWith(duration: const Duration(seconds: 100));
 
     Duration? lastUpdate;
-    await tester.pumpWidget(_wrap(
+    await tester.pumpWidget(wrap(
       Align(
         alignment: Alignment.bottomCenter,
         child: NiumaShortVideoProgressBar(
@@ -105,7 +105,7 @@ void main() {
     c.value = c.value.copyWith(duration: const Duration(seconds: 100));
 
     var endCalls = 0;
-    await tester.pumpWidget(_wrap(
+    await tester.pumpWidget(wrap(
       Align(
         alignment: Alignment.bottomCenter,
         child: NiumaShortVideoProgressBar(
@@ -118,13 +118,52 @@ void main() {
       ),
     ));
 
-    final start = tester.getTopLeft(find.byType(NiumaShortVideoProgressBar));
+    final barLeft =
+        tester.getTopLeft(find.byType(NiumaShortVideoProgressBar));
     final gesture = await tester.startGesture(
-      Offset(start.dx + 100, start.dy + 12),
+      Offset(barLeft.dx + 100, barLeft.dy + 12),
     );
+    await gesture.moveTo(Offset(barLeft.dx + 200, barLeft.dy + 12));
     await gesture.up();
     await tester.pump();
 
     expect(endCalls, 1);
+    // 200 / 400 = 50% of 100s = 50s
+    expect(c.lastSeek?.inSeconds, 50);
+  });
+
+  testWidgets('pointerCancel → 不 seek，恢复 play (如之前 playing)，onScrubEnd',
+      (tester) async {
+    final c = FakeNiumaPlayerController();
+    c.value = c.value.copyWith(
+      duration: const Duration(seconds: 100),
+      phase: PlayerPhase.playing,
+    );
+
+    var endCalls = 0;
+    await tester.pumpWidget(wrap(
+      Align(
+        alignment: Alignment.bottomCenter,
+        child: NiumaShortVideoProgressBar(
+          controller: c,
+          theme: NiumaShortVideoTheme.defaults(),
+          onScrubStart: () {},
+          onScrubUpdate: (_) {},
+          onScrubEnd: () => endCalls++,
+        ),
+      ),
+    ));
+
+    final barLeft =
+        tester.getTopLeft(find.byType(NiumaShortVideoProgressBar));
+    final gesture = await tester.startGesture(
+      Offset(barLeft.dx + 100, barLeft.dy + 12),
+    );
+    await gesture.cancel();
+    await tester.pump();
+
+    expect(endCalls, 1); // onScrubEnd 仍调
+    expect(c.lastSeek, isNull); // 但不 seek
+    expect(c.playCount, greaterThan(0)); // 恢复 play
   });
 }

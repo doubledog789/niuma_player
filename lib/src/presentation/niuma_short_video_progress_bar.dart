@@ -52,6 +52,7 @@ class _NiumaShortVideoProgressBarState
   static const double _hitAreaHeight = 24.0;
 
   void _onPointerDown(PointerDownEvent event, BoxConstraints constraints) {
+    if (_scrubbing) return;
     final width = constraints.maxWidth;
     if (width <= 0) return;
     final newProgress = (event.localPosition.dx / width).clamp(0.0, 1.0);
@@ -76,7 +77,14 @@ class _NiumaShortVideoProgressBarState
   }
 
   void _onPointerUp(PointerUpEvent _) => _finishScrub();
-  void _onPointerCancel(PointerCancelEvent _) => _finishScrub();
+
+  void _onPointerCancel(PointerCancelEvent _) {
+    if (!_scrubbing) return;
+    // 取消 = 不 seek，仅恢复 play 状态 + 通知 parent 隐藏 scrubLabel
+    if (_wasPlayingBeforeScrub) widget.controller.play();
+    widget.onScrubEnd();
+    setState(() => _scrubbing = false);
+  }
 
   void _finishScrub() {
     if (!_scrubbing) return;
