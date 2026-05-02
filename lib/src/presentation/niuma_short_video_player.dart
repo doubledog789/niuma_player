@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../domain/gesture_kind.dart';
 import '../domain/niuma_short_video_theme.dart';
 import '../domain/player_state.dart';
+import 'niuma_danmaku_controller.dart';
+import 'niuma_danmaku_overlay.dart';
+import 'niuma_danmaku_scope.dart';
 import 'niuma_gesture_layer.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_view.dart';
@@ -28,6 +31,7 @@ class NiumaShortVideoPlayer extends StatefulWidget {
     this.overlayBuilder,
     this.onSingleTap,
     this.theme,
+    this.danmakuController,
     this.leftCenterBuilder,
   });
 
@@ -55,9 +59,18 @@ class NiumaShortVideoPlayer extends StatefulWidget {
   /// 主题——null 时走 [NiumaShortVideoTheme.defaults]。
   final NiumaShortVideoTheme? theme;
 
+  /// 可选弹幕 controller。传入即自动叠加 [NiumaDanmakuOverlay] 与注入
+  /// [NiumaDanmakuScope]——同 [NiumaPlayer.danmakuController] 一致。
+  ///
+  /// **z-order：** 弹幕层位于视频画面之上、`overlayBuilder` 之下——
+  /// 业务的爱心/评论/分享按钮永远盖在弹幕之上。
+  final NiumaDanmakuController? danmakuController;
+
   /// 左中浮层 slot——业务可在此塞按钮（如全屏按钮）。
   /// 位置：左侧 12px 偏移，垂直居中。
   /// 典型用法：传 [NiumaShortVideoFullscreenButton] 实现抖音风全屏切换。
+  ///
+  /// 典型用法：`leftCenterBuilder: (ctx, c) => NiumaShortVideoFullscreenButton(controller: c, danmakuController: dc)` —— 全屏后弹幕也跟过去。
   final Widget Function(BuildContext, NiumaPlayerController)? leftCenterBuilder;
 
   @override
@@ -134,7 +147,7 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    final stack = Stack(
       fit: StackFit.expand,
       children: [
         // [1+2] 视频画面 + 单击/长按手势层（GestureLayer 在 child 上挂事件）
@@ -157,6 +170,16 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
             ),
           ),
         ),
+        // [2] 弹幕层（IgnorePointer：让 tap 透传给底下 GestureLayer 的单击 toggle）
+        if (widget.danmakuController != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: NiumaDanmakuOverlay(
+                video: widget.controller,
+                danmaku: widget.danmakuController!,
+              ),
+            ),
+          ),
         // [3] 粘性暂停图标
         Center(
           child: ValueListenableBuilder(
@@ -219,5 +242,13 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
         ),
       ],
     );
+
+    if (widget.danmakuController != null) {
+      return NiumaDanmakuScope(
+        controller: widget.danmakuController!,
+        child: stack,
+      );
+    }
+    return stack;
   }
 }

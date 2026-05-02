@@ -33,6 +33,9 @@
 
 - `NiumaGestureLayer`：当 `disabledGestures` 包含 `GestureKind.doubleTap` 时移除 GestureDetector 的 onDoubleTap recognizer，避免单击响应有 ~300ms 双击消歧延迟（影响 M14 单击 toggle 体验）
 
+- **`NiumaShortVideoPlayer.danmakuController`**：短视频弹幕集成——传入即自动叠 [NiumaDanmakuOverlay] + 注入 [NiumaDanmakuScope]，与 [NiumaPlayer.danmakuController] 同套 API。z-order：弹幕在视频之上、`overlayBuilder` 之下，业务 UI 始终盖在弹幕上。
+- **`NiumaShortVideoFullscreenButton`**：加 `danmakuController` + `theme` prop 透传，全屏后弹幕和主题继续可用。
+
 ### Notes
 
 - 0 新增 pubspec 依赖、0 原生改动（纯 Dart 实现）。

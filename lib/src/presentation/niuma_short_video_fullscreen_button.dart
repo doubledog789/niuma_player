@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'glass_card.dart';
+import 'niuma_danmaku_controller.dart';
 import 'niuma_fullscreen_page.dart';
 import 'niuma_player_controller.dart';
+import 'niuma_player_theme.dart';
 
 /// 抖音风短视频"切全屏"按钮。
 ///
@@ -18,6 +20,8 @@ class NiumaShortVideoFullscreenButton extends StatelessWidget {
     super.key,
     required this.controller,
     this.size = 36,
+    this.danmakuController,
+    this.theme,
   });
 
   /// 共享 controller——push route 时透传，保证视频不重新 init。
@@ -25,6 +29,12 @@ class NiumaShortVideoFullscreenButton extends StatelessWidget {
 
   /// 按钮整体尺寸（圆形）。
   final double size;
+
+  /// 可选弹幕 controller——push 全屏 route 时透传，全屏后弹幕继续可用。
+  final NiumaDanmakuController? danmakuController;
+
+  /// 可选主题——push 全屏 route 时透传，全屏后主题继续可用。
+  final NiumaPlayerTheme? theme;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +45,11 @@ class NiumaShortVideoFullscreenButton extends StatelessWidget {
           Navigator.of(context).pop();
         } else {
           Navigator.of(context).push(
-            NiumaFullscreenPage.route(controller: controller),
+            NiumaFullscreenPage.route(
+              controller: controller,
+              danmakuController: danmakuController,
+              theme: theme,
+            ),
           );
         }
       },

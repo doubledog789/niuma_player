@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/niuma_fullscreen_page.dart'
-    show NiumaFullscreenScope;
+    show NiumaFullscreenPage, NiumaFullscreenScope;
 
 import 'controls/fake_controller.dart';
 
@@ -94,6 +94,36 @@ void main() {
 
     // 退回到第一层（找回 TextButton）
     expect(find.text('go'), findsOneWidget);
+  });
+
+  testWidgets('danmakuController != null → push 时 route name 为 NiumaFullscreenPage',
+      (tester) async {
+    final c = FakeNiumaPlayerController();
+    final dc = NiumaDanmakuController();
+    addTearDown(dc.dispose);
+    final pushedRoutes = <Route<dynamic>>[];
+
+    await tester.pumpWidget(MaterialApp(
+      navigatorObservers: [
+        _RecordingObserver(pushedRoutes),
+      ],
+      home: Scaffold(
+        body: NiumaShortVideoFullscreenButton(
+          controller: c,
+          danmakuController: dc,
+        ),
+      ),
+    ));
+
+    final before = pushedRoutes.length;
+    await tester.tap(find.byType(NiumaShortVideoFullscreenButton));
+    await tester.pump();
+
+    expect(pushedRoutes.length, greaterThan(before));
+    expect(
+      pushedRoutes.last.settings.name,
+      NiumaFullscreenPage.routeName,
+    );
   });
 }
 

@@ -417,6 +417,67 @@ void main() {
     });
   });
 
+  group('danmakuController 集成', () {
+    testWidgets('null → 不挂 NiumaDanmakuOverlay', (tester) async {
+      final c = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c),
+        ),
+      ));
+      expect(find.byType(NiumaDanmakuOverlay), findsNothing);
+    });
+
+    testWidgets('非 null → 挂 NiumaDanmakuOverlay', (tester) async {
+      final c = FakeNiumaPlayerController();
+      final dc = NiumaDanmakuController();
+      addTearDown(dc.dispose);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(
+            controller: c,
+            danmakuController: dc,
+          ),
+        ),
+      ));
+      expect(find.byType(NiumaDanmakuOverlay), findsOneWidget);
+    });
+
+    testWidgets('非 null → 注入 NiumaDanmakuScope', (tester) async {
+      final c = FakeNiumaPlayerController();
+      final dc = NiumaDanmakuController();
+      addTearDown(dc.dispose);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(
+            controller: c,
+            danmakuController: dc,
+          ),
+        ),
+      ));
+      expect(find.byType(NiumaDanmakuScope), findsOneWidget);
+    });
+
+    testWidgets('弹幕 IgnorePointer 包裹（让 tap 透传）', (tester) async {
+      final c = FakeNiumaPlayerController();
+      final dc = NiumaDanmakuController();
+      addTearDown(dc.dispose);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(
+            controller: c,
+            danmakuController: dc,
+          ),
+        ),
+      ));
+      final ignore = find.ancestor(
+        of: find.byType(NiumaDanmakuOverlay),
+        matching: find.byType(IgnorePointer),
+      );
+      expect(ignore, findsAtLeastNWidgets(1));
+    });
+  });
+
   group('leftCenterBuilder slot', () {
     testWidgets('null → 不挂', (tester) async {
       final c = FakeNiumaPlayerController();
