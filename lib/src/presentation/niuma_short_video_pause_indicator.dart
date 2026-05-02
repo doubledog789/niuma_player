@@ -7,7 +7,10 @@ import '../domain/niuma_short_video_theme.dart';
 ///
 /// 在 `phase=paused` 时由父组件挂上，`play()` 后立刻消失（无淡出，
 /// 避免点击响应延迟感）。本组件不响应自身 hit-test，tap 透传给底下单击层。
-class NiumaShortVideoPauseIndicator extends StatefulWidget {
+///
+/// 入场带 80ms ease-out scale 动画（0.8 → 1.0），用 [TweenAnimationBuilder]
+/// 隐式实现，无 [State] 类、无控制器。
+class NiumaShortVideoPauseIndicator extends StatelessWidget {
   /// 构造一个暂停指示器。
   const NiumaShortVideoPauseIndicator({super.key, required this.theme});
 
@@ -15,40 +18,25 @@ class NiumaShortVideoPauseIndicator extends StatefulWidget {
   final NiumaShortVideoTheme theme;
 
   @override
-  State<NiumaShortVideoPauseIndicator> createState() =>
-      _NiumaShortVideoPauseIndicatorState();
-}
-
-class _NiumaShortVideoPauseIndicatorState
-    extends State<NiumaShortVideoPauseIndicator> {
-  double _scale = 0.8;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _scale = 1.0);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: AnimatedScale(
-        scale: _scale,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.8, end: 1.0),
         duration: const Duration(milliseconds: 80),
         curve: Curves.easeOut,
+        builder: (_, scale, child) =>
+            Transform.scale(scale: scale, child: child),
         child: Container(
-          width: widget.theme.pauseIndicatorSize,
-          height: widget.theme.pauseIndicatorSize,
+          width: theme.pauseIndicatorSize,
+          height: theme.pauseIndicatorSize,
           decoration: BoxDecoration(
-            color: widget.theme.pauseIndicatorBackgroundColor,
+            color: theme.pauseIndicatorBackgroundColor,
             shape: BoxShape.circle,
           ),
           child: Icon(
             Icons.play_arrow_rounded,
-            color: widget.theme.pauseIndicatorIconColor,
-            size: widget.theme.pauseIndicatorIconSize,
+            color: theme.pauseIndicatorIconColor,
+            size: theme.pauseIndicatorIconSize,
           ),
         ),
       ),

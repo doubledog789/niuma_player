@@ -82,7 +82,7 @@ void main() {
     expect(dec.shape, BoxShape.circle);
   });
 
-  testWidgets('入场带 AnimatedScale', (tester) async {
+  testWidgets('入场带 TweenAnimationBuilder<double> scale 动画', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: NiumaShortVideoPauseIndicator(
@@ -90,6 +90,6 @@ void main() {
         ),
       ),
     ));
-    expect(find.byType(AnimatedScale), findsOneWidget);
+    expect(find.byType(TweenAnimationBuilder<double>), findsOneWidget);
   });
 }
