@@ -23,7 +23,9 @@ class _M11DanmakuDemoPageState extends State<M11DanmakuDemoPage> {
     super.initState();
     _video = NiumaPlayerController.dataSource(
       NiumaDataSource.network(
-        'https://artplayer.org/assets/sample/bbb-video.mp4',
+        // 注：原本用 artplayer.org，iOS 在部分网络环境拉不动会 30s timeout。
+        // 换 test-videos.co.uk H.264（与项目其他 demo 同源、稳定可达）。
+        'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4',
       ),
     );
     _danmaku = NiumaDanmakuController(loader: _mockLoader);
