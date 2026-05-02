@@ -20,10 +20,12 @@ class M14ShortVideoDemoPage extends StatefulWidget {
 class _M14ShortVideoDemoPageState extends State<M14ShortVideoDemoPage> {
   // 用 test-videos.co.uk 的样本（与项目其他 demo 同源）。
   // 三个不同分辨率/编码，模拟短视频流多样性。
+  // 三条都用 H.264——iOS video_player 解 H.265 在某些 profile 下黑屏不报错。
+  // 改用不同分辨率的 H.264 模拟短视频流多样性。
   static const _samples = [
     'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_5MB.mp4',
-    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
-    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h265/1080/Big_Buck_Bunny_1080_10s_1MB.mp4',
+    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4',
+    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
   ];
 
   late final List<NiumaPlayerController> _controllers;
