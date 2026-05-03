@@ -1692,4 +1692,29 @@ sprite.jpg#xywh=128,0,128,72
       expect(b.hashCode, equals(c.hashCode));
     });
   });
+
+  group('M15 Cast events', () {
+    test('CastStarted 携带 device', () {
+      const d = CastDevice(id: 'dlna:1', name: 'TV', protocolId: 'dlna');
+      final e = CastStarted(d);
+      expect(e.device, d);
+    });
+
+    test('CastEnded 携带 reason', () {
+      const e = CastEnded(CastEndReason.userCancelled);
+      expect(e.reason, CastEndReason.userCancelled);
+    });
+
+    test('CastError 带 code + 可选 message', () {
+      const e = CastError(code: 'TIMEOUT', message: 'connect 30s 超时');
+      expect(e.code, 'TIMEOUT');
+      expect(e.message, 'connect 30s 超时');
+    });
+
+    test('CastError message 可省略', () {
+      const e = CastError(code: 'NETWORK_DOWN');
+      expect(e.code, 'NETWORK_DOWN');
+      expect(e.message, isNull);
+    });
+  });
 }

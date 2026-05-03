@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import '../cast/cast_device.dart';
+import '../cast/cast_state.dart';
 import 'player_backend.dart';
 
 /// [PlayerError] 的粗粒度分类。app 级代码用它判断是否重试、是否给用户
@@ -388,4 +390,23 @@ final class PipRemoteAction extends NiumaPlayerEvent {
 
   /// 动作类型：当前仅 `'playPauseToggle'`。后续可能加 prev/next 等。
   final String action;
+}
+
+/// 投屏开始。
+final class CastStarted extends NiumaPlayerEvent {
+  const CastStarted(this.device);
+  final CastDevice device;
+}
+
+/// 投屏结束。
+final class CastEnded extends NiumaPlayerEvent {
+  const CastEnded(this.reason);
+  final CastEndReason reason;
+}
+
+/// 投屏出错（与 CastEnded 区别：可恢复 / 不可恢复看 reason）。
+final class CastError extends NiumaPlayerEvent {
+  const CastError({required this.code, this.message});
+  final String code;
+  final String? message;
 }

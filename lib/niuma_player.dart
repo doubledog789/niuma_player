@@ -20,7 +20,10 @@ export 'src/domain/player_state.dart'
         LineSwitched,
         LineSwitchFailed,
         PipModeChanged,
-        PipRemoteAction;
+        PipRemoteAction,
+        CastStarted,
+        CastEnded,
+        CastError;
 export 'src/presentation/niuma_player_controller.dart'
     show NiumaPlayerController, NiumaPlayerOptions, ThumbnailFetcher;
 export 'src/presentation/niuma_player_view.dart';
