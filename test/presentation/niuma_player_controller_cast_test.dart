@@ -26,6 +26,15 @@ void main() {
     });
   });
 
+  test('dispose 时投屏中 → 自动 disconnect session', () async {
+    final c = FakeNiumaPlayerController();
+    final s = _CountingFakeSession();
+    await c.connectCast(s);
+    expect(s.disconnectCalled, 0);
+    await c.dispose();
+    expect(s.disconnectCalled, 1);
+  });
+
   group('NiumaPlayerController.connectCast/disconnectCast', () {
     test('connectCast(session) → pause 本地 + 设 castSession + emit CastStarted',
         () async {

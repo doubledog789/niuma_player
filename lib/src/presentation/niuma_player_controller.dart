@@ -908,6 +908,14 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       WidgetsBinding.instance.removeObserver(_pipObserver!);
       _pipObserver = null;
     }
+    final session = _castSession.value;
+    if (session != null) {
+      try {
+        await session.disconnect().timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // 忽略——dispose 中不抛
+      }
+    }
     await _disposeCurrentBackend();
     await _eventController.close();
     _thumbnailCache.clear();
