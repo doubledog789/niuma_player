@@ -6,7 +6,7 @@ import 'controls/fake_controller.dart';
 
 void main() {
   testWidgets(
-      '宽度 <420（PiP 迷你窗）→ 只渲染 ScrubBar，藏 Row 避免 RenderFlex overflow',
+      '宽度 <280（PiP 迷你窗）→ 只渲染 ScrubBar，藏 Row 避免 RenderFlex overflow',
       (tester) async {
     final ctl = FakeNiumaPlayerController();
     await tester.pumpWidget(MaterialApp(
@@ -22,9 +22,38 @@ void main() {
     expect(find.byType(ScrubBar), findsOneWidget,
         reason: '窄宽下 ScrubBar 仍渲染（只有一根条不会 overflow）');
     expect(find.byType(PlayPauseButton), findsNothing,
-        reason: '窄宽下 Row 整体不渲染——8 按钮 + Spacer 塞不下');
+        reason: '窄宽下 Row 整体不渲染——按钮 + Spacer 塞不下');
     expect(find.byType(FullscreenButton), findsNothing);
     // 关键：不应该有 RenderFlex overflow assertion 抛出。
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      '宽度 280-560（手机竖屏）→ compact 模式，5 核心按钮 + Cast 必在',
+      (tester) async {
+    final ctl = FakeNiumaPlayerController();
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 420, // 模拟典型手机竖屏 video 容器宽度（iPhone 14 / Pixel 7 等 393-412dp）
+          height: 200,
+          child: NiumaControlBar(controller: ctl),
+        ),
+      ),
+    ));
+
+    // 5 核心按钮全在
+    expect(find.byType(ScrubBar), findsOneWidget);
+    expect(find.byType(PlayPauseButton), findsOneWidget);
+    expect(find.byType(TimeDisplay), findsOneWidget);
+    expect(find.byType(VolumeButton), findsOneWidget);
+    expect(find.byType(FullscreenButton), findsOneWidget);
+    expect(find.byType(NiumaCastButton), findsOneWidget,
+        reason: '手机竖屏下 CastButton 必须可见——M15 milestone 重点');
+    // 三个二级按钮 compact 模式藏掉
+    expect(find.byType(DanmakuButton), findsNothing);
+    expect(find.byType(SubtitleButton), findsNothing);
+    expect(find.byType(SpeedSelector), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

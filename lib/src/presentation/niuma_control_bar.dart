@@ -46,11 +46,17 @@ class NiumaControlBar extends StatelessWidget {
     final theme = NiumaPlayerTheme.of(context);
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        // 8 个按钮 + Spacer 至少需要 ~420dp。在 PiP 迷你窗 / 极小 inline
-        // 容器里塞不下时直接降级到只渲染 ScrubBar——避免 RenderFlex
-        // overflow assertion。这一层是纯布局兜底，无关 isInPictureInPicture
-        // 状态时序，确保任何情况下不报错。
-        final compact = constraints.maxWidth < 420;
+        // 三档自适应宽度：
+        // - <280dp（PiP 迷你窗）：只渲染 ScrubBar，整个 Row 不构造，避免
+        //   RenderFlex overflow。
+        // - 280-560dp（手机竖屏）：compact 模式——只留 5 个核心按钮：
+        //   PlayPause / TimeDisplay / Volume / Fullscreen / Cast。藏掉
+        //   Danmaku / Subtitle（M9 disabled placeholder）+ SpeedSelector
+        //   （二级控件，全屏/Cast 后再调）。QualitySelector 单线路时本身
+        //   就不渲染。
+        // - ≥560dp（手机横屏 / 平板）：完整 10 个按钮 + Spacer。
+        final tooNarrow = constraints.maxWidth < 280;
+        final compact = constraints.maxWidth < 560;
         return Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -64,7 +70,7 @@ class NiumaControlBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ScrubBar(controller: controller),
-              if (!compact) ...[
+              if (!tooNarrow) ...[
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -72,9 +78,9 @@ class NiumaControlBar extends StatelessWidget {
                     const SizedBox(width: 8),
                     TimeDisplay(controller: controller),
                     const Spacer(),
-                    const DanmakuButton(),
-                    const SubtitleButton(),
-                    SpeedSelector(controller: controller),
+                    if (!compact) const DanmakuButton(),
+                    if (!compact) const SubtitleButton(),
+                    if (!compact) SpeedSelector(controller: controller),
                     QualitySelector(controller: controller),
                     VolumeButton(controller: controller),
                     FullscreenButton(controller: controller),
