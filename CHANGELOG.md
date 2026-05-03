@@ -5,6 +5,21 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [0.9.0] - 2026-05-03
+
+### 新增
+
+- **M15 投屏（Cast）**：DLNA + AirPlay 跨屏投放，国内市场为主
+  - 主包：`NiumaCastButton` widget + `CastService` / `CastSession` 抽象 + `NiumaCastRegistry` 注册表 + `NiumaCastOverlay` 投屏中覆盖层
+  - `niuma_player_dlna` 子包：自实现 SSDP 发现 + SOAP/AVTransport 控制（无第三方依赖，~300KB）+ Android multicast lock + SharedPreferences 历史设备
+  - `niuma_player_airplay` 子包：iOS Swift 桥接 AVRoutePickerView（~10KB）
+  - 业务集成：app 启动调 `NiumaCastRegistry.register(DlnaCastService())` + `NiumaCastRegistry.register(AirPlayCastService())` 即可
+  - ControlBar 默认带 cast 按钮（位于全屏按钮之后）
+  - 投屏中本地播放器自动暂停 + 视频区显示"投屏中"覆盖层
+  - `play` / `pause` / `seekTo` 透明远程映射到 TV
+  - 断开投屏后本地 seek 接续播放
+  - controller dispose 时自动 disconnect 活跃 session
+
 ## [0.8.0] — 2026-05-XX
 
 ### Added — M14 短视频组件
