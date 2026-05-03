@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'cast/niuma_cast_button.dart';
 import 'controls/danmaku_button.dart';
 import 'controls/fullscreen_button.dart';
 import 'controls/play_pause_button.dart';
@@ -77,6 +78,7 @@ class NiumaControlBar extends StatelessWidget {
                     QualitySelector(controller: controller),
                     VolumeButton(controller: controller),
                     FullscreenButton(controller: controller),
+                    NiumaCastButton(controller: controller),
                   ],
                 ),
               ],

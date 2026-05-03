@@ -28,7 +28,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('NiumaControlBar 包含 ScrubBar + 全部 9 个原子控件', (tester) async {
+  testWidgets('NiumaControlBar 包含 ScrubBar + 全部 10 个原子控件', (tester) async {
     final ctl = FakeNiumaPlayerController(
       source: NiumaMediaSource.lines(
         lines: [
@@ -66,6 +66,7 @@ void main() {
     expect(find.byType(QualitySelector), findsOneWidget);
     expect(find.byType(VolumeButton), findsOneWidget);
     expect(find.byType(FullscreenButton), findsOneWidget);
+    expect(find.byType(NiumaCastButton), findsOneWidget);
   });
 
   testWidgets('ScrubBar 在 Row 上方（垂直方向 ScrubBar.center.dy < Row.center.dy）',
@@ -149,5 +150,18 @@ void main() {
     final dec = container.decoration as BoxDecoration;
     final grad = dec.gradient as LinearGradient;
     expect(grad.colors, customGradient);
+  });
+
+  testWidgets('M15: ControlBar 默认包含 NiumaCastButton', (tester) async {
+    final ctl = FakeNiumaPlayerController();
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 800, height: 200,
+          child: NiumaControlBar(controller: ctl),
+        ),
+      ),
+    ));
+    expect(find.byType(NiumaCastButton), findsOneWidget);
   });
 }
