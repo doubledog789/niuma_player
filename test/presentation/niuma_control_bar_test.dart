@@ -28,35 +28,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-      '宽度 320（iPhone SE）→ 全部按钮渲染但右组横向可滑，不 overflow',
+  testWidgets('NiumaControlBar 包含 ScrubBar + 全部 9 个原子控件（Cast 移到顶部 actions）',
       (tester) async {
-    final ctl = FakeNiumaPlayerController();
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: SizedBox(
-          width: 320, // 最小主流手机竖屏（iPhone SE 320dp）
-          height: 200,
-          child: NiumaControlBar(controller: ctl),
-        ),
-      ),
-    ));
-
-    // 关键：不 overflow——右组用 SingleChildScrollView 包，永不报错
-    expect(tester.takeException(), isNull);
-
-    // 全部 10 个原子控件 + ScrubBar 都还在 widget tree 里（窄屏可横向滑动看到）
-    expect(find.byType(ScrubBar), findsOneWidget);
-    expect(find.byType(PlayPauseButton), findsOneWidget);
-    expect(find.byType(TimeDisplay), findsOneWidget);
-    expect(find.byType(NiumaCastButton), findsOneWidget,
-        reason: 'M15 重点——CastButton 必在 widget tree（且 reverse=true 让它在初始视口最右端可见）');
-    expect(find.byType(FullscreenButton), findsOneWidget);
-    expect(find.byType(VolumeButton), findsOneWidget);
-    expect(find.byType(SpeedSelector), findsOneWidget);
-  });
-
-  testWidgets('NiumaControlBar 包含 ScrubBar + 全部 10 个原子控件', (tester) async {
     final ctl = FakeNiumaPlayerController(
       source: NiumaMediaSource.lines(
         lines: [
@@ -94,7 +67,8 @@ void main() {
     expect(find.byType(QualitySelector), findsOneWidget);
     expect(find.byType(VolumeButton), findsOneWidget);
     expect(find.byType(FullscreenButton), findsOneWidget);
-    expect(find.byType(NiumaCastButton), findsOneWidget);
+    expect(find.byType(NiumaCastButton), findsNothing,
+        reason: 'M15 后 Cast 移到 NiumaPlayer 顶部 actions 区，不在 ControlBar');
   });
 
   testWidgets('ScrubBar 在 Row 上方（垂直方向 ScrubBar.center.dy < Row.center.dy）',
@@ -180,7 +154,8 @@ void main() {
     expect(grad.colors, customGradient);
   });
 
-  testWidgets('M15: ControlBar 默认包含 NiumaCastButton', (tester) async {
+  testWidgets('M15: ControlBar 不再装 CastButton（移到 NiumaPlayer 顶部 actions）',
+      (tester) async {
     final ctl = FakeNiumaPlayerController();
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -190,6 +165,7 @@ void main() {
         ),
       ),
     ));
-    expect(find.byType(NiumaCastButton), findsOneWidget);
+    expect(find.byType(NiumaCastButton), findsNothing,
+        reason: 'Cast 按钮已经移到 NiumaPlayer 顶部 actions 区，不再挤 ControlBar');
   });
 }

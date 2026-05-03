@@ -8,6 +8,7 @@ import '../domain/player_state.dart';
 import '../observability/analytics_emitter.dart';
 import '../orchestration/ad_schedule.dart';
 import '../orchestration/ad_scheduler.dart';
+import 'cast/niuma_cast_button.dart';
 import 'cast/niuma_cast_overlay.dart';
 import 'controls/pip_button.dart';
 import 'niuma_ad_overlay.dart';
@@ -409,7 +410,16 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   child: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.all(8),
-                      child: PipButton(controller: widget.controller),
+                      // 右上 actions 区——投屏 + PiP 集中放这里，跟主流
+                      // 播放器的"top-right action bar"惯例一致，不再挤
+                      // 底部 ControlBar。
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          NiumaCastButton(controller: widget.controller),
+                          PipButton(controller: widget.controller),
+                        ],
+                      ),
                     ),
                   ),
                 ),

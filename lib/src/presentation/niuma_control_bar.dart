@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'cast/niuma_cast_button.dart';
 import 'controls/danmaku_button.dart';
 import 'controls/fullscreen_button.dart';
 import 'controls/play_pause_button.dart';
@@ -46,14 +45,11 @@ class NiumaControlBar extends StatelessWidget {
     final theme = NiumaPlayerTheme.of(context);
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        // <280dp（PiP 迷你窗）：只渲染 ScrubBar，整个 Row 不构造，避免 PiP
-        //   小窗里都没意义的控件 + RenderFlex assertion。
-        // ≥280dp：左 PlayPause + TimeDisplay 固定，右侧按钮组放进 Expanded
-        //   的横向 SingleChildScrollView (reverse=true) 里——
-        //   - 容得下：所有按钮正常一行排开（视觉跟原 Row 一样）
-        //   - 容不下（窄屏 320-430dp 手机）：右端 Cast 永远可见，其他按钮
-        //     用户可横向滑动看到。永远不 overflow，永远不丢按钮。
-        final tooNarrow = constraints.maxWidth < 280;
+        // <420dp（PiP 迷你窗 / 极窄 inline）：只渲染 ScrubBar，9 按钮 +
+        //   Spacer 塞不下时整 Row 不构造，避免 RenderFlex assertion。
+        // ≥420dp：完整 9 按钮 Row（Cast / PiP 移到视频右上角 actions 区，
+        //   不再挤这条 ControlBar）。
+        final compact = constraints.maxWidth < 420;
         return Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -67,33 +63,20 @@ class NiumaControlBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ScrubBar(controller: controller),
-              if (!tooNarrow) ...[
+              if (!compact) ...[
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     PlayPauseButton(controller: controller),
                     const SizedBox(width: 8),
                     TimeDisplay(controller: controller),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        // reverse=true：内容右对齐 + 初始滚动位置在最右——
-                        // 窄屏首屏看到的是 Cast 按钮（M15 重点），用户可
-                        // 横向滑动看其他按钮。宽屏自然全显。
-                        reverse: true,
-                        child: Row(
-                          children: [
-                            const DanmakuButton(),
-                            const SubtitleButton(),
-                            SpeedSelector(controller: controller),
-                            QualitySelector(controller: controller),
-                            VolumeButton(controller: controller),
-                            FullscreenButton(controller: controller),
-                            NiumaCastButton(controller: controller),
-                          ],
-                        ),
-                      ),
-                    ),
+                    const Spacer(),
+                    const DanmakuButton(),
+                    const SubtitleButton(),
+                    SpeedSelector(controller: controller),
+                    QualitySelector(controller: controller),
+                    VolumeButton(controller: controller),
+                    FullscreenButton(controller: controller),
                   ],
                 ),
               ],

@@ -647,8 +647,9 @@ void main() {
     });
   });
 
-  group('NiumaPlayer 右上角 PipButton 自动叠', () {
-    testWidgets('默认渲染 PipButton 在右半 + 上半', (tester) async {
+  group('NiumaPlayer 右上角 actions 区（Cast + PiP）', () {
+    testWidgets('默认渲染 NiumaCastButton + PipButton 在右半 + 上半',
+        (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: SizedBox(
@@ -659,13 +660,20 @@ void main() {
       ));
       await tester.pump();
       expect(find.byType(PipButton), findsOneWidget);
-      // 验位置：button 中心点应在右半 + 上半
+      expect(find.byType(NiumaCastButton), findsOneWidget,
+          reason: 'M15 后右上 actions 区也含 NiumaCastButton');
+      // 验位置：两个 button 中心点都在右半 + 上半
       final pipCenter = tester.getCenter(find.byType(PipButton));
+      final castCenter = tester.getCenter(find.byType(NiumaCastButton));
       final playerCenter = tester.getCenter(find.byType(NiumaPlayer));
       expect(pipCenter.dx, greaterThan(playerCenter.dx),
           reason: 'PipButton 应在右半屏');
       expect(pipCenter.dy, lessThan(playerCenter.dy),
           reason: 'PipButton 应在上半屏');
+      expect(castCenter.dx, greaterThan(playerCenter.dx),
+          reason: 'CastButton 应在右半屏（actions 区）');
+      expect(castCenter.dy, lessThan(playerCenter.dy),
+          reason: 'CastButton 应在上半屏（actions 区）');
     });
 
     testWidgets('PipButton 跟控件条 auto-hide 同步', (tester) async {
