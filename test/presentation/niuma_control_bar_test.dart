@@ -29,32 +29,31 @@ void main() {
   });
 
   testWidgets(
-      '宽度 280-560（手机竖屏）→ compact 模式，5 核心按钮 + Cast 必在',
+      '宽度 320（iPhone SE）→ 全部按钮渲染但右组横向可滑，不 overflow',
       (tester) async {
     final ctl = FakeNiumaPlayerController();
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: SizedBox(
-          width: 420, // 模拟典型手机竖屏 video 容器宽度（iPhone 14 / Pixel 7 等 393-412dp）
+          width: 320, // 最小主流手机竖屏（iPhone SE 320dp）
           height: 200,
           child: NiumaControlBar(controller: ctl),
         ),
       ),
     ));
 
-    // 5 核心按钮全在
+    // 关键：不 overflow——右组用 SingleChildScrollView 包，永不报错
+    expect(tester.takeException(), isNull);
+
+    // 全部 10 个原子控件 + ScrubBar 都还在 widget tree 里（窄屏可横向滑动看到）
     expect(find.byType(ScrubBar), findsOneWidget);
     expect(find.byType(PlayPauseButton), findsOneWidget);
     expect(find.byType(TimeDisplay), findsOneWidget);
-    expect(find.byType(VolumeButton), findsOneWidget);
-    expect(find.byType(FullscreenButton), findsOneWidget);
     expect(find.byType(NiumaCastButton), findsOneWidget,
-        reason: '手机竖屏下 CastButton 必须可见——M15 milestone 重点');
-    // 三个二级按钮 compact 模式藏掉
-    expect(find.byType(DanmakuButton), findsNothing);
-    expect(find.byType(SubtitleButton), findsNothing);
-    expect(find.byType(SpeedSelector), findsNothing);
-    expect(tester.takeException(), isNull);
+        reason: 'M15 重点——CastButton 必在 widget tree（且 reverse=true 让它在初始视口最右端可见）');
+    expect(find.byType(FullscreenButton), findsOneWidget);
+    expect(find.byType(VolumeButton), findsOneWidget);
+    expect(find.byType(SpeedSelector), findsOneWidget);
   });
 
   testWidgets('NiumaControlBar 包含 ScrubBar + 全部 10 个原子控件', (tester) async {

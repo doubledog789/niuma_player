@@ -46,17 +46,14 @@ class NiumaControlBar extends StatelessWidget {
     final theme = NiumaPlayerTheme.of(context);
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        // 三档自适应宽度：
-        // - <280dp（PiP 迷你窗）：只渲染 ScrubBar，整个 Row 不构造，避免
-        //   RenderFlex overflow。
-        // - 280-560dp（手机竖屏）：compact 模式——只留 5 个核心按钮：
-        //   PlayPause / TimeDisplay / Volume / Fullscreen / Cast。藏掉
-        //   Danmaku / Subtitle（M9 disabled placeholder）+ SpeedSelector
-        //   （二级控件，全屏/Cast 后再调）。QualitySelector 单线路时本身
-        //   就不渲染。
-        // - ≥560dp（手机横屏 / 平板）：完整 10 个按钮 + Spacer。
+        // <280dp（PiP 迷你窗）：只渲染 ScrubBar，整个 Row 不构造，避免 PiP
+        //   小窗里都没意义的控件 + RenderFlex assertion。
+        // ≥280dp：左 PlayPause + TimeDisplay 固定，右侧按钮组放进 Expanded
+        //   的横向 SingleChildScrollView (reverse=true) 里——
+        //   - 容得下：所有按钮正常一行排开（视觉跟原 Row 一样）
+        //   - 容不下（窄屏 320-430dp 手机）：右端 Cast 永远可见，其他按钮
+        //     用户可横向滑动看到。永远不 overflow，永远不丢按钮。
         final tooNarrow = constraints.maxWidth < 280;
-        final compact = constraints.maxWidth < 560;
         return Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -77,14 +74,26 @@ class NiumaControlBar extends StatelessWidget {
                     PlayPauseButton(controller: controller),
                     const SizedBox(width: 8),
                     TimeDisplay(controller: controller),
-                    const Spacer(),
-                    if (!compact) const DanmakuButton(),
-                    if (!compact) const SubtitleButton(),
-                    if (!compact) SpeedSelector(controller: controller),
-                    QualitySelector(controller: controller),
-                    VolumeButton(controller: controller),
-                    FullscreenButton(controller: controller),
-                    NiumaCastButton(controller: controller),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        // reverse=true：内容右对齐 + 初始滚动位置在最右——
+                        // 窄屏首屏看到的是 Cast 按钮（M15 重点），用户可
+                        // 横向滑动看其他按钮。宽屏自然全显。
+                        reverse: true,
+                        child: Row(
+                          children: [
+                            const DanmakuButton(),
+                            const SubtitleButton(),
+                            SpeedSelector(controller: controller),
+                            QualitySelector(controller: controller),
+                            VolumeButton(controller: controller),
+                            FullscreenButton(controller: controller),
+                            NiumaCastButton(controller: controller),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
