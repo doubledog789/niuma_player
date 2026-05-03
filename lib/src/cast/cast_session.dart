@@ -15,6 +15,9 @@ abstract class CastSession {
   Future<void> pause();
   Future<void> seek(Duration position);
 
+  /// 查 TV 端当前播放位置——disconnect 时本地 seek 接续用。
+  Future<Duration> getPosition();
+
   /// 主动断开。controller dispose 时也会调。
   Future<void> disconnect();
 }

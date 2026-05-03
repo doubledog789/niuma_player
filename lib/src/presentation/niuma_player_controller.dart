@@ -24,6 +24,7 @@ import '../orchestration/thumbnail_resolver.dart';
 import '../orchestration/thumbnail_track.dart';
 import '../orchestration/webvtt_parser.dart';
 import '../cast/cast_session.dart';
+import '../cast/cast_state.dart';
 import 'pip_lifecycle_observer.dart';
 
 /// 拉取 WebVTT body 的函数签名。
@@ -863,6 +864,40 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   @visibleForTesting
   void debugSetCastSession(CastSession? session) {
     _castSession.value = session;
+  }
+
+  /// 进入投屏。pause 本地 backend；把 session 写到 [castSession]；
+  /// emit [CastStarted] 事件。
+  Future<void> connectCast(CastSession session) async {
+    await pause(); // 此时 _castSession 还 null，调本地 backend
+    _castSession.value = session;
+    if (!_eventController.isClosed) {
+      _eventController.add(CastStarted(session.device));
+    }
+  }
+
+  /// 退出投屏。从 session 拿当前位置；本地 seekTo 接续；emit [CastEnded] 事件。
+  Future<void> disconnectCast({
+    required CastEndReason reason,
+  }) async {
+    final session = _castSession.value;
+    if (session == null) return;
+    Duration? remotePos;
+    try {
+      remotePos = await session.getPosition();
+    } catch (_) {
+      remotePos = null;
+    }
+    try {
+      await session.disconnect();
+    } catch (_) {}
+    _castSession.value = null;
+    if (remotePos != null && !_disposed) {
+      await seekTo(remotePos);
+    }
+    if (!_eventController.isClosed) {
+      _eventController.add(CastEnded(reason));
+    }
   }
 
   @override

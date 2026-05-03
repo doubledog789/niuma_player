@@ -26,6 +26,43 @@ void main() {
     });
   });
 
+  group('NiumaPlayerController.connectCast/disconnectCast', () {
+    test('connectCast(session) → pause 本地 + 设 castSession + emit CastStarted',
+        () async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        phase: PlayerPhase.playing,
+        position: const Duration(seconds: 42),
+      );
+      final s = _CountingFakeSession();
+      final events = <NiumaPlayerEvent>[];
+      c.events.listen(events.add);
+      await c.connectCast(s);
+      expect(c.pauseCount, 1, reason: 'connect 时 pause 本地');
+      expect(c.castSession.value, same(s));
+      await Future<void>.delayed(Duration.zero);
+      expect(events.whereType<CastStarted>().length, 1);
+    });
+
+    test('disconnectCast → seek 本地到估算位置 + emit CastEnded', () async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        phase: PlayerPhase.playing,
+        position: const Duration(seconds: 42),
+      );
+      final s = _CountingFakeSession();
+      await c.connectCast(s);
+      s.currentPosition = const Duration(seconds: 100);
+      final events = <NiumaPlayerEvent>[];
+      c.events.listen(events.add);
+      await c.disconnectCast(reason: CastEndReason.userCancelled);
+      expect(c.lastSeek, const Duration(seconds: 100));
+      expect(c.castSession.value, isNull);
+      await Future<void>.delayed(Duration.zero);
+      expect(events.whereType<CastEnded>().length, 1);
+    });
+  });
+
   group('NiumaPlayerController play/pause/seekTo cast 透传', () {
     test('castSession=null → play 调 backend', () async {
       final c = FakeNiumaPlayerController();
