@@ -124,3 +124,7 @@ export 'src/presentation/niuma_short_video_pause_indicator.dart' show NiumaShort
 export 'src/presentation/niuma_short_video_scrub_label.dart' show NiumaShortVideoScrubLabel;
 export 'src/domain/niuma_short_video_theme.dart' show NiumaShortVideoTheme;
 export 'src/presentation/niuma_short_video_fullscreen_button.dart' show NiumaShortVideoFullscreenButton;
+
+// M15 投屏（Cast）
+export 'src/cast/cast_device.dart' show CastDevice;
+export 'src/cast/cast_state.dart' show CastConnectionState, CastEndReason;
