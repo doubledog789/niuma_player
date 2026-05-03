@@ -23,6 +23,7 @@ import '../orchestration/thumbnail_cache.dart';
 import '../orchestration/thumbnail_resolver.dart';
 import '../orchestration/thumbnail_track.dart';
 import '../orchestration/webvtt_parser.dart';
+import '../cast/cast_session.dart';
 import 'pip_lifecycle_observer.dart';
 
 /// 拉取 WebVTT body 的函数签名。
@@ -832,6 +833,21 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
   static int _gcd(int a, int b) => b == 0 ? a : _gcd(b, a % b);
 
+  // ────────────── M15 Cast（投屏） ──────────────
+
+  final ValueNotifier<CastSession?> _castSession =
+      ValueNotifier<CastSession?>(null);
+
+  /// 当前投屏会话。null = 未投屏；非 null = 投屏中。
+  /// UI 监听这个 ValueListenable 切换控件远程映射状态。
+  ValueListenable<CastSession?> get castSession => _castSession;
+
+  /// 测试辅助：直接 set [_castSession.value]。生产路径走 connectCast。
+  @visibleForTesting
+  void debugSetCastSession(CastSession? session) {
+    _castSession.value = session;
+  }
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
@@ -844,6 +860,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     await _eventController.close();
     _thumbnailCache.clear();
     _gestureFeedback.dispose();
+    _castSession.dispose();
     super.dispose();
   }
 }
