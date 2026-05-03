@@ -8,6 +8,7 @@ import '../domain/player_state.dart';
 import '../observability/analytics_emitter.dart';
 import '../orchestration/ad_schedule.dart';
 import '../orchestration/ad_scheduler.dart';
+import 'cast/niuma_cast_overlay.dart';
 import 'controls/pip_button.dart';
 import 'niuma_ad_overlay.dart';
 import 'niuma_control_bar.dart';
@@ -361,6 +362,10 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         final overlays = Stack(
           fit: StackFit.expand,
           children: [
+            // M15: 投屏覆盖层——视频之上最底层浮层，投屏中显示设备信息。
+            Positioned.fill(
+              child: NiumaCastOverlay(controller: widget.controller),
+            ),
             // 手势层：放在视频之上、控件之下。
             // M9 既有"单击切控件显隐"行为通过 onTap: _onTapVideo 透传保留。
             // enabled：全屏 scope 内永远 true；inline 场景看 gesturesEnabledInline。

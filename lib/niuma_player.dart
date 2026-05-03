@@ -135,3 +135,4 @@ export 'src/cast/cast_service.dart' show CastService;
 export 'src/cast/cast_session.dart' show CastSession;
 export 'src/cast/cast_registry.dart' show NiumaCastRegistry;
 export 'src/presentation/cast/niuma_cast_button.dart' show NiumaCastButton;
+export 'src/presentation/cast/niuma_cast_overlay.dart' show NiumaCastOverlay;
