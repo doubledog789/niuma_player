@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player_airplay/niuma_player_airplay.dart';
+import 'package:niuma_player_dlna/niuma_player_dlna.dart';
 
 import 'diagnostics_page.dart';
 import 'm11_danmaku_demo_page.dart';
 import 'm12_pip_demo_page.dart';
 import 'm13_gesture_demo_page.dart';
 import 'm14_short_video_demo_page.dart';
+import 'm15_cast_demo_page.dart';
 import 'm9_custom_demo_page.dart';
 import 'm9_default_demo_page.dart';
 import 'multi_line_page.dart';
@@ -13,6 +17,9 @@ import 'samples.dart';
 import 'thumbnail_demo_page.dart';
 
 void main() {
+  // M15: 注册投屏 services
+  NiumaCastRegistry.register(DlnaCastService());
+  NiumaCastRegistry.register(AirPlayCastService());
   runApp(const NiumaPlayerExampleApp());
 }
 
@@ -173,6 +180,25 @@ class HomeScreen extends StatelessWidget {
                 MaterialPageRoute<void>(
                   builder: (_) => const M14ShortVideoDemoPage(),
                 ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          const _SectionHeader('M15 投屏 demo'),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.cast),
+              title: const Text('Cast 投屏 demo'),
+              subtitle: const Text(
+                'DLNA + AirPlay + 8 项验证清单',
+                style: TextStyle(fontSize: 11),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(builder: (_) => const M15CastDemoPage()),
               ),
             ),
           ),
