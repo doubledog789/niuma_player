@@ -205,7 +205,21 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.4.0"
+    version: "0.8.0"
+  niuma_player_airplay:
+    dependency: "direct main"
+    description:
+      path: "../../niuma_player_airplay"
+      relative: true
+    source: path
+    version: "0.1.0"
+  niuma_player_dlna:
+    dependency: "direct main"
+    description:
+      path: "../../niuma_player_dlna"
+      relative: true
+    source: path
+    version: "0.1.0"
   path:
     dependency: transitive
     description:
