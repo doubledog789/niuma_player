@@ -28,16 +28,28 @@ class FakeNiumaPlayerController extends NiumaPlayerController {
 
   @override
   Future<void> play() async {
+    if (castSession.value != null) {
+      await super.play();
+      return;
+    }
     playCount++;
   }
 
   @override
   Future<void> pause() async {
+    if (castSession.value != null) {
+      await super.pause();
+      return;
+    }
     pauseCount++;
   }
 
   @override
   Future<void> seekTo(Duration position) async {
+    if (castSession.value != null) {
+      await super.seekTo(position);
+      return;
+    }
     lastSeek = position;
   }
 

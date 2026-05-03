@@ -609,6 +609,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> play() async {
+    final session = _castSession.value;
+    if (session != null) {
+      await session.play();
+      return;
+    }
     debugPrint(
       '[niuma_player] play() backend=${_backend?.kind.name ?? "<null>"}',
     );
@@ -616,13 +621,25 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> pause() async {
+    final session = _castSession.value;
+    if (session != null) {
+      await session.pause();
+      return;
+    }
     debugPrint(
       '[niuma_player] pause() backend=${_backend?.kind.name ?? "<null>"}',
     );
     await _backend?.pause();
   }
 
-  Future<void> seekTo(Duration position) async => _backend?.seekTo(position);
+  Future<void> seekTo(Duration position) async {
+    final session = _castSession.value;
+    if (session != null) {
+      await session.seek(position);
+      return;
+    }
+    await _backend?.seekTo(position);
+  }
   Future<void> setPlaybackSpeed(double speed) async {
     value = value.copyWith(playbackSpeed: speed);
     await _backend?.setSpeed(speed);

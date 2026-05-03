@@ -25,6 +25,35 @@ void main() {
       expect(fired, 2);
     });
   });
+
+  group('NiumaPlayerController play/pause/seekTo cast 透传', () {
+    test('castSession=null → play 调 backend', () async {
+      final c = FakeNiumaPlayerController();
+      await c.play();
+      expect(c.playCount, 1);
+    });
+
+    test('castSession 非 null → play 调 session.play 不调 backend', () async {
+      final c = FakeNiumaPlayerController();
+      final s = _CountingFakeSession();
+      c.debugSetCastSession(s);
+      await c.play();
+      expect(s.playCalled, 1);
+      expect(c.playCount, 0, reason: '投屏时本地 backend 不调');
+    });
+
+    test('castSession 非 null → pause / seekTo 透传', () async {
+      final c = FakeNiumaPlayerController();
+      final s = _CountingFakeSession();
+      c.debugSetCastSession(s);
+      await c.pause();
+      await c.seekTo(const Duration(seconds: 30));
+      expect(s.pauseCalled, 1);
+      expect(s.lastSeek, const Duration(seconds: 30));
+      expect(c.pauseCount, 0);
+      expect(c.lastSeek, isNull);
+    });
+  });
 }
 
 class _FakeSession implements CastSession {
@@ -41,4 +70,30 @@ class _FakeSession implements CastSession {
   Future<void> seek(Duration p) async {}
   @override
   Future<void> disconnect() async {}
+  @override
+  Future<Duration> getPosition() async => Duration.zero;
+}
+
+class _CountingFakeSession implements CastSession {
+  int playCalled = 0;
+  int pauseCalled = 0;
+  Duration? lastSeek;
+  int disconnectCalled = 0;
+  Duration currentPosition = Duration.zero;
+
+  @override
+  CastDevice get device => const CastDevice(id: 'x', name: 'X', protocolId: 'dlna');
+  @override
+  ValueListenable<CastConnectionState> get state =>
+      ValueNotifier(CastConnectionState.connected);
+  @override
+  Future<void> play() async => playCalled++;
+  @override
+  Future<void> pause() async => pauseCalled++;
+  @override
+  Future<void> seek(Duration p) async => lastSeek = p;
+  @override
+  Future<void> disconnect() async => disconnectCalled++;
+  @override
+  Future<Duration> getPosition() async => currentPosition;
 }
