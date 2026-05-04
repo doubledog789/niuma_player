@@ -140,6 +140,17 @@ class NiumaCastPickerPanel extends StatelessWidget {
   }
 }
 
+String _formatProtocol(String id) {
+  switch (id.toLowerCase()) {
+    case 'dlna':
+      return 'DLNA';
+    case 'airplay':
+      return 'AirPlay';
+    default:
+      return id.toUpperCase();
+  }
+}
+
 class _DeviceTile extends StatelessWidget {
   const _DeviceTile({
     required this.device,
@@ -194,8 +205,8 @@ class _DeviceTile extends StatelessWidget {
                   ),
                   Text(
                     isConnected
-                        ? '已连接 · ${device.protocolId}'
-                        : device.protocolId,
+                        ? '已连接 · ${_formatProtocol(device.protocolId)}'
+                        : _formatProtocol(device.protocolId),
                     style: TextStyle(
                       color: isConnected ? accent : const Color(0x66FFFFFF),
                       fontSize: 9,
@@ -205,12 +216,12 @@ class _DeviceTile extends StatelessWidget {
               ),
             ),
             if (isConnected)
-              const SizedBox(
+              SizedBox(
                 width: 6,
                 height: 6,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Color(0xFF6DECAF),
+                    color: accent,
                     shape: BoxShape.circle,
                   ),
                 ),

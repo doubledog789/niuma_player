@@ -84,4 +84,53 @@ void main() {
     await t.tap(find.byKey(const Key('cast-panel-close')));
     expect(closed, isTrue);
   });
+
+  testWidgets('connectedDeviceId 匹配设备时高亮显示「已连接」', (t) async {
+    final ctl = FakeNiumaPlayerController();
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 800,
+          height: 400,
+          child: NiumaCastPickerPanel(
+            controller: ctl,
+            onClose: () {},
+            devices: const [
+              CastDevice(
+                id: 'tv1',
+                name: '客厅小米电视',
+                protocolId: 'dlna',
+              ),
+            ],
+            isScanning: false,
+            connectedDeviceId: 'tv1',
+            onSelectDevice: (_) async {},
+            onRefresh: () {},
+          ),
+        ),
+      ),
+    ));
+    expect(find.text('已连接 · DLNA'), findsOneWidget);
+  });
+
+  testWidgets('isScanning=true 时显示「搜索中...」', (t) async {
+    final ctl = FakeNiumaPlayerController();
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 800,
+          height: 400,
+          child: NiumaCastPickerPanel(
+            controller: ctl,
+            onClose: () {},
+            devices: const [],
+            isScanning: true,
+            onSelectDevice: (_) async {},
+            onRefresh: () {},
+          ),
+        ),
+      ),
+    ));
+    expect(find.text('搜索中...'), findsOneWidget);
+  });
 }
