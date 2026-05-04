@@ -23,10 +23,13 @@ class LongVideoDemoPage extends StatefulWidget {
 
 class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
   late final NiumaPlayerController _controller;
+  late final NiumaDanmakuController _danmaku;
 
   @override
   void initState() {
     super.initState();
+    _danmaku = NiumaDanmakuController()
+      ..addAll(_mockDanmaku());
     _controller = NiumaPlayerController(
       NiumaMediaSource.lines(
         lines: [
@@ -65,8 +68,42 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
 
   @override
   void dispose() {
+    _danmaku.dispose();
     unawaited(_controller.dispose());
     super.dispose();
+  }
+
+  /// mock 几条弹幕——按视频播放进度时间撒在 0-10 分钟内。
+  List<DanmakuItem> _mockDanmaku() {
+    const texts = [
+      'awsl 这画面太顶了',
+      '爷青回!!!',
+      '前方高能',
+      '这BGM我能单曲循环',
+      '哈哈哈哈哈哈',
+      '2026 年还在看',
+      '兔子好可爱',
+      '画质修复牛',
+      '弹幕护体',
+      '已三连',
+    ];
+    final colors = [
+      const Color(0xFFFFFFFF),
+      const Color(0xFFFFD93D),
+      const Color(0xFFFB7299),
+      const Color(0xFF6DECAF),
+      const Color(0xFF87CEFA),
+    ];
+    final items = <DanmakuItem>[];
+    for (var i = 0; i < texts.length; i++) {
+      items.add(DanmakuItem(
+        position: Duration(seconds: 3 + i * 4),
+        text: texts[i],
+        color: colors[i % colors.length],
+        fontSize: 18,
+      ));
+    }
+    return items;
   }
 
   @override
@@ -79,6 +116,7 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
             aspectRatio: 16 / 9,
             child: NiumaPlayer(
               controller: _controller,
+              danmakuController: _danmaku,
               title: '【4K修复】经典动画混剪 致敬童年',
               subtitle: '阿伟动漫研究所 · P1 童年回忆',
               // inline 显式给 config 走 _ConfigDrivenBar，避开 M9 _LegacyM9Bar
@@ -91,7 +129,26 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
                 ],
                 bottomRight: [NiumaControlButton.fullscreen],
               ),
-              fullscreenControlBarConfig: NiumaControlBarConfig.bili,
+              // 关掉 mockup 中央大圆 PlayPause——避免和 M13 双击 hud 重复
+              // 显示。底栏 PlayPauseButton + 双击切换已经够用。
+              fullscreenControlBarConfig: const NiumaControlBarConfig(
+                topLeading: [
+                  NiumaControlButton.back,
+                  NiumaControlButton.title,
+                ],
+                topActions: [NiumaControlButton.more],
+                bottomLeft: [
+                  NiumaControlButton.playPause,
+                  NiumaControlButton.danmakuToggle,
+                  NiumaControlButton.danmakuInput,
+                ],
+                bottomRight: [
+                  NiumaControlButton.speed,
+                  NiumaControlButton.lineSwitch,
+                ],
+                centerPlayPause: false,
+                showProgressBar: true,
+              ),
               chapters: const [
                 Duration(minutes: 2),
                 Duration(minutes: 5),
@@ -162,13 +219,72 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
   }
 
   void _showDanmakuInput() {
+    final textCtl = TextEditingController();
     showModalBottomSheet<void>(
       context: context,
-      builder: (_) => const Padding(
-        padding: EdgeInsets.all(16),
-        child: Text('demo 弹幕输入框（业务自实现）'),
-      ),
+      isScrollControlled: true,
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                '发条友善的弹幕',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: textCtl,
+                autofocus: true,
+                maxLength: 30,
+                decoration: const InputDecoration(
+                  hintText: '说点什么...',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (_) => _submitDanmaku(textCtl.text, sheetCtx),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(sheetCtx).pop(),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _submitDanmaku(textCtl.text, sheetCtx),
+                    child: const Text('发送'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
+  }
+
+  void _submitDanmaku(String raw, BuildContext sheetCtx) {
+    final text = raw.trim();
+    if (text.isEmpty) return;
+    // 用当前播放进度作为弹幕 position——下一次播放也能复现这条。
+    final pos = _controller.value.position;
+    _danmaku.add(DanmakuItem(
+      position: pos,
+      text: text,
+      color: const Color(0xFFFB7299),
+      fontSize: 18,
+    ));
+    Navigator.of(sheetCtx).pop();
+    _showSnack('弹幕已发送：$text');
   }
 
   void _showSnack(String msg) {

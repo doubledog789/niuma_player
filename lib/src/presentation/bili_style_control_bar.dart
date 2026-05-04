@@ -119,7 +119,9 @@ class BiliStyleControlBar extends StatelessWidget {
           left: 0,
           right: 0,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            // 右内 padding 设小让最右元素（[more] / actionsBuilder）紧贴
+            // 屏幕右边缘，对齐 mockup 视觉。
+            padding: const EdgeInsets.fromLTRB(18, 10, 4, 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,

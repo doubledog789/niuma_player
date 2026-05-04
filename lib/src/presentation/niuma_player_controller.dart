@@ -255,6 +255,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Completer<void>? _initCompleter;
   bool _disposed = false;
 
+  /// 当前激活线路的 id。初始值 = `source.defaultLineId`；[switchLine] 成功
+  /// 后更新。订阅 controller（ValueNotifier listener）能在切换时重建依赖
+  /// 此 getter 的 widget——例如 LineSwitchPill 的 label。
+  String get activeLineId => _activeLineId ?? source.defaultLineId;
+
   /// 跟踪当前激活线路的 id，以便 [switchLine] 能发出正确的
   /// [LineSwitching.fromId]。在 [switchLine] 成功时更新。
   String? _activeLineId;
