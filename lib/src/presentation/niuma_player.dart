@@ -699,11 +699,23 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 child: const SizedBox.expand(),
               ),
             ),
+            // M16: 监听 controller.danmakuVisibility（DanmakuToggle 控制的
+            // ValueNotifier）——false 时不渲染 overlay。和 M11 既有的
+            // danmaku.settings.visible 是两套独立 state：
+            //   - danmaku.settings.visible 是 NiumaDanmakuController 全局开关
+            //   - controller.danmakuVisibility 是播放器侧 UI hook（M16 加）
+            // 任意一个 false 都隐藏弹幕。
             if (widget.danmakuController != null)
               Positioned.fill(
-                child: NiumaDanmakuOverlay(
-                  video: widget.controller,
-                  danmaku: widget.danmakuController!,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: widget.controller.danmakuVisibility,
+                  builder: (ctx, visible, _) {
+                    if (!visible) return const SizedBox.shrink();
+                    return NiumaDanmakuOverlay(
+                      video: widget.controller,
+                      danmaku: widget.danmakuController!,
+                    );
+                  },
                 ),
               ),
             // 全屏：BiliStyleControlBar 用 Stack/Positioned 自己排 top/bottom/
