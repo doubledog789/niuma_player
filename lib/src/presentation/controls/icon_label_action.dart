@@ -41,7 +41,8 @@ class IconLabelAction extends StatelessWidget {
         ],
       ),
     );
-    if (!enabled) return Opacity(opacity: 0.4, child: body);
+    if (!enabled)
+      return IgnorePointer(child: Opacity(opacity: 0.4, child: body));
     return InkWell(onTap: onTap, child: body);
   }
 }
