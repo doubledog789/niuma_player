@@ -199,7 +199,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   final List<StreamSubscription<List<CastDevice>>> _castScanSubs =
       <StreamSubscription<List<CastDevice>>>[];
 
-  /// 扫描超时计时器（与 [NiumaCastPicker] 一致 8s 兜底）。
+  /// 扫描超时计时器（8s 兜底，防止无限扫描）。
   Timer? _castScanTimeout;
 
   /// 当前还在扫描的协议数。降到 0 时停止 scanning 状态。
@@ -408,7 +408,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     }
   }
 
-  /// 启动 / 重启 cast 设备扫描。复用 [NiumaCastPicker] 的 8s 兜底。
+  /// 启动 / 重启 cast 设备扫描（8s 兜底）。
   void _startCastScan() {
     _cancelCastScan();
     final services = NiumaCastRegistry.all();
@@ -711,7 +711,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            NiumaCastButton(controller: widget.controller),
+                            NiumaCastButton(controller: widget.controller, onTap: _openCastPicker),
                             PipButton(controller: widget.controller),
                           ],
                         ),

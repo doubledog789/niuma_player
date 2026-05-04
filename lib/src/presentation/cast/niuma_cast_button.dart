@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
 import '../../cast/cast_session.dart';
 import '../niuma_player_controller.dart';
-import 'niuma_cast_picker.dart';
 
 /// 投屏按钮。inline / 投屏中两态自动切。
 ///
-/// `castSession.value == null` 时显示 outlined cast 图标，tap 弹完整
-/// picker 扫描设备。`castSession.value != null` 时显示高亮 cast_connected
-/// 图标 + 设备名 chip，tap 弹简化 picker（切换 / 断开）。
+/// `castSession.value == null` 时显示 outlined cast 图标，tap 触发 [onTap]。
+/// `castSession.value != null` 时显示高亮 cast_connected 图标 + 设备名 chip，
+/// tap 同样触发 [onTap]（由调用方决定弹 picker 还是 panel）。
+///
+/// [onTap] 由宿主（如 [NiumaPlayer]）注入，默认 null（按钮显示但无操作）。
 class NiumaCastButton extends StatelessWidget {
-  const NiumaCastButton({super.key, required this.controller});
+  const NiumaCastButton({
+    super.key,
+    required this.controller,
+    this.onTap,
+  });
 
   /// 被驱动的 controller。
   final NiumaPlayerController controller;
+
+  /// tap 回调——调用方负责决定展示哪种 cast picker。
+  /// 为 null 时按钮不响应点击。
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +31,7 @@ class NiumaCastButton extends StatelessWidget {
         if (session == null) {
           return IconButton(
             icon: const Icon(Icons.cast, color: Colors.white),
-            onPressed: () => NiumaCastPicker.show(ctx, controller),
+            onPressed: onTap,
             tooltip: '投屏',
           );
         }
@@ -34,8 +43,7 @@ class NiumaCastButton extends StatelessWidget {
                 Icons.cast_connected,
                 color: Colors.lightBlueAccent,
               ),
-              onPressed: () =>
-                  NiumaCastPicker.showConnected(ctx, controller, session),
+              onPressed: onTap,
               tooltip: '投屏中',
             ),
             Flexible(
