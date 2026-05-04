@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <g transform="translate(64, 64)">
+    <polygon points="-32,-22 -42,-40 -28,-30" fill="#854F0B"/>
+    <polygon points="32,-22 42,-40 28,-30" fill="#854F0B"/>
+    <rect x="-30" y="-22" width="60" height="60" rx="22" fill="#FAC775"/>
+    <polygon points="-15,-22 -12,-30 -9,-22" fill="#854F0B"/>
+    <polygon points="0,-25 3,-33 6,-25" fill="#854F0B"/>
+    <polygon points="9,-22 12,-30 15,-22" fill="#854F0B"/>
+    <!-- 斜眼坏笑 -->
+    <path d="M -16 -3 Q -12 0 -8 -3" stroke="#1a1410" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 8 -3 Q 12 0 16 -3" stroke="#1a1410" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <rect x="-5" y="13" width="10" height="5" rx="2.5" fill="#854F0B"/>
+    <!-- 坏笑 -->
+    <path d="M -6 23 Q 0 28 6 23" stroke="#1a1410" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+  <text x="64" y="118" text-anchor="middle" fill="#7F77DD" font-family="monospace" font-size="11" font-weight="700">摸鱼</text>
+</svg>

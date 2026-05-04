@@ -48,6 +48,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  # 资源包附带的 native splash 生成器。配置见 pubspec 末尾 flutter_native_splash 段。
+  flutter_native_splash: ^2.4.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -59,6 +61,13 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # 资源包 niuma-player-assets/example/assets/{tab_icons,emoji,splash}
+  # 进 demo 的 Flutter assets——SDK 不打包这些（属于 demo 装饰类资源）
+  assets:
+    - assets/tab_icons/
+    - assets/emoji/
+    - assets/splash/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -90,3 +99,20 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# ============================================================================
+# Native Splash 配置（来自 niuma-player-assets v1.1）
+# 生成命令：dart run flutter_native_splash:create
+# 启动页背景 #0d0a08（深炭），中央居中 splash_logo@2x.png（牛马头）。
+# ============================================================================
+flutter_native_splash:
+  color: "#0d0a08"
+  image: assets/splash/splash_logo@2x.png
+  android: true
+  ios: true
+  android_12:
+    color: "#0d0a08"
+    image: assets/splash/splash_logo@2x.png
+    icon_background_color: "#0d0a08"
+  ios_content_mode: center
+  web: false
