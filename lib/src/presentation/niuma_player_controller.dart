@@ -540,9 +540,15 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     super.value = newValue;
     final inPip = newValue.isInPictureInPicture;
     final isPlaying = newValue.isPlaying;
-    // 在 PiP 中且（play↔pause 边沿 OR 刚进 PiP 还没 push 过）就同步
-    // RemoteAction 图标。出 PiP 时 reset 缓存，下次进 PiP 重新初始化。
-    if (inPip &&
+    if (!wasInPip && inPip) {
+      // 刚乐观 set isInPictureInPicture=true（[enterPictureInPicture] 内）——
+      // 此时 Activity 还没真的进 PiP，紧接着 native enterPictureInPictureMode
+      // 会用完整 params (setAspectRatio + setActions) 设置初始 RemoteAction。
+      // 这里**不 push** 一次 setActions-only 的 update，避免 OS PiP UI 收到
+      // 双重 setPictureInPictureParams 让 system controls 失效（模拟器尤其
+      // 敏感）。仅 init cache，下次 isPlaying 变化才 push。
+      _lastPipActionsIsPlaying = isPlaying;
+    } else if (inPip &&
         (isPlaying != wasPlaying || _lastPipActionsIsPlaying != isPlaying)) {
       _lastPipActionsIsPlaying = isPlaying;
       unawaited(

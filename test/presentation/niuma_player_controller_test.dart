@@ -230,10 +230,13 @@ void main() {
       final backend = _PipFakeBackend(enterPipResult: true);
       final c = _makeController(backend);
       await c.initialize();
-      // 进 PiP——乐观更新立刻把 inPip=true 写进 value，但此时 phase=ready
-      // 不是 playing，所以推 isPlaying=false。
+      // 进 PiP——乐观更新立刻把 inPip=true 写进 value。M16: 刚进 PiP 不 push
+      // updatePictureInPictureActions（依赖 native enterPictureInPictureMode
+      // 自己设的 setActions(playPauseAction)；setter 仅 init cache 避免双重
+      // setPictureInPictureParams 让 OS PiP UI 失效）。
       await c.enterPictureInPicture();
-      expect(backend.lastPipActionsIsPlaying, isFalse);
+      expect(backend.updatePipActionsCalled, 0,
+          reason: '刚进 PiP 不 push——native enterPip 自带 setActions');
       final initialCount = backend.updatePipActionsCalled;
 
       // 模拟 backend 推 phase=playing（用户点了 PiP 窗里的 play 按钮）。
