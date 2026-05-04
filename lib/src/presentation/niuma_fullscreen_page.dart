@@ -6,6 +6,9 @@ import 'package:flutter/services.dart';
 import '../domain/gesture_kind.dart';
 import '../observability/analytics_emitter.dart';
 import '../orchestration/ad_schedule.dart';
+import 'button_override.dart';
+import 'niuma_control_bar_config.dart';
+import 'niuma_control_button.dart';
 import 'niuma_danmaku_controller.dart';
 import 'niuma_gesture_layer.dart' show GestureHudBuilder;
 import 'niuma_player.dart';
@@ -44,6 +47,17 @@ class NiumaFullscreenPage extends StatefulWidget {
     this.danmakuController,
     this.disabledGestures = const {},
     this.gestureHudBuilder,
+    // M16 参数
+    this.title,
+    this.subtitle,
+    this.controlBarConfig,
+    this.fullscreenControlBarConfig = NiumaControlBarConfig.bili,
+    this.buttonOverrides,
+    this.bottomActionsBuilder,
+    this.rightRailBuilder,
+    this.moreMenuBuilder,
+    this.chapters,
+    this.onDanmakuInputTap,
   });
 
   /// 与外部 page 共享的 [NiumaPlayerController]。
@@ -75,6 +89,38 @@ class NiumaFullscreenPage extends StatefulWidget {
   /// M13: 透传给内层 [NiumaPlayer] 的 HUD builder。
   final GestureHudBuilder? gestureHudBuilder;
 
+  // ─── M16 参数 ───
+
+  /// M16: 标题（透传给内层 [NiumaPlayer.title]）。
+  final String? title;
+
+  /// M16: 副标题（透传给内层 [NiumaPlayer.subtitle]）。
+  final String? subtitle;
+
+  /// M16: inline 控件条配置（透传给内层 [NiumaPlayer.controlBarConfig]）。
+  final NiumaControlBarConfig? controlBarConfig;
+
+  /// M16: 全屏控件条配置（透传给内层 [NiumaPlayer.fullscreenControlBarConfig]）。
+  final NiumaControlBarConfig fullscreenControlBarConfig;
+
+  /// M16: 按钮级覆盖（透传给内层 [NiumaPlayer.buttonOverrides]）。
+  final Map<NiumaControlButton, ButtonOverride>? buttonOverrides;
+
+  /// M16: 底栏额外 slot（透传给内层 [NiumaPlayer.bottomActionsBuilder]）。
+  final WidgetBuilder? bottomActionsBuilder;
+
+  /// M16: 全屏右侧 rail（透传给内层 [NiumaPlayer.rightRailBuilder]）。
+  final WidgetBuilder? rightRailBuilder;
+
+  /// M16: more menu builder（透传给内层 [NiumaPlayer.moreMenuBuilder]）。
+  final List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder;
+
+  /// M16: 视频章节（透传给内层 [NiumaPlayer.chapters]）。
+  final List<Duration>? chapters;
+
+  /// M16: 弹幕输入 tap 回调（透传给内层 [NiumaPlayer.onDanmakuInputTap]）。
+  final VoidCallback? onDanmakuInputTap;
+
   /// page route 的 settings.name，保留作为子树反向识别的辅助手段；
   /// 但 `FullscreenButton` 现在主要通过内部的 InheritedWidget marker
   /// 判定（不再依赖 settings.name），避免子 route 嵌套时漏判 / 误判。
@@ -98,6 +144,17 @@ class NiumaFullscreenPage extends StatefulWidget {
     NiumaDanmakuController? danmakuController,
     Set<GestureKind> disabledGestures = const {},
     GestureHudBuilder? gestureHudBuilder,
+    // M16 参数
+    String? title,
+    String? subtitle,
+    NiumaControlBarConfig? controlBarConfig,
+    NiumaControlBarConfig fullscreenControlBarConfig = NiumaControlBarConfig.bili,
+    Map<NiumaControlButton, ButtonOverride>? buttonOverrides,
+    WidgetBuilder? bottomActionsBuilder,
+    WidgetBuilder? rightRailBuilder,
+    List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder,
+    List<Duration>? chapters,
+    VoidCallback? onDanmakuInputTap,
   }) {
     return PageRouteBuilder<void>(
       settings: const RouteSettings(name: routeName),
@@ -113,6 +170,16 @@ class NiumaFullscreenPage extends StatefulWidget {
         danmakuController: danmakuController,
         disabledGestures: disabledGestures,
         gestureHudBuilder: gestureHudBuilder,
+        title: title,
+        subtitle: subtitle,
+        controlBarConfig: controlBarConfig,
+        fullscreenControlBarConfig: fullscreenControlBarConfig,
+        buttonOverrides: buttonOverrides,
+        bottomActionsBuilder: bottomActionsBuilder,
+        rightRailBuilder: rightRailBuilder,
+        moreMenuBuilder: moreMenuBuilder,
+        chapters: chapters,
+        onDanmakuInputTap: onDanmakuInputTap,
       ),
       transitionsBuilder: (_, animation, __, child) =>
           FadeTransition(opacity: animation, child: child),
@@ -205,6 +272,18 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
             gesturesEnabledInline: false,
             disabledGestures: widget.disabledGestures,
             gestureHudBuilder: widget.gestureHudBuilder,
+            // M16 参数：全屏页内 NiumaPlayer 检测到 NiumaFullscreenScope 后
+            // 渲染 BiliStyleControlBar，这些参数才真正生效。
+            title: widget.title,
+            subtitle: widget.subtitle,
+            controlBarConfig: widget.controlBarConfig,
+            fullscreenControlBarConfig: widget.fullscreenControlBarConfig,
+            buttonOverrides: widget.buttonOverrides,
+            bottomActionsBuilder: widget.bottomActionsBuilder,
+            rightRailBuilder: widget.rightRailBuilder,
+            moreMenuBuilder: widget.moreMenuBuilder,
+            chapters: widget.chapters,
+            onDanmakuInputTap: widget.onDanmakuInputTap,
           ),
         ),
       ),

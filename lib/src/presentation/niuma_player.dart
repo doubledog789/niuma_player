@@ -448,6 +448,9 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
 
   /// 一条协议扫描结束（done / error）时减计数；归零时清 scanning 标志。
   void _onCastScanSubDone() {
+    // _cancelCastScan 会把 _castScanPendingSubs 清零，此后仍可能有
+    // stream onDone 延迟回调——加 guard 避免 underflow 到 -1。
+    if (_castScanPendingSubs <= 0) return;
     _castScanPendingSubs--;
     if (_castScanPendingSubs <= 0) {
       _castScanTimeout?.cancel();
@@ -765,7 +768,8 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     // 包一层 NiumaPlayerConfigScope，让子树（特别是 FullscreenButton）
     // 在 push 全屏 route 时能读到外层 NiumaPlayer 的全部配置——避免
     // 全屏页内部的 NiumaPlayer 丢失 adSchedule / theme / autoHide 等
-    // 关键 props。
+    // 关键 props。M16 新增 9 个参数同样透传，让全屏页里的 NiumaPlayer
+    // 能正确渲染 BiliStyleControlBar 配置。
     content = NiumaPlayerConfigScope(
       adSchedule: widget.adSchedule,
       adAnalyticsEmitter: widget.adAnalyticsEmitter,
@@ -776,6 +780,17 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       disabledGestures: widget.disabledGestures,
       gestureHudBuilder: widget.gestureHudBuilder,
       gesturesEnabledInline: widget.gesturesEnabledInline,
+      // M16 参数
+      title: widget.title,
+      subtitle: widget.subtitle,
+      controlBarConfig: widget.controlBarConfig,
+      fullscreenControlBarConfig: widget.fullscreenControlBarConfig,
+      buttonOverrides: widget.buttonOverrides,
+      bottomActionsBuilder: widget.bottomActionsBuilder,
+      rightRailBuilder: widget.rightRailBuilder,
+      moreMenuBuilder: widget.moreMenuBuilder,
+      chapters: widget.chapters,
+      onDanmakuInputTap: widget.onDanmakuInputTap,
       child: content,
     );
 
@@ -827,6 +842,17 @@ class NiumaPlayerConfigScope extends InheritedWidget {
     required this.disabledGestures,
     required this.gestureHudBuilder,
     required this.gesturesEnabledInline,
+    // M16 参数
+    required this.title,
+    required this.subtitle,
+    required this.controlBarConfig,
+    required this.fullscreenControlBarConfig,
+    required this.buttonOverrides,
+    required this.bottomActionsBuilder,
+    required this.rightRailBuilder,
+    required this.moreMenuBuilder,
+    required this.chapters,
+    required this.onDanmakuInputTap,
     required super.child,
   });
 
@@ -858,6 +884,38 @@ class NiumaPlayerConfigScope extends InheritedWidget {
   /// M13: inline 启用手势（全屏页通常不读这字段——全屏永远开）。
   final bool gesturesEnabledInline;
 
+  // ─── M16 参数 ───
+
+  /// M16: 标题（透传给全屏页 NiumaPlayer.title）。
+  final String? title;
+
+  /// M16: 副标题（透传给全屏页 NiumaPlayer.subtitle）。
+  final String? subtitle;
+
+  /// M16: inline 控件条配置（透传给全屏页 NiumaPlayer.controlBarConfig）。
+  final NiumaControlBarConfig? controlBarConfig;
+
+  /// M16: 全屏控件条配置（透传给全屏页 NiumaPlayer.fullscreenControlBarConfig）。
+  final NiumaControlBarConfig fullscreenControlBarConfig;
+
+  /// M16: 按钮级覆盖（透传给全屏页 NiumaPlayer.buttonOverrides）。
+  final Map<NiumaControlButton, ButtonOverride>? buttonOverrides;
+
+  /// M16: 底栏额外 slot（透传给全屏页 NiumaPlayer.bottomActionsBuilder）。
+  final WidgetBuilder? bottomActionsBuilder;
+
+  /// M16: 全屏右侧 rail（透传给全屏页 NiumaPlayer.rightRailBuilder）。
+  final WidgetBuilder? rightRailBuilder;
+
+  /// M16: more menu builder（透传给全屏页 NiumaPlayer.moreMenuBuilder）。
+  final List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder;
+
+  /// M16: 视频章节（透传给全屏页 NiumaPlayer.chapters）。
+  final List<Duration>? chapters;
+
+  /// M16: 弹幕输入 tap 回调（透传给全屏页 NiumaPlayer.onDanmakuInputTap）。
+  final VoidCallback? onDanmakuInputTap;
+
   /// 找最近的 [NiumaPlayerConfigScope]——存在即返回；不存在返回 null。
   static NiumaPlayerConfigScope? maybeOf(BuildContext context) {
     return context
@@ -874,7 +932,17 @@ class NiumaPlayerConfigScope extends InheritedWidget {
       danmakuController != oldWidget.danmakuController ||
       oldWidget.disabledGestures != disabledGestures ||
       oldWidget.gestureHudBuilder != gestureHudBuilder ||
-      oldWidget.gesturesEnabledInline != gesturesEnabledInline;
+      oldWidget.gesturesEnabledInline != gesturesEnabledInline ||
+      title != oldWidget.title ||
+      subtitle != oldWidget.subtitle ||
+      controlBarConfig != oldWidget.controlBarConfig ||
+      fullscreenControlBarConfig != oldWidget.fullscreenControlBarConfig ||
+      buttonOverrides != oldWidget.buttonOverrides ||
+      bottomActionsBuilder != oldWidget.bottomActionsBuilder ||
+      rightRailBuilder != oldWidget.rightRailBuilder ||
+      moreMenuBuilder != oldWidget.moreMenuBuilder ||
+      chapters != oldWidget.chapters ||
+      onDanmakuInputTap != oldWidget.onDanmakuInputTap;
 }
 
 /// noop analytics emitter——用户不传 emitter 时把事件丢掉，避免广告

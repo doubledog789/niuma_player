@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../niuma_control_bar_config.dart';
 import '../niuma_fullscreen_page.dart';
 import '../niuma_player.dart';
 import '../niuma_player_controller.dart';
@@ -62,6 +63,19 @@ class FullscreenButton extends StatelessWidget {
           danmakuController: cfg?.danmakuController,
           disabledGestures: cfg?.disabledGestures ?? const {},
           gestureHudBuilder: cfg?.gestureHudBuilder,
+          // M16 参数：从 NiumaPlayerConfigScope 读取后透传给全屏页，
+          // 确保全屏 BiliStyleControlBar 能正确渲染 mockup 配置。
+          title: cfg?.title,
+          subtitle: cfg?.subtitle,
+          controlBarConfig: cfg?.controlBarConfig,
+          fullscreenControlBarConfig:
+              cfg?.fullscreenControlBarConfig ?? NiumaControlBarConfig.bili,
+          buttonOverrides: cfg?.buttonOverrides,
+          bottomActionsBuilder: cfg?.bottomActionsBuilder,
+          rightRailBuilder: cfg?.rightRailBuilder,
+          moreMenuBuilder: cfg?.moreMenuBuilder,
+          chapters: cfg?.chapters,
+          onDanmakuInputTap: cfg?.onDanmakuInputTap,
         ),
       );
     }
