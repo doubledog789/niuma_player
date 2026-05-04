@@ -74,10 +74,14 @@ class _ScrubBarState extends State<ScrubBar> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
+              // PiP 小窗 / 折叠状态 width 可能为 0，避免下方 clamp(low, high) 在
+              // high<low 时抛 Invalid argument。
+              if (width <= 0) return const SizedBox.shrink();
               final thumbX = width * progress;
               final previewWidth = theme.thumbnailPreviewSize.width;
-              final previewLeft =
-                  (thumbX - previewWidth / 2).clamp(0.0, width - previewWidth);
+              final previewLeft = width >= previewWidth
+                  ? (thumbX - previewWidth / 2).clamp(0.0, width - previewWidth)
+                  : 0.0;
 
               double xToMs(double x) {
                 final clamped = x.clamp(0.0, width);

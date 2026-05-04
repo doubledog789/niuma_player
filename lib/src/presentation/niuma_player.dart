@@ -75,6 +75,7 @@ class NiumaPlayer extends StatefulWidget {
     this.moreMenuBuilder,
     this.chapters,
     this.onDanmakuInputTap,
+    this.actionsBuilder,
   });
 
   /// 实际驱动播放的 controller。所有内部子组件共享同一实例。
@@ -150,6 +151,10 @@ class NiumaPlayer extends StatefulWidget {
 
   /// 全屏 [DanmakuInputPill] tap 回调——业务弹自家 input bottom sheet 用。
   final VoidCallback? onDanmakuInputTap;
+
+  /// 全屏顶栏 topActions enum 之后追加的业务自定义 slot
+  /// （业务互动按钮如点赞 / 分享等）。仅全屏 [BiliStyleControlBar] 生效。
+  final WidgetBuilder? actionsBuilder;
 
   @override
   State<NiumaPlayer> createState() => _NiumaPlayerState();
@@ -489,12 +494,10 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     }
   }
 
-  /// 全屏 [BiliStyleControlBar] 的 onMore 回调——按业务 [moreMenuBuilder]
-  /// 弹原生 PopupMenu。`moreMenuBuilder` 为 null 时 no-op（按钮仍渲染但
-  /// 点了无反应——业务自己决定是否 hide 该按钮）。
+  /// 全屏 [BiliStyleControlBar] 的 onMore 回调——内置「投屏」「画中画」
+  /// 两项，之后追加业务侧 [moreMenuBuilder] 返回的条目（用分隔线隔开）。
   void _showMoreMenu(BuildContext ctx) {
-    final builder = widget.moreMenuBuilder;
-    if (builder == null) return;
+    final extra = widget.moreMenuBuilder?.call(ctx) ?? <PopupMenuEntry<dynamic>>[];
     final overlay = Overlay.of(ctx).context.findRenderObject() as RenderBox?;
     final box = ctx.findRenderObject() as RenderBox?;
     final position = (overlay != null && box != null)
@@ -510,8 +513,34 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     showMenu<dynamic>(
       context: ctx,
       position: position,
-      items: builder(ctx),
-    );
+      items: <PopupMenuEntry<dynamic>>[
+        PopupMenuItem<dynamic>(
+          value: '__niuma_cast',
+          child: Row(
+            children: const [
+              Icon(Icons.cast, size: 18),
+              SizedBox(width: 8),
+              Text('投屏'),
+            ],
+          ),
+        ),
+        PopupMenuItem<dynamic>(
+          value: '__niuma_pip',
+          child: Row(
+            children: const [
+              Icon(Icons.picture_in_picture_alt, size: 18),
+              SizedBox(width: 8),
+              Text('画中画'),
+            ],
+          ),
+        ),
+        if (extra.isNotEmpty) const PopupMenuDivider(),
+        ...extra,
+      ],
+    ).then((value) {
+      if (value == '__niuma_cast') _openCastPicker();
+      if (value == '__niuma_pip') _enterPip();
+    });
   }
 
   /// 退出全屏：当前在 [NiumaFullscreenScope] 里时 pop route；否则 no-op。
@@ -619,6 +648,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 chapters: widget.chapters,
                 controlsVisible: _controlsVisible,
                 buttonOverrides: widget.buttonOverrides,
+                actionsBuilder: widget.actionsBuilder,
                 bottomActionsBuilder: widget.bottomActionsBuilder,
                 rightRailBuilder: widget.rightRailBuilder,
                 onBack: () => _exitFullscreen(innerContext),

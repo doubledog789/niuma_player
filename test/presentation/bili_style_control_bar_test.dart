@@ -12,7 +12,7 @@ import 'package:niuma_player/src/presentation/controls/title_bar.dart';
 import 'controls/fake_controller.dart';
 
 void main() {
-  testWidgets('bili 预设：渲染顶栏 6 项 + 中央 + 底栏 + 进度条', (t) async {
+  testWidgets('bili 预设：顶栏 back/title/more + 中央 + 底栏 lineSwitch + 进度条', (t) async {
     final ctl = FakeNiumaPlayerController(
       source: NiumaMediaSource.lines(
         lines: [
@@ -50,10 +50,10 @@ void main() {
     ));
     expect(find.byType(BackAction), findsOneWidget);
     expect(find.byType(TitleBar), findsOneWidget);
-    expect(find.byType(CastAction), findsOneWidget);
-    expect(find.byType(PipAction), findsOneWidget);
-    expect(find.byType(LineSwitchPill), findsOneWidget);
     expect(find.byType(MoreAction), findsOneWidget);
+    expect(find.byType(CastAction), findsNothing); // cast/pip 现在通过 more 菜单触发
+    expect(find.byType(PipAction), findsNothing);
+    expect(find.byType(LineSwitchPill), findsOneWidget); // 在底栏
     // CenterPlayPause: bili 预设 centerPlayPause=true，不论暂停态都会构造（暂停态才显示）
     expect(find.byType(CenterPlayPause), findsOneWidget);
     expect(find.byType(ScrubBar), findsOneWidget);
@@ -127,7 +127,7 @@ void main() {
     expect(find.text('actions-marker'), findsOneWidget);
   });
 
-  testWidgets('buttonOverrides BuilderOverride 完全替换 cast 按钮', (t) async {
+  testWidgets('buttonOverrides BuilderOverride 完全替换 more 按钮', (t) async {
     final ctl = FakeNiumaPlayerController();
     await t.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -139,8 +139,8 @@ void main() {
             config: NiumaControlBarConfig.bili,
             title: '视频',
             buttonOverrides: {
-              NiumaControlButton.cast:
-                  ButtonOverride.builder((_) => const Text('custom-cast')),
+              NiumaControlButton.more:
+                  ButtonOverride.builder((_) => const Text('custom-more')),
             },
             onBack: () {},
             onCast: () {},
@@ -150,13 +150,24 @@ void main() {
         ),
       ),
     ));
-    expect(find.text('custom-cast'), findsOneWidget);
-    expect(find.byType(CastAction), findsNothing);
+    expect(find.text('custom-more'), findsOneWidget);
+    expect(find.byType(MoreAction), findsNothing);
   });
 
-  testWidgets('buttonOverrides FieldsOverride 替换 cast 字段且 onTap 可点击',
+  testWidgets('buttonOverrides FieldsOverride 替换 lineSwitch 字段且 onTap 可点击',
       (t) async {
-    final ctl = FakeNiumaPlayerController();
+    final ctl = FakeNiumaPlayerController(
+      source: NiumaMediaSource.lines(
+        lines: [
+          MediaLine(
+            id: 'high',
+            label: 'HD',
+            source: NiumaDataSource.network('https://x/h.mp4'),
+          ),
+        ],
+        defaultLineId: 'high',
+      ),
+    );
     bool tapped = false;
     await t.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -168,9 +179,9 @@ void main() {
             config: NiumaControlBarConfig.bili,
             title: '视频',
             buttonOverrides: {
-              NiumaControlButton.cast: ButtonOverride.fields(
+              NiumaControlButton.lineSwitch: ButtonOverride.fields(
                 icon: const Icon(Icons.flutter_dash),
-                label: '自定义投屏',
+                label: '自定义线路',
                 onTap: () => tapped = true,
               ),
             },
@@ -182,9 +193,9 @@ void main() {
         ),
       ),
     ));
-    expect(find.text('自定义投屏'), findsOneWidget);
+    expect(find.text('自定义线路'), findsOneWidget);
     expect(find.byIcon(Icons.flutter_dash), findsOneWidget);
-    await t.tap(find.text('自定义投屏'));
+    await t.tap(find.text('自定义线路'));
     expect(tapped, isTrue);
   });
 }

@@ -16,25 +16,21 @@ void main() {
     expect(c.showProgressBar, isTrue);
   });
 
-  test('bili 预设：顶 6 项 / 底左 2 项 / 底右 2 项 / 中央按钮启用', () {
+  test('bili 预设：顶栏 [back, title] + [more] / 底栏 [playPause+弹幕] / 中央按钮启用', () {
     const c = NiumaControlBarConfig.bili;
     expect(c.topLeading, [
       NiumaControlButton.back,
       NiumaControlButton.title,
     ]);
-    expect(c.topActions, [
-      NiumaControlButton.cast,
-      NiumaControlButton.pip,
-      NiumaControlButton.lineSwitch,
-      NiumaControlButton.more,
-    ]);
+    expect(c.topActions, [NiumaControlButton.more]);
     expect(c.bottomLeft, [
       NiumaControlButton.playPause,
-      NiumaControlButton.speed,
-    ]);
-    expect(c.bottomRight, [
       NiumaControlButton.danmakuToggle,
       NiumaControlButton.danmakuInput,
+    ]);
+    expect(c.bottomRight, [
+      NiumaControlButton.speed,
+      NiumaControlButton.lineSwitch,
     ]);
     expect(c.centerPlayPause, isTrue);
     expect(c.showProgressBar, isTrue);

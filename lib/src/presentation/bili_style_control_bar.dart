@@ -82,6 +82,19 @@ class BiliStyleControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        // PiP 小窗 / 折叠状态 width 太小塞不下 mockup 控件，整个隐藏。
+        // 阈值 280：手机竖屏最小 360-400，PiP 迷你窗 ~180-240。
+        if (constraints.maxWidth < 280) {
+          return const SizedBox.shrink();
+        }
+        return _buildContent(ctx);
+      },
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
     final gradColors = theme.controlsBackgroundGradient;
     final resolver = NiumaControlButtonResolver(

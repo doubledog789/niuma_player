@@ -82,6 +82,15 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
                 Duration(minutes: 8),
               ],
               onDanmakuInputTap: _showDanmakuInput,
+              actionsBuilder: (ctx) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  _TopActionButton(icon: Icons.thumb_up_outlined, label: '6.1万'),
+                  SizedBox(width: 12),
+                  _TopActionButton(icon: Icons.share_outlined, label: '分享'),
+                  SizedBox(width: 12),
+                ],
+              ),
               moreMenuBuilder: (ctx) => [
                 const PopupMenuItem(value: 'subtitle', child: Text('字幕设置')),
                 const PopupMenuItem(value: 'report', child: Text('反馈问题')),
@@ -155,6 +164,28 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), duration: const Duration(seconds: 1)),
+    );
+  }
+}
+
+class _TopActionButton extends StatelessWidget {
+  const _TopActionButton({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white, size: 18),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontSize: 9),
+        ),
+      ],
     );
   }
 }

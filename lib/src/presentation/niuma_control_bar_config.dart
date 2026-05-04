@@ -44,21 +44,18 @@ class NiumaControlBarConfig {
   );
 
   /// mockup B 站风格（全屏默认）。
+  /// v2（M16 follow-up）：cast/pip 收进 more 菜单，lineSwitch 移到底栏右侧。
   static const bili = NiumaControlBarConfig(
     topLeading: [NiumaControlButton.back, NiumaControlButton.title],
-    topActions: [
-      NiumaControlButton.cast,
-      NiumaControlButton.pip,
-      NiumaControlButton.lineSwitch,
-      NiumaControlButton.more,
-    ],
+    topActions: [NiumaControlButton.more],
     bottomLeft: [
       NiumaControlButton.playPause,
-      NiumaControlButton.speed,
-    ],
-    bottomRight: [
       NiumaControlButton.danmakuToggle,
       NiumaControlButton.danmakuInput,
+    ],
+    bottomRight: [
+      NiumaControlButton.speed,
+      NiumaControlButton.lineSwitch,
     ],
     centerPlayPause: true,
     showProgressBar: true,
