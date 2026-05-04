@@ -13,10 +13,11 @@ class MoreAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
     // padding/constraints 紧凑，避免 Material 默认 48dp hit area 让
-    // ⋮ 离顶栏右边缘有空隙——mockup 是贴边的。
+    // ⋮ 离顶栏右边缘有空隙——mockup 是贴边的。minWidth=24 配合
+    // BiliStyleControlBar 顶栏 Container right padding=0，让 ⋮ 距屏幕右 ~2px。
     return IconButton(
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
       icon: Icon(
         Icons.more_horiz,
         color: theme.actionIconColor,
