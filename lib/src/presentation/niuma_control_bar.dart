@@ -9,8 +9,8 @@ import 'controls/speed_selector.dart';
 import 'controls/subtitle_button.dart';
 import 'controls/time_display.dart';
 import 'controls/volume_button.dart';
+import 'control_button_resolver.dart';
 import 'niuma_control_bar_config.dart';
-import 'niuma_control_button.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
 
@@ -122,33 +122,10 @@ class _ConfigDrivenBar extends StatelessWidget {
   final NiumaPlayerController controller;
   final NiumaControlBarConfig config;
 
-  Widget? _renderDefault(NiumaControlButton btn) {
-    switch (btn) {
-      case NiumaControlButton.playPause:
-        return PlayPauseButton(controller: controller);
-      case NiumaControlButton.timeDisplay:
-        return TimeDisplay(controller: controller);
-      case NiumaControlButton.scrubBar:
-        return ScrubBar(controller: controller);
-      case NiumaControlButton.fullscreen:
-        return FullscreenButton(controller: controller);
-      case NiumaControlButton.volume:
-        return VolumeButton(controller: controller);
-      case NiumaControlButton.subtitle:
-        return const SubtitleButton();
-      case NiumaControlButton.danmakuToggle:
-        return const DanmakuButton();
-      case NiumaControlButton.speed:
-        return SpeedSelector(controller: controller);
-      // back/title/cast/pip/lineSwitch/more/danmakuInput inline 不渲染（默认全屏才用）
-      default:
-        return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
+    final resolver = NiumaControlButtonResolver(controller: controller);
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -166,10 +143,10 @@ class _ConfigDrivenBar extends StatelessWidget {
           Row(
             children: [
               for (final btn in config.bottomLeft)
-                _renderDefault(btn) ?? const SizedBox.shrink(),
+                resolver.resolveDefault(btn) ?? const SizedBox.shrink(),
               const Spacer(),
               for (final btn in config.bottomRight)
-                _renderDefault(btn) ?? const SizedBox.shrink(),
+                resolver.resolveDefault(btn) ?? const SizedBox.shrink(),
             ],
           ),
         ],

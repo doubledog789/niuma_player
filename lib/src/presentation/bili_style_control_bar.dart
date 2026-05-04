@@ -1,23 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'button_override.dart';
-import 'controls/back_action.dart';
-import 'controls/cast_action.dart';
+import 'control_button_resolver.dart';
 import 'controls/center_play_pause.dart';
-import 'controls/danmaku_input_pill.dart';
-import 'controls/danmaku_toggle.dart';
-import 'controls/fullscreen_button.dart';
 import 'controls/icon_label_action.dart';
-import 'controls/line_switch_pill.dart';
-import 'controls/more_action.dart';
-import 'controls/pip_action.dart';
-import 'controls/play_pause_button.dart';
 import 'controls/scrub_bar.dart';
-import 'controls/speed_selector.dart';
-import 'controls/subtitle_button.dart';
 import 'controls/time_display.dart';
-import 'controls/title_bar.dart';
-import 'controls/volume_button.dart';
 import 'niuma_control_bar_config.dart';
 import 'niuma_control_button.dart';
 import 'niuma_player_controller.dart';
@@ -63,7 +51,11 @@ class BiliStyleControlBar extends StatelessWidget {
   final VoidCallback? onMore;
   final VoidCallback? onDanmakuInputTap;
 
-  Widget? _resolve(BuildContext ctx, NiumaControlButton btn) {
+  Widget? _resolve(
+    BuildContext ctx,
+    NiumaControlButton btn,
+    NiumaControlButtonResolver resolver,
+  ) {
     final ov = buttonOverrides?[btn];
     if (ov is BuilderOverride) return ov.builder(ctx);
     if (ov is FieldsOverride) {
@@ -74,50 +66,16 @@ class BiliStyleControlBar extends StatelessWidget {
         onTap: ov.onTap ?? () {},
       );
     }
-    return _renderDefault(btn);
-  }
-
-  Widget? _renderDefault(NiumaControlButton btn) {
-    switch (btn) {
-      case NiumaControlButton.back:
-        return BackAction(onBack: onBack ?? () {});
-      case NiumaControlButton.title:
-        return title == null
-            ? null
-            : TitleBar(title: title!, subtitle: subtitle);
-      case NiumaControlButton.cast:
-        return CastAction(controller: controller, onTap: onCast);
-      case NiumaControlButton.pip:
-        return PipAction(controller: controller, onTap: onPip);
-      case NiumaControlButton.lineSwitch:
-        return LineSwitchPill(controller: controller);
-      case NiumaControlButton.more:
-        return MoreAction(onTap: onMore ?? () {});
-      case NiumaControlButton.playPause:
-        return PlayPauseButton(controller: controller);
-      case NiumaControlButton.speed:
-        return SpeedSelector(controller: controller);
-      case NiumaControlButton.danmakuToggle:
-        return DanmakuToggle(visibility: controller.danmakuVisibility);
-      case NiumaControlButton.danmakuInput:
-        return DanmakuInputPill(onTap: onDanmakuInputTap);
-      case NiumaControlButton.subtitle:
-        return const SubtitleButton();
-      case NiumaControlButton.volume:
-        return VolumeButton(controller: controller);
-      case NiumaControlButton.fullscreen:
-        return FullscreenButton(controller: controller);
-      case NiumaControlButton.timeDisplay:
-        return TimeDisplay(controller: controller);
-      case NiumaControlButton.scrubBar:
-        return ScrubBar(controller: controller, chapters: chapters);
-    }
+    return resolver.resolveDefault(btn);
   }
 
   Iterable<Widget> _buildList(
-      BuildContext ctx, List<NiumaControlButton> list) sync* {
+    BuildContext ctx,
+    List<NiumaControlButton> list,
+    NiumaControlButtonResolver resolver,
+  ) sync* {
     for (final btn in list) {
-      final w = _resolve(ctx, btn);
+      final w = _resolve(ctx, btn, resolver);
       if (w != null) yield w;
     }
   }
@@ -126,6 +84,17 @@ class BiliStyleControlBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
     final gradColors = theme.controlsBackgroundGradient;
+    final resolver = NiumaControlButtonResolver(
+      controller: controller,
+      title: title,
+      subtitle: subtitle,
+      chapters: chapters,
+      onBack: onBack,
+      onCast: onCast,
+      onPip: onPip,
+      onMore: onMore,
+      onDanmakuInputTap: onDanmakuInputTap,
+    );
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -145,9 +114,9 @@ class BiliStyleControlBar extends StatelessWidget {
             ),
             child: Row(
               children: [
-                ..._buildList(context, config.topLeading),
+                ..._buildList(context, config.topLeading, resolver),
                 const Spacer(),
-                ..._buildList(context, config.topActions),
+                ..._buildList(context, config.topActions, resolver),
                 if (actionsBuilder != null) actionsBuilder!(context),
               ],
             ),
@@ -198,11 +167,11 @@ class BiliStyleControlBar extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    ..._buildList(context, config.bottomLeft),
+                    ..._buildList(context, config.bottomLeft, resolver),
                     if (bottomActionsBuilder != null)
                       bottomActionsBuilder!(context),
                     const Spacer(),
-                    ..._buildList(context, config.bottomRight),
+                    ..._buildList(context, config.bottomRight, resolver),
                   ],
                 ),
               ],
