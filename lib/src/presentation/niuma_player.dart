@@ -3,16 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../cast/cast_device.dart';
+import '../cast/cast_registry.dart';
 import '../domain/gesture_kind.dart';
 import '../domain/player_state.dart';
 import '../observability/analytics_emitter.dart';
 import '../orchestration/ad_schedule.dart';
 import '../orchestration/ad_scheduler.dart';
+import 'bili_style_control_bar.dart';
+import 'button_override.dart';
 import 'cast/niuma_cast_button.dart';
 import 'cast/niuma_cast_overlay.dart';
+import 'cast/niuma_cast_picker_panel.dart';
 import 'controls/pip_button.dart';
 import 'niuma_ad_overlay.dart';
 import 'niuma_control_bar.dart';
+import 'niuma_control_bar_config.dart';
+import 'niuma_control_button.dart';
 import 'niuma_danmaku_controller.dart';
 import 'niuma_danmaku_overlay.dart';
 import 'niuma_danmaku_scope.dart';
@@ -57,6 +64,17 @@ class NiumaPlayer extends StatefulWidget {
     this.gesturesEnabledInline = false,
     this.disabledGestures = const {},
     this.gestureHudBuilder,
+    // M16：配置驱动 UI / 全屏 swap / cast picker panel
+    this.title,
+    this.subtitle,
+    this.controlBarConfig,
+    this.fullscreenControlBarConfig = NiumaControlBarConfig.bili,
+    this.buttonOverrides,
+    this.bottomActionsBuilder,
+    this.rightRailBuilder,
+    this.moreMenuBuilder,
+    this.chapters,
+    this.onDanmakuInputTap,
   });
 
   /// 实际驱动播放的 controller。所有内部子组件共享同一实例。
@@ -94,6 +112,45 @@ class NiumaPlayer extends StatefulWidget {
   /// HUD 自定义 builder。null = 用默认 [NiumaGestureHud]。
   final GestureHudBuilder? gestureHudBuilder;
 
+  // ───────────────── M16 配置驱动 UI ─────────────────
+
+  /// 标题（在全屏顶栏 [NiumaControlButton.title] 的 [TitleBar] 渲染）；
+  /// inline 状态默认走 _LegacyM9Bar 不展示标题。
+  final String? title;
+
+  /// 副标题（同 [title]）。
+  final String? subtitle;
+
+  /// inline 控件条配置：
+  /// - `null`（默认）：[NiumaControlBar] 走 M9 9 按钮老逻辑，向后兼容。
+  /// - 非 null：把 enum list 透传给 [NiumaControlBar] 走配置驱动渲染。
+  final NiumaControlBarConfig? controlBarConfig;
+
+  /// 全屏控件条配置（[BiliStyleControlBar]）。默认 [NiumaControlBarConfig.bili]。
+  final NiumaControlBarConfig fullscreenControlBarConfig;
+
+  /// 按钮级覆盖：把指定 enum 的默认 widget 替换为业务自定义内容。
+  /// 仅在全屏 [BiliStyleControlBar] 上生效（inline 暂不支持）。
+  final Map<NiumaControlButton, ButtonOverride>? buttonOverrides;
+
+  /// 底栏左侧按钮区**之后**的额外 slot——业务想塞 episode/next/prev 等播放
+  /// 列表按钮就放这里。仅全屏生效。
+  final WidgetBuilder? bottomActionsBuilder;
+
+  /// 全屏右侧 rail（垂直堆叠的浮动按钮，B 站风格"点赞 / 投币 / 收藏 / 分享"）。
+  final WidgetBuilder? rightRailBuilder;
+
+  /// 全屏 [NiumaControlButton.more] 弹出 PopupMenu 的 builder——返回 entries
+  /// list 由 [showMenu] 渲染。
+  final List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder;
+
+  /// 视频章节起点位置（透到 [ScrubBar.chapters]，全屏 BiliStyleControlBar
+  /// 进度条会画刻度）。
+  final List<Duration>? chapters;
+
+  /// 全屏 [DanmakuInputPill] tap 回调——业务弹自家 input bottom sheet 用。
+  final VoidCallback? onDanmakuInputTap;
+
   @override
   State<NiumaPlayer> createState() => _NiumaPlayerState();
 }
@@ -122,6 +179,31 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 旧 callback 仍然按闭包里的 `visible` 参数执行——会覆盖新意图。
   /// 把意图存这里，post-frame 再读字段，确保按"最后一次写入"生效。
   bool? _pendingVisibleIntent;
+
+  // ───────────── M16 cast picker panel state ─────────────
+
+  /// cast picker panel 是否当前可见。
+  bool _showCastPicker = false;
+
+  /// 弹出 panel 那一刻播放器是否在 playing——关闭 panel 时按这个决定是否
+  /// 自动恢复 play。
+  bool _wasPlayingBeforeCast = false;
+
+  /// 已发现的 cast devices（去重）。
+  final List<CastDevice> _castDevices = <CastDevice>[];
+
+  /// 当前是否在扫描 cast devices。
+  bool _isCastScanning = false;
+
+  /// 扫描产生的 [Stream] 订阅，dispose 时取消。
+  final List<StreamSubscription<List<CastDevice>>> _castScanSubs =
+      <StreamSubscription<List<CastDevice>>>[];
+
+  /// 扫描超时计时器（与 [NiumaCastPicker] 一致 8s 兜底）。
+  Timer? _castScanTimeout;
+
+  /// 当前还在扫描的协议数。降到 0 时停止 scanning 状态。
+  int _castScanPendingSubs = 0;
 
   @override
   void initState() {
@@ -173,6 +255,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _cancelCastScan();
     widget.controller.removeListener(_onValueChanged);
     _teardownOrchestrator();
     super.dispose();
@@ -294,6 +377,151 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     }
   }
 
+  // ───────────── M16 cast picker panel methods ─────────────
+
+  /// 弹出 cast picker：记录当前 isPlaying，pause 视频，开始扫描设备。
+  void _openCastPicker() {
+    if (_showCastPicker) return;
+    setState(() {
+      _wasPlayingBeforeCast = widget.controller.value.isPlaying;
+      _showCastPicker = true;
+      _castDevices.clear();
+    });
+    // pause 走 fire-and-forget——业务侧实现可能是 async。Tests 里 fake
+    // controller 同步落地，prod controller 也只是发个 platform call，
+    // 我们不必 await。
+    unawaited(widget.controller.pause());
+    _startCastScan();
+  }
+
+  /// 关闭 cast picker：隐藏 panel + 取消扫描；如果弹出前在 playing，
+  /// 恢复 play。
+  void _closeCastPicker() {
+    if (!_showCastPicker) return;
+    setState(() {
+      _showCastPicker = false;
+      _isCastScanning = false;
+    });
+    _cancelCastScan();
+    if (_wasPlayingBeforeCast) {
+      unawaited(widget.controller.play());
+    }
+  }
+
+  /// 启动 / 重启 cast 设备扫描。复用 [NiumaCastPicker] 的 8s 兜底。
+  void _startCastScan() {
+    _cancelCastScan();
+    final services = NiumaCastRegistry.all();
+    setState(() {
+      _isCastScanning = true;
+      _castScanPendingSubs = services.length;
+      _castDevices.clear();
+    });
+    if (services.isEmpty) {
+      // 没注册任何 protocol——直接停止 scanning 状态。
+      setState(() => _isCastScanning = false);
+      return;
+    }
+    for (final svc in services) {
+      _castScanSubs.add(svc.discover().listen(
+            (batch) {
+              if (!mounted) return;
+              setState(() {
+                for (final d in batch) {
+                  if (!_castDevices.any((e) => e.id == d.id)) {
+                    _castDevices.add(d);
+                  }
+                }
+              });
+            },
+            onDone: _onCastScanSubDone,
+            onError: (_) => _onCastScanSubDone(),
+          ));
+    }
+    _castScanTimeout = Timer(const Duration(seconds: 8), () {
+      if (!mounted) return;
+      if (_isCastScanning) {
+        setState(() => _isCastScanning = false);
+      }
+    });
+  }
+
+  /// 一条协议扫描结束（done / error）时减计数；归零时清 scanning 标志。
+  void _onCastScanSubDone() {
+    _castScanPendingSubs--;
+    if (_castScanPendingSubs <= 0) {
+      _castScanTimeout?.cancel();
+      _castScanTimeout = null;
+      if (!mounted) return;
+      setState(() => _isCastScanning = false);
+    }
+  }
+
+  void _cancelCastScan() {
+    for (final s in _castScanSubs) {
+      unawaited(s.cancel());
+    }
+    _castScanSubs.clear();
+    _castScanTimeout?.cancel();
+    _castScanTimeout = null;
+    _castScanPendingSubs = 0;
+  }
+
+  /// 选定 cast 设备：连接对应 protocol 的 service，把 session 推给
+  /// controller，关 panel。出错时弹 toast 并保持 panel。
+  Future<void> _onSelectCastDevice(CastDevice device) async {
+    final svc = NiumaCastRegistry.byProtocolId(device.protocolId);
+    if (svc == null) return;
+    // 先关 panel——用户体感"点了就关"；连接异步进行。
+    setState(() => _showCastPicker = false);
+    _cancelCastScan();
+    try {
+      final session = await svc.connect(device, widget.controller);
+      // controller.connectCast 会自己 pause 本地 backend 并 emit CastStarted。
+      await widget.controller.connectCast(session);
+    } catch (e) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.showSnackBar(SnackBar(content: Text('连接失败：$e')));
+    }
+  }
+
+  /// 全屏 [BiliStyleControlBar] 的 onMore 回调——按业务 [moreMenuBuilder]
+  /// 弹原生 PopupMenu。`moreMenuBuilder` 为 null 时 no-op（按钮仍渲染但
+  /// 点了无反应——业务自己决定是否 hide 该按钮）。
+  void _showMoreMenu(BuildContext ctx) {
+    final builder = widget.moreMenuBuilder;
+    if (builder == null) return;
+    final overlay = Overlay.of(ctx).context.findRenderObject() as RenderBox?;
+    final box = ctx.findRenderObject() as RenderBox?;
+    final position = (overlay != null && box != null)
+        ? RelativeRect.fromRect(
+            Rect.fromPoints(
+              box.localToGlobal(Offset.zero, ancestor: overlay),
+              box.localToGlobal(box.size.bottomRight(Offset.zero),
+                  ancestor: overlay),
+            ),
+            Offset.zero & overlay.size,
+          )
+        : const RelativeRect.fromLTRB(1000, 80, 0, 0);
+    showMenu<dynamic>(
+      context: ctx,
+      position: position,
+      items: builder(ctx),
+    );
+  }
+
+  /// 退出全屏：当前在 [NiumaFullscreenScope] 里时 pop route；否则 no-op。
+  void _exitFullscreen(BuildContext ctx) {
+    final nav = Navigator.maybeOf(ctx);
+    if (nav != null && nav.canPop()) nav.pop();
+  }
+
+  /// 进入 PiP：直接代到 controller。失败静默忽略。
+  void _enterPip() {
+    unawaited(widget.controller.enterPictureInPicture());
+  }
+
   // ───────────── @visibleForTesting accessors ─────────────
   // 这一组 getter / wrapper 只供单测访问内部状态——日常代码不要用。
 
@@ -309,6 +537,22 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// post-frame 入队分支。
   @visibleForTesting
   void debugSetControlsVisible(bool visible) => _setControlsVisible(visible);
+
+  /// 测试用：当前 `_showCastPicker` 字段值。
+  @visibleForTesting
+  bool get debugShowCastPicker => _showCastPicker;
+
+  /// 测试用：当前 `_wasPlayingBeforeCast` 字段值。
+  @visibleForTesting
+  bool get debugWasPlayingBeforeCast => _wasPlayingBeforeCast;
+
+  /// 测试用：直接调 [_openCastPicker]。
+  @visibleForTesting
+  void debugOpenCastPicker() => _openCastPicker();
+
+  /// 测试用：直接调 [_closeCastPicker]。
+  @visibleForTesting
+  void debugCloseCastPicker() => _closeCastPicker();
 
   void _onTapVideo() {
     // 广告 cue 活跃时把 tap 让给 NiumaAdOverlay（它自己有 dismissOnTap
@@ -353,6 +597,38 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         // controller.value 变化以外的交互（仅本地 widget state 变化的拖动）
         // 才需要这一层兜底；不做的话 ScrubBar drag 期间 _onValueChanged
         // 不 fire，timer 一直跑到底。
+        // M16：全屏（NiumaFullscreenScope 注入）走 BiliStyleControlBar，
+        // inline 走原 NiumaControlBar——同一棵树，按当前 BuildContext
+        // 是否在 fullscreen scope 里 swap。
+        final isFullscreen =
+            NiumaFullscreenScope.maybeOf(innerContext) != null;
+
+        // 全屏底栏：BiliStyleControlBar 自带 top + bottom + center + rail，
+        // 替代 inline 模式下的 [NiumaCastButton + PipButton] 右上 actions
+        // 区（这两个按钮在全屏的 topActions enum 里有重渲染入口）。
+        // inline：保留 M9 行为——NiumaControlBar 在底部 + 右上 Cast/PiP 浮层。
+        final controlBarLayer = isFullscreen
+            ? BiliStyleControlBar(
+                controller: widget.controller,
+                config: widget.fullscreenControlBarConfig,
+                title: widget.title,
+                subtitle: widget.subtitle,
+                chapters: widget.chapters,
+                controlsVisible: _controlsVisible,
+                buttonOverrides: widget.buttonOverrides,
+                bottomActionsBuilder: widget.bottomActionsBuilder,
+                rightRailBuilder: widget.rightRailBuilder,
+                onBack: () => _exitFullscreen(innerContext),
+                onCast: _openCastPicker,
+                onPip: _enterPip,
+                onMore: () => _showMoreMenu(innerContext),
+                onDanmakuInputTap: widget.onDanmakuInputTap,
+              )
+            : NiumaControlBar(
+                controller: widget.controller,
+                config: widget.controlBarConfig,
+              );
+
         // PiP 模式下整个浮层组（手势层 / 弹幕 / 控件条 / PipButton / 广告）
         // 隐藏，只剩裸 NiumaPlayerView——
         //   1. 行为契合"画中画窗只放画面"的产品语义；
@@ -373,8 +649,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
             Positioned.fill(
               child: NiumaGestureLayer(
                 controller: widget.controller,
-                enabled: NiumaFullscreenScope.maybeOf(innerContext) != null ||
-                    widget.gesturesEnabledInline,
+                enabled: isFullscreen || widget.gesturesEnabledInline,
                 disabledGestures: widget.disabledGestures,
                 hudBuilder: widget.gestureHudBuilder,
                 onTap: _onTapVideo,
@@ -388,43 +663,60 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   danmaku: widget.danmakuController!,
                 ),
               ),
-            AnimatedOpacity(
-              opacity: _controlsVisible ? 1.0 : 0.0,
-              duration: fadeDuration,
-              child: IgnorePointer(
-                ignoring: !_controlsVisible,
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: NiumaControlBar(controller: widget.controller),
+            // 全屏：BiliStyleControlBar 用 Stack/Positioned 自己排 top/bottom/
+            // center/rail，必须铺满整个浮层 Stack——把它放在独立的
+            // Positioned.fill 槽里。inline：保留 M9 老行为，Align bottom。
+            if (isFullscreen)
+              Positioned.fill(
+                child: AnimatedOpacity(
+                  opacity: _controlsVisible ? 1.0 : 0.0,
+                  duration: fadeDuration,
+                  child: IgnorePointer(
+                    ignoring: !_controlsVisible,
+                    child: controlBarLayer,
+                  ),
+                ),
+              )
+            else
+              AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: fadeDuration,
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: controlBarLayer,
+                  ),
                 ),
               ),
-            ),
-            // M12: 右上角 PipButton 浮层，跟控件条 auto-hide 同步
-            AnimatedOpacity(
-              opacity: _controlsVisible ? 1.0 : 0.0,
-              duration: fadeDuration,
-              child: IgnorePointer(
-                ignoring: !_controlsVisible,
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      // 右上 actions 区——投屏 + PiP 集中放这里，跟主流
-                      // 播放器的"top-right action bar"惯例一致，不再挤
-                      // 底部 ControlBar。
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          NiumaCastButton(controller: widget.controller),
-                          PipButton(controller: widget.controller),
-                        ],
+            // M12: 右上角 PipButton + Cast 浮层（仅 inline；全屏的 Cast/PiP
+            // 在 BiliStyleControlBar 的 topActions 里走 enum 渲染）。
+            if (!isFullscreen)
+              AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: fadeDuration,
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        // 右上 actions 区——投屏 + PiP 集中放这里，跟主流
+                        // 播放器的"top-right action bar"惯例一致，不再挤
+                        // 底部 ControlBar。
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            NiumaCastButton(controller: widget.controller),
+                            PipButton(controller: widget.controller),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
             if (_orchestrator != null)
               Positioned.fill(
                 child: NiumaAdOverlay(
@@ -432,6 +724,19 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   videoController: widget.controller,
                   emitter: widget.adAnalyticsEmitter ?? _noopEmitter,
                   pauseVideoWhileShowing: widget.pauseVideoDuringAd,
+                ),
+              ),
+            // M16: cast picker panel——铺整个 player，左暗 + 右设备列表。
+            // 放在 ad overlay 之上，cast picker 时屏蔽广告。
+            if (_showCastPicker)
+              Positioned.fill(
+                child: NiumaCastPickerPanel(
+                  controller: widget.controller,
+                  onClose: _closeCastPicker,
+                  devices: _castDevices,
+                  isScanning: _isCastScanning,
+                  onSelectDevice: _onSelectCastDevice,
+                  onRefresh: _startCastScan,
                 ),
               ),
           ],
@@ -588,3 +893,16 @@ SchedulerPhase? debugSchedulerPhaseOverride;
 /// 私有 [State] 类公开。
 @visibleForTesting
 typedef NiumaPlayerStateForTesting = _NiumaPlayerState;
+
+/// 测试用别名——指向 [NiumaFullscreenScope]，让单测能在不引内部路径的情况下
+/// 包一层 fullscreen marker，触发 NiumaPlayer 的 BiliStyleControlBar swap。
+@visibleForTesting
+typedef NiumaFullscreenScopeForTesting = NiumaFullscreenScope;
+
+/// 测试用别名——指向 [BiliStyleControlBar] 类型，单测 `find.byType` 用。
+@visibleForTesting
+typedef BiliStyleControlBarTypeForTesting = BiliStyleControlBar;
+
+/// 测试用别名——指向 [NiumaCastPickerPanel] 类型，单测 `find.byType` 用。
+@visibleForTesting
+typedef NiumaCastPickerPanelTypeForTesting = NiumaCastPickerPanel;

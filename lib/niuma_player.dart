@@ -43,6 +43,17 @@ export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;
 // M9 控件条组合
 export 'src/presentation/niuma_control_bar.dart' show NiumaControlBar;
 
+// M16 配置驱动 UI（控件 enum / config / 按钮覆盖）
+export 'src/presentation/niuma_control_button.dart' show NiumaControlButton;
+export 'src/presentation/niuma_control_bar_config.dart'
+    show NiumaControlBarConfig;
+export 'src/presentation/button_override.dart'
+    show ButtonOverride, BuilderOverride, FieldsOverride;
+export 'src/presentation/bili_style_control_bar.dart'
+    show BiliStyleControlBar;
+export 'src/presentation/cast/niuma_cast_picker_panel.dart'
+    show NiumaCastPickerPanel;
+
 // M9 广告 overlay
 export 'src/presentation/niuma_ad_overlay.dart' show NiumaAdOverlay;
 
