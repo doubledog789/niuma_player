@@ -167,20 +167,16 @@ class BiliStyleControlBar extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 进度条 row：TimeDisplay 显示 "mm:ss / mm:ss"（current / total）一段字符串
-                if (config.showProgressBar)
-                  Row(
-                    children: [
-                      TimeDisplay(controller: controller),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ScrubBar(
-                          controller: controller,
-                          chapters: chapters,
-                        ),
-                      ),
-                    ],
+                // mockup 风格：时间独占一行（左对齐），进度条独占一行——
+                // 不挤在同一 Row。
+                if (config.showProgressBar) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TimeDisplay(controller: controller),
                   ),
+                  const SizedBox(height: 4),
+                  ScrubBar(controller: controller, chapters: chapters),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [

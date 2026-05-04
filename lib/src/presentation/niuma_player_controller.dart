@@ -553,7 +553,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     _backend = backend;
     _valueSub = backend.valueStream.listen((v) {
       if (_disposed) return;
-      value = v;
+      // backend 不知道 platform-level PiP 状态——它推送的 NiumaPlayerValue
+      // isInPictureInPicture 默认 false，会覆盖 controller 通过
+      // PipModeChanged event 维护的真实 PiP state。保留 controller 自己的
+      // PiP state，否则 PiP 期间 RemoteAction icon 同步 chain 断裂
+      // （setter 检测 inPip=false 就不 push updatePictureInPictureActions）。
+      value = v.copyWith(isInPictureInPicture: value.isInPictureInPicture);
     });
     _eventSub = backend.eventStream.listen((e) {
       if (_disposed) return;
@@ -619,6 +624,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       '[niuma_player] play() backend=${_backend?.kind.name ?? "<null>"}',
     );
     await _backend?.play();
+    // PiP 期间立即同步 RemoteAction icon——不等 valueStream 异步 round-trip
+    // （某些 backend 推送 value 时机不稳定 / 可能被覆盖）。
+    if (value.isInPictureInPicture) {
+      unawaited(_backend?.updatePictureInPictureActions(isPlaying: true));
+    }
   }
 
   Future<void> pause() async {
@@ -631,6 +641,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       '[niuma_player] pause() backend=${_backend?.kind.name ?? "<null>"}',
     );
     await _backend?.pause();
+    if (value.isInPictureInPicture) {
+      unawaited(_backend?.updatePictureInPictureActions(isPlaying: false));
+    }
   }
 
   Future<void> seekTo(Duration position) async {

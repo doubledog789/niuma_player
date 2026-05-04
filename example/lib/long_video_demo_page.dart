@@ -27,12 +27,28 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
   @override
   void initState() {
     super.initState();
-    _controller = NiumaPlayerController.dataSource(
-      NiumaDataSource.network(
-        'https://artplayer.org/assets/sample/bbb-video.mp4',
+    _controller = NiumaPlayerController(
+      NiumaMediaSource.lines(
+        lines: [
+          MediaLine(
+            id: 'line1',
+            label: '线路一',
+            source: NiumaDataSource.network(
+              'https://artplayer.org/assets/sample/bbb-video.mp4',
+            ),
+          ),
+          MediaLine(
+            id: 'line2',
+            label: '线路二',
+            source: NiumaDataSource.network(
+              'https://artplayer.org/assets/sample/bbb-video.mp4',
+            ),
+          ),
+        ],
+        defaultLineId: 'line1',
+        thumbnailVtt:
+            'https://artplayer.org/assets/sample/bbb-thumbnails.vtt',
       ),
-      thumbnailVtt:
-          'https://artplayer.org/assets/sample/bbb-thumbnails.vtt',
     );
     unawaited(_initialize());
   }
