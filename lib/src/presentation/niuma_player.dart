@@ -24,6 +24,7 @@ import 'niuma_danmaku_overlay.dart';
 import 'niuma_danmaku_scope.dart';
 import 'niuma_fullscreen_page.dart' show NiumaFullscreenScope;
 import 'niuma_gesture_layer.dart';
+import 'niuma_loading_indicator.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
 import 'niuma_player_view.dart';
@@ -785,6 +786,23 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   onRefresh: _startCastScan,
                 ),
               ),
+            // 缓冲 / 打开阶段中央 loading 浮层（资源包 niuma 头 + 旋转
+            // bug + 脉动点）——所有别的浮层之上，避免被遮。inline + 全屏
+            // 都走这层；只看 phase，不看 controlsVisible（loading 时控件
+            // 也可能 fade 走了）。
+            Positioned.fill(
+              child: ValueListenableBuilder<NiumaPlayerValue>(
+                valueListenable: widget.controller,
+                builder: (ctx, v, _) {
+                  final loading = v.phase == PlayerPhase.opening ||
+                      v.phase == PlayerPhase.buffering;
+                  if (!loading) return const SizedBox.shrink();
+                  return const IgnorePointer(
+                    child: Center(child: NiumaLoadingIndicator()),
+                  );
+                },
+              ),
+            ),
             // M16: pausedOverlayBuilder——视频暂停时中央渲染业务自定义
             // overlay（典型用例：可点击的 "▶ 继续播放" 圆按钮）。inline +
             // fullscreen 都走这层；放在 ad overlay / cast picker 之上。

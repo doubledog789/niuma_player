@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- 旋转的小 Bug -->
+  <g>
+    <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="2s" repeatCount="indefinite"/>
+    <g transform="translate(100, 30)">
+      <ellipse cx="0" cy="0" rx="10" ry="6" fill="#1a1410"/>
+      <line x1="-7" y1="-5" x2="-13" y2="-12" stroke="#1a1410" stroke-width="3" stroke-linecap="round"/>
+      <line x1="7" y1="-5" x2="13" y2="-12" stroke="#1a1410" stroke-width="3" stroke-linecap="round"/>
+      <line x1="-9" y1="0" x2="-15" y2="0" stroke="#1a1410" stroke-width="3" stroke-linecap="round"/>
+      <line x1="9" y1="0" x2="15" y2="0" stroke="#1a1410" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- 中央牛马头 (×× 眼跟随表情切换) -->
+  <g transform="translate(100, 100)">
+    <polygon points="-32,-22 -42,-40 -28,-30" fill="#854F0B"/>
+    <polygon points="32,-22 42,-40 28,-30" fill="#854F0B"/>
+    <rect x="-30" y="-22" width="60" height="60" rx="22" fill="#FAC775"/>
+    <polygon points="-15,-22 -12,-30 -9,-22" fill="#854F0B"/>
+    <polygon points="0,-25 3,-33 6,-25" fill="#854F0B"/>
+    <polygon points="9,-22 12,-30 15,-22" fill="#854F0B"/>
+
+    <!-- 眼睛闪烁 -->
+    <g>
+      <line x1="-16" y1="-3" x2="-10" y2="3" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="-16" y1="3" x2="-10" y2="-3" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="10" y1="-3" x2="16" y2="3" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="10" y1="3" x2="16" y2="-3" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+      <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/>
+    </g>
+
+    <rect x="-5" y="13" width="10" height="5" rx="2.5" fill="#854F0B"/>
+    <ellipse cx="0" cy="26" rx="3" ry="2" fill="#1a1410"/>
+  </g>
+
+  <!-- 底部加载点 -->
+  <g transform="translate(100, 170)">
+    <circle cx="-12" cy="0" r="3" fill="#EF9F27">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="0" cy="0" r="3" fill="#EF9F27">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="12" cy="0" r="3" fill="#EF9F27">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>

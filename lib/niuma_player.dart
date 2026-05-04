@@ -37,6 +37,10 @@ export 'src/presentation/niuma_player_theme.dart'
 export 'src/presentation/niuma_player.dart' show NiumaPlayer;
 export 'src/presentation/niuma_fullscreen_page.dart' show NiumaFullscreenPage;
 
+// 缓冲 / 打开阶段中央 loading 动画（牛马头 + 旋转 bug + 脉动点）
+export 'src/presentation/niuma_loading_indicator.dart'
+    show NiumaLoadingIndicator;
+
 // M9 缩略图悬浮预览
 export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;
 
