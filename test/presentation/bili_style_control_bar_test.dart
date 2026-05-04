@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/presentation/bili_style_control_bar.dart';
-import 'package:niuma_player/src/presentation/button_override.dart';
 import 'package:niuma_player/src/presentation/controls/back_action.dart';
 import 'package:niuma_player/src/presentation/controls/cast_action.dart';
 import 'package:niuma_player/src/presentation/controls/center_play_pause.dart';
@@ -10,8 +8,6 @@ import 'package:niuma_player/src/presentation/controls/line_switch_pill.dart';
 import 'package:niuma_player/src/presentation/controls/more_action.dart';
 import 'package:niuma_player/src/presentation/controls/pip_action.dart';
 import 'package:niuma_player/src/presentation/controls/title_bar.dart';
-import 'package:niuma_player/src/presentation/niuma_control_bar_config.dart';
-import 'package:niuma_player/src/presentation/niuma_control_button.dart';
 
 import 'controls/fake_controller.dart';
 

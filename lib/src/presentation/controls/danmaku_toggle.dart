@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../niuma_player_theme.dart';
 
-/// 弹幕开关——可视化 toggle，state 驱动外部 [ValueNotifier]<bool>。
+/// 弹幕开关——可视化 toggle，state 驱动外部 `ValueNotifier<bool>`。
 ///
 /// 业务接弹幕系统时监听同一 ValueNotifier 决定是否渲染弹幕层。
 class DanmakuToggle extends StatelessWidget {

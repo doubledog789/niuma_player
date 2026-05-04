@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/presentation/cast/niuma_cast_picker_panel.dart';
 
 import '../controls/fake_controller.dart';
 
