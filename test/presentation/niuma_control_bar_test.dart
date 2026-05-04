@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/presentation/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/niuma_control_button.dart';
 
 import 'controls/fake_controller.dart';
 
@@ -167,5 +169,43 @@ void main() {
     ));
     expect(find.byType(NiumaCastButton), findsNothing,
         reason: 'Cast 按钮已经移到 NiumaPlayer 顶部 actions 区，不再挤 ControlBar');
+  });
+
+  group('M16 config', () {
+    testWidgets('config=null（默认）时仍渲染 M9 9 按钮（向后兼容）', (t) async {
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 200,
+            child: NiumaControlBar(controller: ctl),
+          ),
+        ),
+      ));
+      expect(find.byType(PlayPauseButton), findsOneWidget);
+      expect(find.byType(VolumeButton), findsOneWidget);
+      expect(find.byType(FullscreenButton), findsOneWidget);
+    });
+
+    testWidgets('config=minimal 时只渲染 minimal 预设的按钮', (t) async {
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 200,
+            child: NiumaControlBar(
+              controller: ctl,
+              config: NiumaControlBarConfig.minimal,
+            ),
+          ),
+        ),
+      ));
+      expect(find.byType(PlayPauseButton), findsOneWidget);
+      expect(find.byType(FullscreenButton), findsOneWidget);
+      expect(find.byType(VolumeButton), findsNothing);
+      expect(find.byType(SubtitleButton), findsNothing);
+    });
   });
 }

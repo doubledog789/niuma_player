@@ -9,6 +9,8 @@ import 'controls/speed_selector.dart';
 import 'controls/subtitle_button.dart';
 import 'controls/time_display.dart';
 import 'controls/volume_button.dart';
+import 'niuma_control_bar_config.dart';
+import 'niuma_control_button.dart';
 import 'niuma_player_controller.dart';
 import 'niuma_player_theme.dart';
 
@@ -33,11 +35,36 @@ import 'niuma_player_theme.dart';
 ///
 /// 调用方覆盖外观的方式：在 [NiumaControlBar] 之上挂一层
 /// [NiumaPlayerThemeData]，调整 13 个主题字段中需要变的那几个。
+///
+/// M16：传入 [config] 可切换为配置驱动模式；不传（默认 null）走 M9 老逻辑，
+/// 向后兼容。
 class NiumaControlBar extends StatelessWidget {
   /// 创建一个 [NiumaControlBar]。
-  const NiumaControlBar({super.key, required this.controller});
+  const NiumaControlBar({
+    super.key,
+    required this.controller,
+    this.config,
+  });
 
   /// 该控件条观察 / 控制的 player controller。所有原子控件共享同一实例。
+  final NiumaPlayerController controller;
+
+  /// M16 配置：传入时按 enum list 渲染；不传时走 M9 9 按钮老逻辑（向后兼容）。
+  final NiumaControlBarConfig? config;
+
+  @override
+  Widget build(BuildContext context) {
+    if (config != null) {
+      return _ConfigDrivenBar(controller: controller, config: config!);
+    }
+    return _LegacyM9Bar(controller: controller);
+  }
+}
+
+/// M9 9 按钮 layout，原 NiumaControlBar 实现照搬，行为不变。
+class _LegacyM9Bar extends StatelessWidget {
+  const _LegacyM9Bar({required this.controller});
+
   final NiumaPlayerController controller;
 
   @override
@@ -84,6 +111,69 @@ class NiumaControlBar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// M16 配置驱动 layout：按 enum list 渲染。
+class _ConfigDrivenBar extends StatelessWidget {
+  const _ConfigDrivenBar({required this.controller, required this.config});
+
+  final NiumaPlayerController controller;
+  final NiumaControlBarConfig config;
+
+  Widget? _renderDefault(NiumaControlButton btn) {
+    switch (btn) {
+      case NiumaControlButton.playPause:
+        return PlayPauseButton(controller: controller);
+      case NiumaControlButton.timeDisplay:
+        return TimeDisplay(controller: controller);
+      case NiumaControlButton.scrubBar:
+        return ScrubBar(controller: controller);
+      case NiumaControlButton.fullscreen:
+        return FullscreenButton(controller: controller);
+      case NiumaControlButton.volume:
+        return VolumeButton(controller: controller);
+      case NiumaControlButton.subtitle:
+        return const SubtitleButton();
+      case NiumaControlButton.danmakuToggle:
+        return const DanmakuButton();
+      case NiumaControlButton.speed:
+        return SpeedSelector(controller: controller);
+      // back/title/cast/pip/lineSwitch/more/danmakuInput inline 不渲染（默认全屏才用）
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = NiumaPlayerTheme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: theme.controlsBackgroundGradient,
+        ),
+      ),
+      padding: theme.controlBarPadding,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (config.showProgressBar) ScrubBar(controller: controller),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              for (final btn in config.bottomLeft)
+                _renderDefault(btn) ?? const SizedBox.shrink(),
+              const Spacer(),
+              for (final btn in config.bottomRight)
+                _renderDefault(btn) ?? const SizedBox.shrink(),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
