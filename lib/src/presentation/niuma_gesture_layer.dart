@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../domain/gesture_feedback_state.dart';
 import '../domain/gesture_kind.dart';
 import '../domain/player_state.dart';
+import '../niuma_sdk_assets.dart';
 import 'niuma_gesture_hud.dart';
 import 'niuma_player_controller.dart';
 import 'video_time_format.dart';
@@ -111,6 +112,7 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
         progress: 1.0,
         label: '已暂停',
         icon: Icons.pause,
+        iconAsset: NiumaSdkAssets.icPause,
       ));
     } else {
       widget.controller.play();
@@ -119,6 +121,7 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
         progress: 1.0,
         label: '播放中',
         icon: Icons.play_arrow,
+        iconAsset: NiumaSdkAssets.icPlay,
       ));
     }
     _scheduleHide();
@@ -133,6 +136,7 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
       progress: 1.0,
       label: '2x 倍速',
       icon: Icons.fast_forward,
+      iconAsset: NiumaSdkAssets.icSpeedAlt,
     ));
   }
 
@@ -202,6 +206,9 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
           label: '${seekDeltaMs >= 0 ? '+' : ''}${seekDeltaMs ~/ 1000}s '
               '/ ${formatVideoTime(clamped)} / ${formatVideoTime(duration)}',
           icon: Icons.fast_forward,
+          iconAsset: seekDeltaMs >= 0
+              ? NiumaSdkAssets.icForward10
+              : NiumaSdkAssets.icRewind10,
         ));
       case GestureKind.brightness:
       case GestureKind.volume:
@@ -230,6 +237,10 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
           icon: _lockedKind == GestureKind.brightness
               ? Icons.brightness_6
               : Icons.volume_up,
+          // 资源包没提供亮度 SVG，亮度走 Material；音量走 niuma SVG。
+          iconAsset: _lockedKind == GestureKind.volume
+              ? NiumaSdkAssets.icVolume
+              : null,
         ));
       case GestureKind.doubleTap:
       case GestureKind.longPressSpeed:

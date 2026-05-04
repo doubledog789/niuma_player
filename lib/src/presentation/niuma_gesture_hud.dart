@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/gesture_feedback_state.dart';
 import '../domain/gesture_kind.dart';
+import 'controls/niuma_sdk_icon.dart';
 import 'glass_card.dart';
 
 /// 默认手势 HUD（B 站 / YouTube 风）。
@@ -104,7 +105,10 @@ class _ValueCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state.icon != null) ...[
+          if (state.iconAsset != null) ...[
+            NiumaSdkIcon(asset: state.iconAsset!, color: accent, size: 36),
+            const SizedBox(height: 10),
+          ] else if (state.icon != null) ...[
             Icon(state.icon, color: accent, size: 36),
             const SizedBox(height: 10),
           ],
@@ -139,7 +143,14 @@ class _SpeedPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state.icon != null) ...[
+          if (state.iconAsset != null) ...[
+            NiumaSdkIcon(
+              asset: state.iconAsset!,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 6),
+          ] else if (state.icon != null) ...[
             Icon(state.icon, color: Colors.white, size: 18),
             const SizedBox(width: 6),
           ],
@@ -179,9 +190,17 @@ class _IconFlash extends StatelessWidget {
               width: 0.5,
             ),
           ),
-          child: state.icon != null
-              ? Icon(state.icon, color: Colors.white, size: 44)
-              : null,
+          child: state.iconAsset != null
+              ? Center(
+                  child: NiumaSdkIcon(
+                    asset: state.iconAsset!,
+                    color: Colors.white,
+                    size: 44,
+                  ),
+                )
+              : (state.icon != null
+                  ? Icon(state.icon, color: Colors.white, size: 44)
+                  : null),
         ),
         if (state.label != null) ...[
           const SizedBox(height: 8),

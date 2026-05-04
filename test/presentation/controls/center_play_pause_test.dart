@@ -14,7 +14,7 @@ void main() {
         body: CenterPlayPause(controller: ctl, visible: true),
       ),
     ));
-    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icPlayCircle), findsOneWidget);
   });
 
   testWidgets('播放态时不渲染', (t) async {
@@ -24,7 +24,7 @@ void main() {
         body: CenterPlayPause(controller: ctl, visible: true),
       ),
     ));
-    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsNothing);
+    expect(findNiumaIcon(NiumaSdkAssets.icPlayCircle), findsNothing);
   });
 
   testWidgets('暂停 + visible=false 时不渲染', (t) async {
@@ -34,6 +34,6 @@ void main() {
         body: CenterPlayPause(controller: ctl, visible: false),
       ),
     ));
-    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsNothing);
+    expect(findNiumaIcon(NiumaSdkAssets.icPlayCircle), findsNothing);
   });
 }

@@ -18,7 +18,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icPlayCircle), findsOneWidget);
   });
 
   testWidgets('容器尺寸 == theme.pauseIndicatorSize', (tester) async {

@@ -36,7 +36,7 @@ class NiumaShortVideoPauseIndicator extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: NiumaSdkIcon(
-            asset: NiumaSdkAssets.icPlay,
+            asset: NiumaSdkAssets.icPlayCircle,
             color: theme.pauseIndicatorIconColor,
             size: theme.pauseIndicatorIconSize,
           ),

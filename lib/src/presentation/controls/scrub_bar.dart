@@ -4,6 +4,7 @@ import '../../domain/player_state.dart';
 import '../niuma_fullscreen_page.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
+import '../niuma_progress_thumb.dart';
 import '../niuma_scrub_preview.dart';
 
 /// B 站风格密集进度条。
@@ -42,7 +43,41 @@ class _ScrubBarState extends State<ScrubBar> {
   /// 拖动中的目标位置（毫秒）；`null` 表示不在拖动中。
   double? _scrubMs;
 
+  /// 上一帧 scrubMs / 时间，用来给 [NiumaProgressThumb] 算 seekDirection +
+  /// seekSpeed。pointer up 后清零。
+  double? _lastScrubMs;
+  DateTime? _lastScrubTime;
+  int _seekDirection = 0;
+  double _seekSpeed = 0;
+
   bool get _scrubbing => _scrubMs != null;
+
+  void _trackScrub(double newMs) {
+    final now = DateTime.now();
+    final lastMs = _lastScrubMs;
+    final lastTime = _lastScrubTime;
+    if (lastMs != null && lastTime != null) {
+      final dtMs = now.difference(lastTime).inMilliseconds;
+      if (dtMs > 0) {
+        // 单位：内容秒 / 100ms 时间——超过 fastSpeedThreshold(50) 切 shock。
+        _seekSpeed = ((newMs - lastMs).abs() / 1000) / (dtMs / 100);
+        _seekDirection = (newMs - lastMs) > 0
+            ? 1
+            : ((newMs - lastMs) < 0 ? -1 : 0);
+      }
+    }
+    _lastScrubMs = newMs;
+    _lastScrubTime = now;
+    _scrubMs = newMs;
+  }
+
+  void _resetScrub() {
+    _scrubMs = null;
+    _lastScrubMs = null;
+    _lastScrubTime = null;
+    _seekDirection = 0;
+    _seekSpeed = 0;
+  }
 
   /// inline 状态不显示 VTT 缩略图预览（仅全屏沉浸式拖动需要）——
   /// 通过检测当前 BuildContext 是否在 [NiumaFullscreenScope] 内决定。
@@ -135,16 +170,12 @@ class _ScrubBarState extends State<ScrubBar> {
                     behavior: HitTestBehavior.opaque,
                     onPointerDown: hasDuration
                         ? (e) {
-                            setState(() {
-                              _scrubMs = xToMs(e.localPosition.dx);
-                            });
+                            setState(() => _trackScrub(xToMs(e.localPosition.dx)));
                           }
                         : null,
                     onPointerMove: hasDuration
                         ? (e) {
-                            setState(() {
-                              _scrubMs = xToMs(e.localPosition.dx);
-                            });
+                            setState(() => _trackScrub(xToMs(e.localPosition.dx)));
                           }
                         : null,
                     onPointerUp: hasDuration
@@ -154,12 +185,12 @@ class _ScrubBarState extends State<ScrubBar> {
                               widget.controller
                                   .seekTo(Duration(milliseconds: ms.toInt()));
                             }
-                            setState(() => _scrubMs = null);
+                            setState(_resetScrub);
                           }
                         : null,
                     onPointerCancel: hasDuration
                         ? (_) {
-                            setState(() => _scrubMs = null);
+                            setState(_resetScrub);
                           }
                         : null,
                     child: CustomPaint(
@@ -171,11 +202,23 @@ class _ScrubBarState extends State<ScrubBar> {
                         bufferedColor: theme.bufferedFillColor ??
                             theme.iconColor.withValues(alpha: 0.4),
                         trackColor: theme.iconColor.withValues(alpha: 0.25),
-                        thumbColor: accent,
                         trackHeight: theme.scrubBarHeight,
-                        thumbRadius: _scrubbing
-                            ? theme.scrubBarThumbRadiusActive
-                            : theme.scrubBarThumbRadius,
+                      ),
+                    ),
+                  ),
+                  // 牛马表情 thumb——按拖动方向 / 速度 / 暂停 5 秒切 5 表情。
+                  // 替代之前 _ScrubBarPainter 画的圆点。
+                  Positioned(
+                    left: thumbX - 14,
+                    top: constraints.maxHeight / 2 - 14,
+                    child: IgnorePointer(
+                      child: NiumaProgressThumb(
+                        progress: progress,
+                        isPlaying: value.isPlaying,
+                        isDragging: _scrubbing,
+                        seekDirection: _seekDirection,
+                        seekSpeed: _seekSpeed,
+                        size: 28,
                       ),
                     ),
                   ),
@@ -196,9 +239,7 @@ class _ScrubBarPainter extends CustomPainter {
     required this.activeColor,
     required this.bufferedColor,
     required this.trackColor,
-    required this.thumbColor,
     required this.trackHeight,
-    required this.thumbRadius,
   });
 
   final double progress;
@@ -206,9 +247,7 @@ class _ScrubBarPainter extends CustomPainter {
   final Color activeColor;
   final Color bufferedColor;
   final Color trackColor;
-  final Color thumbColor;
   final double trackHeight;
-  final double thumbRadius;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -249,13 +288,7 @@ class _ScrubBarPainter extends CustomPainter {
         Paint()..color = activeColor,
       );
     }
-
-    // thumb 圆点
-    canvas.drawCircle(
-      Offset(size.width * progress, centerY),
-      thumbRadius,
-      Paint()..color = thumbColor,
-    );
+    // thumb 不在这画——见外层 Stack 的 NiumaProgressThumb。
   }
 
   @override
@@ -265,7 +298,5 @@ class _ScrubBarPainter extends CustomPainter {
       old.activeColor != activeColor ||
       old.bufferedColor != bufferedColor ||
       old.trackColor != trackColor ||
-      old.thumbColor != thumbColor ||
-      old.trackHeight != trackHeight ||
-      old.thumbRadius != thumbRadius;
+      old.trackHeight != trackHeight;
 }

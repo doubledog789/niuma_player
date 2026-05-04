@@ -40,7 +40,7 @@ class CenterPlayPause extends StatelessWidget {
                 width: theme.centerPlayPauseSize,
                 height: theme.centerPlayPauseSize,
                 child: NiumaSdkIcon(
-                  asset: NiumaSdkAssets.icPlay,
+                  asset: NiumaSdkAssets.icPlayCircle,
                   color: theme.actionIconColor,
                   size: theme.centerPlayPauseSize / 2,
                 ),

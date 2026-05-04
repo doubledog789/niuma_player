@@ -23,6 +23,8 @@ import 'niuma_danmaku_controller.dart';
 import 'niuma_danmaku_overlay.dart';
 import 'niuma_danmaku_scope.dart';
 import 'niuma_fullscreen_page.dart' show NiumaFullscreenScope;
+import '../niuma_sdk_assets.dart';
+import 'controls/niuma_sdk_icon.dart';
 import 'niuma_gesture_layer.dart';
 import 'niuma_loading_indicator.dart';
 import 'niuma_player_controller.dart';
@@ -528,7 +530,11 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
           value: '__niuma_cast',
           child: Row(
             children: const [
-              Icon(Icons.cast, size: 18),
+              NiumaSdkIcon(
+                asset: NiumaSdkAssets.icCast,
+                size: 18,
+                color: Color(0xFF1A1410),
+              ),
               SizedBox(width: 8),
               Text('投屏'),
             ],
@@ -538,7 +544,11 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
           value: '__niuma_pip',
           child: Row(
             children: const [
-              Icon(Icons.picture_in_picture_alt, size: 18),
+              NiumaSdkIcon(
+                asset: NiumaSdkAssets.icPip,
+                size: 18,
+                color: Color(0xFF1A1410),
+              ),
               SizedBox(width: 8),
               Text('画中画'),
             ],

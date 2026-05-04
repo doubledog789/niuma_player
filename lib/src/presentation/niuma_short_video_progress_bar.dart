@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../domain/niuma_short_video_theme.dart';
 import '../domain/player_state.dart';
 import 'niuma_player_controller.dart';
+import 'niuma_progress_thumb.dart';
 
 /// 抖音式底部细线进度条。
 ///
@@ -49,6 +50,35 @@ class _NiumaShortVideoProgressBarState
   double _progress = 0.0;
   bool _wasPlayingBeforeScrub = false;
 
+  // 给 NiumaProgressThumb 算 seekDirection / seekSpeed。
+  double? _lastProgress;
+  DateTime? _lastProgressTime;
+  int _seekDirection = 0;
+  double _seekSpeed = 0;
+
+  void _track(double newP, double widthPx) {
+    final now = DateTime.now();
+    final lastP = _lastProgress;
+    final lastT = _lastProgressTime;
+    if (lastP != null && lastT != null) {
+      final dtMs = now.difference(lastT).inMilliseconds;
+      if (dtMs > 0) {
+        // 用像素差作为 speed 标尺，跟 NiumaProgressThumb 文档单位一致。
+        _seekSpeed = ((newP - lastP).abs() * widthPx) / (dtMs / 100);
+        _seekDirection = (newP - lastP) > 0 ? 1 : ((newP - lastP) < 0 ? -1 : 0);
+      }
+    }
+    _lastProgress = newP;
+    _lastProgressTime = now;
+  }
+
+  void _resetTrack() {
+    _lastProgress = null;
+    _lastProgressTime = null;
+    _seekDirection = 0;
+    _seekSpeed = 0;
+  }
+
   static const double _hitAreaHeight = 24.0;
 
   void _onPointerDown(PointerDownEvent event, BoxConstraints constraints) {
@@ -61,6 +91,7 @@ class _NiumaShortVideoProgressBarState
       _progress = newProgress;
       _wasPlayingBeforeScrub =
           widget.controller.value.phase == PlayerPhase.playing;
+      _track(newProgress, width);
     });
     widget.controller.pause();
     widget.onScrubStart();
@@ -72,7 +103,10 @@ class _NiumaShortVideoProgressBarState
     final width = constraints.maxWidth;
     if (width <= 0) return;
     final newProgress = (event.localPosition.dx / width).clamp(0.0, 1.0);
-    setState(() => _progress = newProgress);
+    setState(() {
+      _progress = newProgress;
+      _track(newProgress, width);
+    });
     widget.onScrubUpdate(_durationFromProgress(newProgress));
   }
 
@@ -83,7 +117,10 @@ class _NiumaShortVideoProgressBarState
     // 取消 = 不 seek，仅恢复 play 状态 + 通知 parent 隐藏 scrubLabel
     if (_wasPlayingBeforeScrub) widget.controller.play();
     widget.onScrubEnd();
-    setState(() => _scrubbing = false);
+    setState(() {
+      _scrubbing = false;
+      _resetTrack();
+    });
   }
 
   void _finishScrub() {
@@ -92,7 +129,10 @@ class _NiumaShortVideoProgressBarState
     widget.controller.seekTo(target);
     if (_wasPlayingBeforeScrub) widget.controller.play();
     widget.onScrubEnd();
-    setState(() => _scrubbing = false);
+    setState(() {
+      _scrubbing = false;
+      _resetTrack();
+    });
   }
 
   Duration _durationFromProgress(double p) {
@@ -159,20 +199,21 @@ class _NiumaShortVideoProgressBarState
                               color: widget.theme.progressPlayedColor,
                             ),
                           ),
-                          // thumb
+                          // thumb：拖动期间换成牛马表情，按方向 / 速度切 5 表情。
                           if (_scrubbing)
                             Positioned(
                               left: pos.clamp(0.0, 1.0) *
                                       constraints.maxWidth -
-                                  widget.theme.progressThumbRadius,
-                              top: -(widget.theme.progressThumbRadius -
-                                  h / 2),
-                              child: Container(
-                                width: widget.theme.progressThumbRadius * 2,
-                                height: widget.theme.progressThumbRadius * 2,
-                                decoration: BoxDecoration(
-                                  color: widget.theme.progressThumbColor,
-                                  shape: BoxShape.circle,
+                                  16,
+                              top: -(16 - h / 2),
+                              child: IgnorePointer(
+                                child: NiumaProgressThumb(
+                                  progress: pos,
+                                  isPlaying: value.isPlaying,
+                                  isDragging: true,
+                                  seekDirection: _seekDirection,
+                                  seekSpeed: _seekSpeed,
+                                  size: 32,
                                 ),
                               ),
                             ),
