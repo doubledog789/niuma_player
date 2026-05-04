@@ -137,6 +137,28 @@ NiumaPlayerController _makeController(_PipFakeBackend backend) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('NiumaPlayerController danmakuVisibility', () {
+    test('danmakuVisibility ValueNotifier 默认 true', () {
+      final backend = _PipFakeBackend();
+      final ctl = _makeController(backend);
+      expect(ctl.danmakuVisibility, isA<ValueNotifier<bool>>());
+      expect(ctl.danmakuVisibility.value, isTrue);
+      ctl.dispose();
+    });
+
+    test('danmakuVisibility 可被外部更新并触发 listener', () {
+      final backend = _PipFakeBackend();
+      final ctl = _makeController(backend);
+      bool? heard;
+      ctl.danmakuVisibility.addListener(
+        () => heard = ctl.danmakuVisibility.value,
+      );
+      ctl.danmakuVisibility.value = false;
+      expect(heard, isFalse);
+      ctl.dispose();
+    });
+  });
+
   group('NiumaPlayerController PiP', () {
     test('enterPictureInPicture 在未 initialize 时返 false 不调 backend', () async {
       final backend = _PipFakeBackend(enterPipResult: true);
@@ -164,7 +186,8 @@ void main() {
       await c.dispose();
     });
 
-    test('enterPictureInPicture 调 backend 之前先把 value 乐观翻成 inPip=true', () async {
+    test('enterPictureInPicture 调 backend 之前先把 value 乐观翻成 inPip=true',
+        () async {
       // 防 Android PiP 转场时 NiumaControlBar 在迷你窗里渲染一帧 overflow。
       final backend = _PipFakeBackend(enterPipResult: true);
       final c = _makeController(backend);
@@ -198,19 +221,22 @@ void main() {
       c.value = c.value.copyWith(isInPictureInPicture: true);
       final r = await c.enterPictureInPicture();
       expect(r, isFalse);
-      expect(backend.enterPipCalled, 0,
-          reason: '已在 PiP 时不应再调 backend');
+      expect(backend.enterPipCalled, 0, reason: '已在 PiP 时不应再调 backend');
       await c.dispose();
     });
 
-    test('PiP 中 phase 翻 playing↔paused 会推 updatePictureInPictureActions', () async {
+    test('PiP 中 phase 翻 playing↔paused 会推 updatePictureInPictureActions',
+        () async {
       final backend = _PipFakeBackend(enterPipResult: true);
       final c = _makeController(backend);
       await c.initialize();
-      // 进 PiP——乐观更新立刻把 inPip=true 写进 value，但此时 phase=ready
-      // 不是 playing，所以推 isPlaying=false。
+      // 进 PiP——乐观更新立刻把 inPip=true 写进 value。M16: 刚进 PiP 不 push
+      // updatePictureInPictureActions（依赖 native enterPictureInPictureMode
+      // 自己设的 setActions(playPauseAction)；setter 仅 init cache 避免双重
+      // setPictureInPictureParams 让 OS PiP UI 失效）。
       await c.enterPictureInPicture();
-      expect(backend.lastPipActionsIsPlaying, isFalse);
+      expect(backend.updatePipActionsCalled, 0,
+          reason: '刚进 PiP 不 push——native enterPip 自带 setActions');
       final initialCount = backend.updatePipActionsCalled;
 
       // 模拟 backend 推 phase=playing（用户点了 PiP 窗里的 play 按钮）。
@@ -293,8 +319,7 @@ void main() {
 
       // false → false（默认）：不挂 observer，inactive 不触发
       binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      expect(backend.enterPipCalled, 0,
-          reason: 'autoEnter=false 时不应触发');
+      expect(backend.enterPipCalled, 0, reason: 'autoEnter=false 时不应触发');
 
       // 开 autoEnter
       c.autoEnterPictureInPictureOnBackground = true;

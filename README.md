@@ -415,6 +415,56 @@ PageView.builder(
 
 **进度条**：常态 1.5px 细线贴底，触摸变粗到 3.5px + 出现 thumb，拖动期间暂停 + 中央显示大字时间，松手 seek + 恢复 play 状态。
 
+## 投屏（Cast）— M15
+
+niuma_player 通过 federated plugin 模式支持投屏：主包提供 UI + 抽象，DLNA / AirPlay 协议实现走 companion package。
+
+### 安装
+
+```yaml
+dependencies:
+  niuma_player: ^0.9.0
+  niuma_player_dlna: ^0.1.0    # 国内 TV / 盒子（DLNA），~300KB
+  niuma_player_airplay: ^0.1.0 # iOS 苹果生态（AirPlay），~10KB
+```
+
+国外业务可加 Chromecast 子包（暂未提供，留接口待社区补）。
+
+### 业务集成
+
+```dart
+import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player_dlna/niuma_player_dlna.dart';
+import 'package:niuma_player_airplay/niuma_player_airplay.dart';
+
+void main() {
+  NiumaCastRegistry.register(DlnaCastService());
+  NiumaCastRegistry.register(AirPlayCastService());
+  runApp(const MyApp());
+}
+```
+
+`NiumaPlayer` 默认 ControlBar 已自动叠 cast 按钮——业务侧无额外集成。
+
+### Android 注意
+
+DLNA SSDP 走 UDP 多播。Android 11+ 业务侧 `AndroidManifest.xml` 加：
+
+```xml
+<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+```
+
+子包内部已自动管理 `WifiManager.MulticastLock` 申请释放。
+
+### 相关 widget / 类
+
+- `NiumaCastButton` — 投屏按钮（默认在 ControlBar）
+- `NiumaCastOverlay` — 投屏中视频区中央覆盖层
+- `NiumaCastRegistry` — 子包注册表（业务侧调 register）
+- `CastService` / `CastSession` / `CastDevice` / `CastConnectionState` / `CastEndReason` — 协议抽象，可自定义协议子包
+
+完整 demo 见 [`example/lib/m15_cast_demo_page.dart`](example/lib/m15_cast_demo_page.dart)。
+
 ## 监听后端选择
 
 ```dart

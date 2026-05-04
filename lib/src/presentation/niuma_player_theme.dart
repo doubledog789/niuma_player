@@ -36,6 +36,27 @@ class NiumaPlayerTheme {
       fontFeatures: [FontFeature.tabularFigures()],
       fontSize: 12,
     ),
+    // M16 fields
+    this.primaryAccent = const Color(0xFFFB7299),
+    this.actionIconColor = const Color(0xFFFFFFFF),
+    this.actionIconSize = 20,
+    this.actionLabelStyle = const TextStyle(
+      fontSize: 8,
+      color: Color(0xFFFFFFFF),
+    ),
+    this.pillBoxDecoration = const BoxDecoration(),
+    this.centerPlayPauseSize = 48,
+    this.centerPlayPauseBackground = const Color(0x66000000),
+    this.videoTitleStyle = const TextStyle(
+      fontSize: 14,
+      color: Color(0xFFFFFFFF),
+      fontWeight: FontWeight.w500,
+    ),
+    this.videoSubtitleStyle = const TextStyle(
+      fontSize: 11,
+      color: Color(0x8CFFFFFF),
+    ),
+    this.chapterMarkColor = const Color(0x99FFFFFF),
   });
 
   /// 强调色。
@@ -90,6 +111,38 @@ class NiumaPlayerTheme {
   /// 时间显示（mm:ss / mm:ss）使用的 TextStyle。
   final TextStyle timeTextStyle;
 
+  // ── M16 新增字段 ──────────────────────────────────────────────────────────
+
+  /// B 站粉强调色，用于顶栏高亮状态、选中标记等。默认 #FB7299。
+  final Color primaryAccent;
+
+  /// 顶栏操作 icon 的前景色。默认白色。
+  final Color actionIconColor;
+
+  /// 顶栏操作 icon 的尺寸（mockup 18px，这里取 20 略放宽）。
+  final double actionIconSize;
+
+  /// 顶栏操作按钮下方文字 label 的 TextStyle。默认 8px white。
+  final TextStyle actionLabelStyle;
+
+  /// 「线路」切换 pill 的背景装饰。默认空 BoxDecoration，widget 自管 fallback。
+  final BoxDecoration pillBoxDecoration;
+
+  /// 中央播放 / 暂停按钮的尺寸。默认 48。
+  final double centerPlayPauseSize;
+
+  /// 中央播放 / 暂停按钮的背景色。默认 rgba(0,0,0,0.4)。
+  final Color centerPlayPauseBackground;
+
+  /// 视频主标题 TextStyle。默认 14px white w500。
+  final TextStyle videoTitleStyle;
+
+  /// 视频副标题 TextStyle。默认 11px white-55%。
+  final TextStyle videoSubtitleStyle;
+
+  /// 章节标记线的颜色。默认半透明白 0x99FFFFFF。
+  final Color chapterMarkColor;
+
   /// 静态查找：从 widget 树中沿祖先方向找最近的 [NiumaPlayerThemeData]，
   /// 没有则返回默认 [NiumaPlayerTheme] 实例。
   ///
@@ -118,13 +171,23 @@ class NiumaPlayerTheme {
         other.bufferedFillColor == bufferedFillColor &&
         other.thumbnailPreviewSize == thumbnailPreviewSize &&
         other.fadeInDuration == fadeInDuration &&
-        _listEquals(other.controlsBackgroundGradient,
-            controlsBackgroundGradient) &&
-        other.timeTextStyle == timeTextStyle;
+        _listEquals(
+            other.controlsBackgroundGradient, controlsBackgroundGradient) &&
+        other.timeTextStyle == timeTextStyle &&
+        other.primaryAccent == primaryAccent &&
+        other.actionIconColor == actionIconColor &&
+        other.actionIconSize == actionIconSize &&
+        other.actionLabelStyle == actionLabelStyle &&
+        other.pillBoxDecoration == pillBoxDecoration &&
+        other.centerPlayPauseSize == centerPlayPauseSize &&
+        other.centerPlayPauseBackground == centerPlayPauseBackground &&
+        other.videoTitleStyle == videoTitleStyle &&
+        other.videoSubtitleStyle == videoSubtitleStyle &&
+        other.chapterMarkColor == chapterMarkColor;
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
         accentColor,
         iconColor,
         iconSize,
@@ -138,7 +201,17 @@ class NiumaPlayerTheme {
         fadeInDuration,
         Object.hashAll(controlsBackgroundGradient),
         timeTextStyle,
-      );
+        primaryAccent,
+        actionIconColor,
+        actionIconSize,
+        actionLabelStyle,
+        pillBoxDecoration,
+        centerPlayPauseSize,
+        centerPlayPauseBackground,
+        videoTitleStyle,
+        videoSubtitleStyle,
+        chapterMarkColor,
+      ]);
 }
 
 /// 沿用 [Object.==] 之外的逐元素比较，因为 List 的默认 equality 是

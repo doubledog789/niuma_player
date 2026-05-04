@@ -20,7 +20,10 @@ export 'src/domain/player_state.dart'
         LineSwitched,
         LineSwitchFailed,
         PipModeChanged,
-        PipRemoteAction;
+        PipRemoteAction,
+        CastStarted,
+        CastEnded,
+        CastError;
 export 'src/presentation/niuma_player_controller.dart'
     show NiumaPlayerController, NiumaPlayerOptions, ThumbnailFetcher;
 export 'src/presentation/niuma_player_view.dart';
@@ -39,6 +42,17 @@ export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;
 
 // M9 控件条组合
 export 'src/presentation/niuma_control_bar.dart' show NiumaControlBar;
+
+// M16 配置驱动 UI（控件 enum / config / 按钮覆盖）
+export 'src/presentation/niuma_control_button.dart' show NiumaControlButton;
+export 'src/presentation/niuma_control_bar_config.dart'
+    show NiumaControlBarConfig;
+export 'src/presentation/button_override.dart'
+    show ButtonOverride, BuilderOverride, FieldsOverride;
+export 'src/presentation/bili_style_control_bar.dart'
+    show BiliStyleControlBar;
+export 'src/presentation/cast/niuma_cast_picker_panel.dart'
+    show NiumaCastPickerPanel;
 
 // M9 广告 overlay
 export 'src/presentation/niuma_ad_overlay.dart' show NiumaAdOverlay;
@@ -124,3 +138,12 @@ export 'src/presentation/niuma_short_video_pause_indicator.dart' show NiumaShort
 export 'src/presentation/niuma_short_video_scrub_label.dart' show NiumaShortVideoScrubLabel;
 export 'src/domain/niuma_short_video_theme.dart' show NiumaShortVideoTheme;
 export 'src/presentation/niuma_short_video_fullscreen_button.dart' show NiumaShortVideoFullscreenButton;
+
+// M15 投屏（Cast）
+export 'src/cast/cast_device.dart' show CastDevice;
+export 'src/cast/cast_state.dart' show CastConnectionState, CastEndReason;
+export 'src/cast/cast_service.dart' show CastService;
+export 'src/cast/cast_session.dart' show CastSession;
+export 'src/cast/cast_registry.dart' show NiumaCastRegistry;
+export 'src/presentation/cast/niuma_cast_button.dart' show NiumaCastButton;
+export 'src/presentation/cast/niuma_cast_overlay.dart' show NiumaCastOverlay;

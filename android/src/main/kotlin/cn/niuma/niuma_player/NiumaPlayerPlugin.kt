@@ -259,12 +259,19 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun handleQueryPipSupport(result: Result) {
         val activity = activityBinding?.activity
         if (activity == null) {
+            Log.w(TAG, "handleQueryPipSupport: activityBinding null → false")
             result.success(false)
             return
         }
-        val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-            && activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-        result.success(supported)
+        // 只检 SDK 级别——manifest 已声明 supportsPictureInPicture="true"，
+        // PackageManager.hasSystemFeature 在部分 MIUI / OEM 系统返 false 但
+        // 实际能跑 PiP（系统也尊重 manifest 声明）。先信 SDK，运行时 enterPictureInPictureMode
+        // 真失败再处理。
+        val sdkOk = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+        val hasFeature = activity.packageManager
+            .hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        Log.d(TAG, "handleQueryPipSupport: sdkOk=$sdkOk hasFeature=$hasFeature")
+        result.success(sdkOk)
     }
 
     private fun createPlayPauseRemoteAction(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/player_state.dart';
+import '../niuma_fullscreen_page.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
 import '../niuma_scrub_preview.dart';
@@ -21,10 +22,17 @@ import '../niuma_scrub_preview.dart';
 ///    触发大量 seek。
 class ScrubBar extends StatefulWidget {
   /// 创建一个 [ScrubBar]。
-  const ScrubBar({super.key, required this.controller});
+  const ScrubBar({super.key, required this.controller, this.chapters});
 
   /// 该进度条观察 / 控制的 player controller。
   final NiumaPlayerController controller;
+
+  /// 可选的章节时间点列表。非 null 时在进度条上叠加对应位置的细线标记。
+  ///
+  /// 每个 [Duration] 对应进度条上方一根 1px 宽、5px 高的白线（颜色由
+  /// [NiumaPlayerTheme.chapterMarkColor] 控制）。超出 duration 范围的
+  /// 时间点不渲染。标记外层 Positioned 带 `ValueKey('scrub-chapter-mark-$i')` 供测试查找。
+  final List<Duration>? chapters;
 
   @override
   State<ScrubBar> createState() => _ScrubBarState();
@@ -36,10 +44,14 @@ class _ScrubBarState extends State<ScrubBar> {
 
   bool get _scrubbing => _scrubMs != null;
 
-  bool get _hasThumbnail => widget.controller.source.thumbnailVtt != null;
+  /// inline 状态不显示 VTT 缩略图预览（仅全屏沉浸式拖动需要）——
+  /// 通过检测当前 BuildContext 是否在 [NiumaFullscreenScope] 内决定。
+  bool get _hasThumbnail =>
+      widget.controller.source.thumbnailVtt != null &&
+      NiumaFullscreenScope.maybeOf(context) != null;
 
   /// 进度条本体的高度——足以容纳"拖动 thumb"圆点（thumbRadiusActive=9 → 18px
-   /// 直径）和上下安全区。如果调用方需要更大点击区，外面包 [SizedBox] 即可。
+  /// 直径）和上下安全区。如果调用方需要更大点击区，外面包 [SizedBox] 即可。
   double _hostHeight() {
     final theme = NiumaPlayerTheme.of(context);
     return theme.scrubBarThumbRadiusActive * 2 + 8;
@@ -55,10 +67,10 @@ class _ScrubBarState extends State<ScrubBar> {
       builder: (context, value, _) {
         final durMs = value.duration.inMilliseconds.toDouble();
         final hasDuration = durMs > 0;
-        final positionMs =
-            _scrubMs ?? value.position.inMilliseconds.toDouble();
+        final positionMs = _scrubMs ?? value.position.inMilliseconds.toDouble();
         final bufMs = value.bufferedPosition.inMilliseconds.toDouble();
-        final progress = hasDuration ? (positionMs / durMs).clamp(0.0, 1.0) : 0.0;
+        final progress =
+            hasDuration ? (positionMs / durMs).clamp(0.0, 1.0) : 0.0;
         final bufferedProgress =
             hasDuration ? (bufMs / durMs).clamp(0.0, 1.0) : 0.0;
 
@@ -67,78 +79,103 @@ class _ScrubBarState extends State<ScrubBar> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
-            final thumbX = width * progress;
-            final previewWidth = theme.thumbnailPreviewSize.width;
-            final previewLeft =
-                (thumbX - previewWidth / 2).clamp(0.0, width - previewWidth);
+              // PiP 小窗 / 折叠状态 width 可能为 0，避免下方 clamp(low, high) 在
+              // high<low 时抛 Invalid argument。
+              if (width <= 0) return const SizedBox.shrink();
+              final thumbX = width * progress;
+              final previewWidth = theme.thumbnailPreviewSize.width;
+              final previewLeft = width >= previewWidth
+                  ? (thumbX - previewWidth / 2).clamp(0.0, width - previewWidth)
+                  : 0.0;
 
-            double xToMs(double x) {
-              final clamped = x.clamp(0.0, width);
-              return hasDuration ? (clamped / width) * durMs : 0.0;
-            }
+              double xToMs(double x) {
+                final clamped = x.clamp(0.0, width);
+                return hasDuration ? (clamped / width) * durMs : 0.0;
+              }
 
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // 缩略图悬浮预览：thumb 上方 8px。
-                if (_scrubbing && _hasThumbnail)
-                  Positioned(
-                    left: previewLeft,
-                    bottom: theme.scrubBarThumbRadiusActive * 2 + 8,
-                    child: IgnorePointer(
-                      child: NiumaScrubPreview(
-                        controller: widget.controller,
-                        scrubPosition:
-                            Duration(milliseconds: positionMs.toInt()),
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // 缩略图悬浮预览：thumb 上方 8px。
+                  if (_scrubbing && _hasThumbnail)
+                    Positioned(
+                      left: previewLeft,
+                      bottom: theme.scrubBarThumbRadiusActive * 2 + 8,
+                      child: IgnorePointer(
+                        child: NiumaScrubPreview(
+                          controller: widget.controller,
+                          scrubPosition:
+                              Duration(milliseconds: positionMs.toInt()),
+                        ),
                       ),
                     ),
-                  ),
-                // 原始 pointer 路由：不进 GestureDetector arena。
-                Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerDown: hasDuration
-                      ? (e) {
-                          setState(() {
-                            _scrubMs = xToMs(e.localPosition.dx);
-                          });
-                        }
-                      : null,
-                  onPointerMove: hasDuration
-                      ? (e) {
-                          setState(() {
-                            _scrubMs = xToMs(e.localPosition.dx);
-                          });
-                        }
-                      : null,
-                  onPointerUp: hasDuration
-                      ? (_) {
-                          final ms = _scrubMs;
-                          if (ms != null) {
-                            widget.controller
-                                .seekTo(Duration(milliseconds: ms.toInt()));
+                  // 章节标记：在进度条轨道上方渲染细线。
+                  if (widget.chapters != null && hasDuration)
+                    for (var ci = 0; ci < widget.chapters!.length; ci++)
+                      if (widget.chapters![ci].inMilliseconds > 0 &&
+                          widget.chapters![ci].inMilliseconds <
+                              value.duration.inMilliseconds)
+                        Positioned(
+                          key: ValueKey('scrub-chapter-mark-$ci'),
+                          left: (widget.chapters![ci].inMilliseconds / durMs) *
+                              width,
+                          top: constraints.maxHeight / 2 -
+                              theme.scrubBarHeight / 2 -
+                              1,
+                          child: IgnorePointer(
+                            child: Container(
+                              width: 1,
+                              height: theme.scrubBarHeight + 2,
+                              color: theme.chapterMarkColor,
+                            ),
+                          ),
+                        ),
+                  // 原始 pointer 路由：不进 GestureDetector arena。
+                  Listener(
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: hasDuration
+                        ? (e) {
+                            setState(() {
+                              _scrubMs = xToMs(e.localPosition.dx);
+                            });
                           }
-                          setState(() => _scrubMs = null);
-                        }
-                      : null,
-                  onPointerCancel: hasDuration
-                      ? (_) {
-                          setState(() => _scrubMs = null);
-                        }
-                      : null,
-                  child: CustomPaint(
-                    size: Size(width, constraints.maxHeight),
-                    painter: _ScrubBarPainter(
-                      progress: progress,
-                      bufferedProgress: bufferedProgress,
-                      activeColor: accent,
-                      bufferedColor: theme.bufferedFillColor ??
-                          theme.iconColor.withValues(alpha: 0.4),
-                      trackColor: theme.iconColor.withValues(alpha: 0.25),
-                      thumbColor: accent,
-                      trackHeight: theme.scrubBarHeight,
-                      thumbRadius: _scrubbing
-                          ? theme.scrubBarThumbRadiusActive
-                          : theme.scrubBarThumbRadius,
+                        : null,
+                    onPointerMove: hasDuration
+                        ? (e) {
+                            setState(() {
+                              _scrubMs = xToMs(e.localPosition.dx);
+                            });
+                          }
+                        : null,
+                    onPointerUp: hasDuration
+                        ? (_) {
+                            final ms = _scrubMs;
+                            if (ms != null) {
+                              widget.controller
+                                  .seekTo(Duration(milliseconds: ms.toInt()));
+                            }
+                            setState(() => _scrubMs = null);
+                          }
+                        : null,
+                    onPointerCancel: hasDuration
+                        ? (_) {
+                            setState(() => _scrubMs = null);
+                          }
+                        : null,
+                    child: CustomPaint(
+                      size: Size(width, constraints.maxHeight),
+                      painter: _ScrubBarPainter(
+                        progress: progress,
+                        bufferedProgress: bufferedProgress,
+                        activeColor: accent,
+                        bufferedColor: theme.bufferedFillColor ??
+                            theme.iconColor.withValues(alpha: 0.4),
+                        trackColor: theme.iconColor.withValues(alpha: 0.25),
+                        thumbColor: accent,
+                        trackHeight: theme.scrubBarHeight,
+                        thumbRadius: _scrubbing
+                            ? theme.scrubBarThumbRadiusActive
+                            : theme.scrubBarThumbRadius,
                       ),
                     ),
                   ),

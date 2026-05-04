@@ -23,6 +23,8 @@ import '../orchestration/thumbnail_cache.dart';
 import '../orchestration/thumbnail_resolver.dart';
 import '../orchestration/thumbnail_track.dart';
 import '../orchestration/webvtt_parser.dart';
+import '../cast/cast_session.dart';
+import '../cast/cast_state.dart';
 import 'pip_lifecycle_observer.dart';
 
 /// 拉取 WebVTT body 的函数签名。
@@ -252,6 +254,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   StreamSubscription<NiumaPlayerEvent>? _eventSub;
   Completer<void>? _initCompleter;
   bool _disposed = false;
+
+  /// 当前激活线路的 id。初始值 = `source.defaultLineId`；[switchLine] 成功
+  /// 后更新。订阅 controller（ValueNotifier listener）能在切换时重建依赖
+  /// 此 getter 的 widget——例如 LineSwitchPill 的 label。
+  String get activeLineId => _activeLineId ?? source.defaultLineId;
 
   /// 跟踪当前激活线路的 id，以便 [switchLine] 能发出正确的
   /// [LineSwitching.fromId]。在 [switchLine] 成功时更新。
@@ -515,8 +522,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       rethrow;
     }
     final native = lastBackend;
-    final fromMemory =
-        native is NativeBackend ? native.fromMemory : false;
+    final fromMemory = native is NativeBackend ? native.fromMemory : false;
     _emit(BackendSelected(
       PlayerBackendKind.native,
       fromMemory: fromMemory,
@@ -534,9 +540,16 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     super.value = newValue;
     final inPip = newValue.isInPictureInPicture;
     final isPlaying = newValue.isPlaying;
-    // 在 PiP 中且（play↔pause 边沿 OR 刚进 PiP 还没 push 过）就同步
-    // RemoteAction 图标。出 PiP 时 reset 缓存，下次进 PiP 重新初始化。
-    if (inPip && (isPlaying != wasPlaying || _lastPipActionsIsPlaying != isPlaying)) {
+    if (!wasInPip && inPip) {
+      // 刚乐观 set isInPictureInPicture=true（[enterPictureInPicture] 内）——
+      // 此时 Activity 还没真的进 PiP，紧接着 native enterPictureInPictureMode
+      // 会用完整 params (setAspectRatio + setActions) 设置初始 RemoteAction。
+      // 这里**不 push** 一次 setActions-only 的 update，避免 OS PiP UI 收到
+      // 双重 setPictureInPictureParams 让 system controls 失效（模拟器尤其
+      // 敏感）。仅 init cache，下次 isPlaying 变化才 push。
+      _lastPipActionsIsPlaying = isPlaying;
+    } else if (inPip &&
+        (isPlaying != wasPlaying || _lastPipActionsIsPlaying != isPlaying)) {
       _lastPipActionsIsPlaying = isPlaying;
       unawaited(
         _backend?.updatePictureInPictureActions(isPlaying: isPlaying),
@@ -551,7 +564,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     _backend = backend;
     _valueSub = backend.valueStream.listen((v) {
       if (_disposed) return;
-      value = v;
+      // backend 不知道 platform-level PiP 状态——它推送的 NiumaPlayerValue
+      // isInPictureInPicture 默认 false，会覆盖 controller 通过
+      // PipModeChanged event 维护的真实 PiP state。保留 controller 自己的
+      // PiP state，否则 PiP 期间 RemoteAction icon 同步 chain 断裂
+      // （setter 检测 inPip=false 就不 push updatePictureInPictureActions）。
+      value = v.copyWith(isInPictureInPicture: value.isInPictureInPicture);
     });
     _eventSub = backend.eventStream.listen((e) {
       if (_disposed) return;
@@ -608,24 +626,47 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> play() async {
+    final session = _castSession.value;
+    if (session != null) {
+      await session.play();
+      return;
+    }
     debugPrint(
       '[niuma_player] play() backend=${_backend?.kind.name ?? "<null>"}',
     );
     await _backend?.play();
+    // PiP RemoteAction 同步走 value setter（valueStream listener 保留
+    // isInPictureInPicture，setter 检测 isPlaying 变化自动触发 update）。
+    // 不在这里主动 push——之前主动 push + setter 双调 setPictureInPictureParams
+    // 会让 OS PiP system UI（关闭 / 放大 / RemoteAction）反复重置闪掉。
   }
 
   Future<void> pause() async {
+    final session = _castSession.value;
+    if (session != null) {
+      await session.pause();
+      return;
+    }
     debugPrint(
       '[niuma_player] pause() backend=${_backend?.kind.name ?? "<null>"}',
     );
     await _backend?.pause();
   }
 
-  Future<void> seekTo(Duration position) async => _backend?.seekTo(position);
+  Future<void> seekTo(Duration position) async {
+    final session = _castSession.value;
+    if (session != null) {
+      await session.seek(position);
+      return;
+    }
+    await _backend?.seekTo(position);
+  }
+
   Future<void> setPlaybackSpeed(double speed) async {
     value = value.copyWith(playbackSpeed: speed);
     await _backend?.setSpeed(speed);
   }
+
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
   Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
 
@@ -704,6 +745,15 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// app 级"清缓存 / 重置"流程应调用此方法，让下次 initialize 重新
   /// 探测 ExoPlayer，而不是直接走 IJK。
   static Future<void> clearDeviceMemory() => DeviceMemory().clear();
+
+  // ────────────── M16 弹幕显示开关 ──────────────
+
+  /// 弹幕显示开关。业务接弹幕系统时监听此 ValueNotifier 决定渲染弹幕层。
+  ///
+  /// 默认 `true`（显示弹幕）。业务层或 [DanmakuToggleButton]（T9）
+  /// 直接写 `.value = false` 即可关闭；[NiumaPlayerController.dispose]
+  /// 会自动 dispose 此 notifier。
+  final ValueNotifier<bool> danmakuVisibility = ValueNotifier(true);
 
   // ────────────── M13 手势 HUD ──────────────
 
@@ -832,6 +882,55 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
   static int _gcd(int a, int b) => b == 0 ? a : _gcd(b, a % b);
 
+  // ────────────── M15 Cast（投屏） ──────────────
+
+  final ValueNotifier<CastSession?> _castSession =
+      ValueNotifier<CastSession?>(null);
+
+  /// 当前投屏会话。null = 未投屏；非 null = 投屏中。
+  /// UI 监听这个 ValueListenable 切换控件远程映射状态。
+  ValueListenable<CastSession?> get castSession => _castSession;
+
+  /// 测试辅助：直接 set [_castSession.value]。生产路径走 connectCast。
+  @visibleForTesting
+  void debugSetCastSession(CastSession? session) {
+    _castSession.value = session;
+  }
+
+  /// 进入投屏。pause 本地 backend；把 session 写到 [castSession]；
+  /// emit [CastStarted] 事件。
+  Future<void> connectCast(CastSession session) async {
+    await pause(); // 此时 _castSession 还 null，调本地 backend
+    _castSession.value = session;
+    if (!_eventController.isClosed) {
+      _eventController.add(CastStarted(session.device));
+    }
+  }
+
+  /// 退出投屏。从 session 拿当前位置；本地 seekTo 接续；emit [CastEnded] 事件。
+  Future<void> disconnectCast({
+    required CastEndReason reason,
+  }) async {
+    final session = _castSession.value;
+    if (session == null) return;
+    Duration? remotePos;
+    try {
+      remotePos = await session.getPosition();
+    } catch (_) {
+      remotePos = null;
+    }
+    try {
+      await session.disconnect();
+    } catch (_) {}
+    _castSession.value = null;
+    if (remotePos != null && !_disposed) {
+      await seekTo(remotePos);
+    }
+    if (!_eventController.isClosed) {
+      _eventController.add(CastEnded(reason));
+    }
+  }
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
@@ -840,10 +939,20 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       WidgetsBinding.instance.removeObserver(_pipObserver!);
       _pipObserver = null;
     }
+    final session = _castSession.value;
+    if (session != null) {
+      try {
+        await session.disconnect().timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // 忽略——dispose 中不抛
+      }
+    }
     await _disposeCurrentBackend();
     await _eventController.close();
     _thumbnailCache.clear();
+    danmakuVisibility.dispose();
     _gestureFeedback.dispose();
+    _castSession.dispose();
     super.dispose();
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/presentation/controls/back_action.dart';
 import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
@@ -647,8 +648,9 @@ void main() {
     });
   });
 
-  group('NiumaPlayer 右上角 PipButton 自动叠', () {
-    testWidgets('默认渲染 PipButton 在右半 + 上半', (tester) async {
+  group('NiumaPlayer inline 左上 BackAction 浮层（M16 后）', () {
+    testWidgets('inline 状态默认渲染 BackAction 在左半 + 上半，无 Cast/Pip',
+        (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: SizedBox(
@@ -658,17 +660,21 @@ void main() {
         ),
       ));
       await tester.pump();
-      expect(find.byType(PipButton), findsOneWidget);
-      // 验位置：button 中心点应在右半 + 上半
-      final pipCenter = tester.getCenter(find.byType(PipButton));
+      expect(find.byType(BackAction), findsOneWidget,
+          reason: 'M16 inline 左上 overlay 是 BackAction');
+      expect(find.byType(PipButton), findsNothing,
+          reason: 'M16 后 inline 不再渲染 PipButton 浮层（仅全屏 more 菜单）');
+      expect(find.byType(NiumaCastButton), findsNothing,
+          reason: 'M16 后 inline 不再渲染 Cast 浮层（仅全屏 more 菜单）');
+      final backCenter = tester.getCenter(find.byType(BackAction));
       final playerCenter = tester.getCenter(find.byType(NiumaPlayer));
-      expect(pipCenter.dx, greaterThan(playerCenter.dx),
-          reason: 'PipButton 应在右半屏');
-      expect(pipCenter.dy, lessThan(playerCenter.dy),
-          reason: 'PipButton 应在上半屏');
+      expect(backCenter.dx, lessThan(playerCenter.dx),
+          reason: 'BackAction 应在左半屏');
+      expect(backCenter.dy, lessThan(playerCenter.dy),
+          reason: 'BackAction 应在上半屏');
     });
 
-    testWidgets('PipButton 跟控件条 auto-hide 同步', (tester) async {
+    testWidgets('BackAction 跟控件条 auto-hide 同步', (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: SizedBox(
@@ -680,18 +686,16 @@ void main() {
           ),
         ),
       ));
-      // 进 playing → 5s 后 controls + PipButton 一起隐藏
       video.value = video.value.copyWith(phase: PlayerPhase.playing);
       await tester.pump();
       await tester.pump(const Duration(seconds: 6));
-      // 找包 PipButton 的最近 AnimatedOpacity 祖先，opacity 应为 0
-      final pipOpacity = tester.widget<AnimatedOpacity>(
+      final backOpacity = tester.widget<AnimatedOpacity>(
         find.ancestor(
-          of: find.byType(PipButton),
+          of: find.byType(BackAction),
           matching: find.byType(AnimatedOpacity),
         ).first,
       );
-      expect(pipOpacity.opacity, 0.0);
+      expect(backOpacity.opacity, 0.0);
     });
   });
 
@@ -746,6 +750,164 @@ void main() {
         find.byType(NiumaGestureLayer),
       );
       expect(layer.disabledGestures, contains(GestureKind.brightness));
+    });
+  });
+
+  group('M16 集成', () {
+    testWidgets('NiumaPlayer 接受 title/subtitle/controlBarConfig 等新参数 build 不抛',
+        (t) async {
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: NiumaPlayer(
+              controller: ctl,
+              title: '测试视频',
+              subtitle: '测试副标题',
+              chapters: const [Duration(seconds: 10), Duration(seconds: 20)],
+            ),
+          ),
+        ),
+      ));
+      expect(find.byType(NiumaPlayer), findsOneWidget);
+      // inline 模式默认仍走 _LegacyM9Bar：PlayPauseButton 仍在
+      expect(find.byType(PlayPauseButton), findsOneWidget);
+    });
+
+    testWidgets('controlBarConfig 传入时 NiumaControlBar 接收同一 config 实例',
+        (t) async {
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: NiumaPlayer(
+              controller: ctl,
+              controlBarConfig: NiumaControlBarConfig.bili,
+            ),
+          ),
+        ),
+      ));
+      final bar = t.widget<NiumaControlBar>(find.byType(NiumaControlBar));
+      expect(bar.config, same(NiumaControlBarConfig.bili),
+          reason: 'NiumaPlayer 应把 controlBarConfig 透传给 inline NiumaControlBar');
+    });
+
+    testWidgets('controlBarConfig 不传时默认走 _LegacyM9Bar（M9 行为不变）',
+        (t) async {
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: NiumaPlayer(controller: ctl),
+          ),
+        ),
+      ));
+      final bar = t.widget<NiumaControlBar>(find.byType(NiumaControlBar));
+      expect(bar.config, isNull,
+          reason: 'controlBarConfig 默认 null 保 M9 老行为');
+    });
+
+    testWidgets('全屏 scope 内：BiliStyleControlBar 替换 NiumaControlBar',
+        (t) async {
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: np_internal.NiumaFullscreenScopeForTesting(
+              child: NiumaPlayer(
+                controller: ctl,
+                title: '全屏标题',
+                fullscreenControlBarConfig: NiumaControlBarConfig.bili,
+              ),
+            ),
+          ),
+        ),
+      ));
+      // 全屏态：NiumaControlBar 不渲染，BiliStyleControlBar 出现
+      expect(find.byType(np_internal.BiliStyleControlBarTypeForTesting),
+          findsOneWidget,
+          reason: '全屏 scope 内应渲染 BiliStyleControlBar');
+      expect(find.byType(NiumaControlBar), findsNothing,
+          reason: '全屏 scope 内不渲染 inline NiumaControlBar');
+    });
+
+    testWidgets('cast picker panel 默认不显示，提供 onCast 钩子', (t) async {
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: NiumaPlayer(controller: ctl),
+          ),
+        ),
+      ));
+      // 默认不显示 panel
+      expect(find.byType(np_internal.NiumaCastPickerPanelTypeForTesting),
+          findsNothing);
+    });
+
+    testWidgets('debugOpenCastPicker：弹出 panel + pause + 记录 wasPlaying',
+        (t) async {
+      final ctl = FakeNiumaPlayerController();
+      final key = GlobalKey<np_internal.NiumaPlayerStateForTesting>();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: NiumaPlayer(key: key, controller: ctl),
+          ),
+        ),
+      ));
+      // 推到 playing
+      ctl.value = ctl.value.copyWith(phase: PlayerPhase.playing);
+      await t.pump();
+
+      key.currentState!.debugOpenCastPicker();
+      await t.pump();
+
+      // panel 出现
+      expect(find.byType(np_internal.NiumaCastPickerPanelTypeForTesting),
+          findsOneWidget);
+      // pause 被调
+      expect(ctl.pauseCount, 1);
+      // wasPlaying 记下来了
+      expect(key.currentState!.debugWasPlayingBeforeCast, isTrue);
+    });
+
+    testWidgets('debugCloseCastPicker：隐藏 panel + 恢复 wasPlaying 时 play',
+        (t) async {
+      final ctl = FakeNiumaPlayerController();
+      final key = GlobalKey<np_internal.NiumaPlayerStateForTesting>();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: NiumaPlayer(key: key, controller: ctl),
+          ),
+        ),
+      ));
+      ctl.value = ctl.value.copyWith(phase: PlayerPhase.playing);
+      await t.pump();
+      key.currentState!.debugOpenCastPicker();
+      await t.pump();
+
+      // 关闭 → 隐藏 + play
+      key.currentState!.debugCloseCastPicker();
+      await t.pump();
+      expect(find.byType(np_internal.NiumaCastPickerPanelTypeForTesting),
+          findsNothing);
+      expect(ctl.playCount, 1, reason: 'wasPlaying=true 关闭 panel 后应恢复 play');
     });
   });
 }

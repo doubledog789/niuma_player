@@ -28,16 +28,28 @@ class FakeNiumaPlayerController extends NiumaPlayerController {
 
   @override
   Future<void> play() async {
+    if (castSession.value != null) {
+      await super.play();
+      return;
+    }
     playCount++;
   }
 
   @override
   Future<void> pause() async {
+    if (castSession.value != null) {
+      await super.pause();
+      return;
+    }
     pauseCount++;
   }
 
   @override
   Future<void> seekTo(Duration position) async {
+    if (castSession.value != null) {
+      await super.seekTo(position);
+      return;
+    }
     lastSeek = position;
   }
 
@@ -85,6 +97,17 @@ class FakeNiumaPlayerController extends NiumaPlayerController {
   /// 测试辅助：直接改 [value.position] 并触发 notifyListeners。
   void setPosition(Duration p) {
     value = value.copyWith(position: p);
+    notifyListeners();
+  }
+
+  /// 测试辅助：直接改播放状态（isPlaying setter）。
+  ///
+  /// `isPlaying = true`  → phase = playing
+  /// `isPlaying = false` → phase = paused
+  set isPlaying(bool playing) {
+    value = value.copyWith(
+      phase: playing ? PlayerPhase.playing : PlayerPhase.paused,
+    );
     notifyListeners();
   }
 

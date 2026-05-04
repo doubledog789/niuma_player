@@ -63,8 +63,7 @@ void main() {
         const NiumaPlayerTheme(timeTextStyle: TextStyle(fontSize: 99)),
       ];
       for (final v in variations) {
-        expect(v == base, isFalse,
-            reason: '差异实例应当与默认实例不相等：$v');
+        expect(v == base, isFalse, reason: '差异实例应当与默认实例不相等：$v');
       }
     });
   });
@@ -136,6 +135,40 @@ void main() {
       );
 
       expect(picked, const NiumaPlayerTheme());
+    });
+  });
+
+  group('M16 fields', () {
+    test('primaryAccent 默认 Color(0xFFFB7299) (B 站粉)', () {
+      const theme = NiumaPlayerTheme();
+      expect(theme.primaryAccent, const Color(0xFFFB7299));
+    });
+
+    test('actionIconSize 默认 20', () {
+      const theme = NiumaPlayerTheme();
+      expect(theme.actionIconSize, 20);
+    });
+
+    test('centerPlayPauseSize 默认 48', () {
+      const theme = NiumaPlayerTheme();
+      expect(theme.centerPlayPauseSize, 48);
+    });
+
+    test('chapterMarkColor 默认半透明白', () {
+      const theme = NiumaPlayerTheme();
+      expect(theme.chapterMarkColor, const Color(0x99FFFFFF));
+    });
+
+    test('actionLabelStyle 默认 8px white', () {
+      const theme = NiumaPlayerTheme();
+      expect(theme.actionLabelStyle.fontSize, 8);
+      expect(theme.actionLabelStyle.color, const Color(0xFFFFFFFF));
+    });
+
+    test('自定义 primaryAccent 后字段保留', () {
+      const customAccent = Color(0xFF00FF00);
+      const theme = NiumaPlayerTheme(primaryAccent: customAccent);
+      expect(theme.primaryAccent, customAccent);
     });
   });
 }
