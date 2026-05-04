@@ -6,7 +6,7 @@ import 'package:niuma_player/niuma_player.dart';
 /// 长视频 demo——演示 M16 inline → 全屏 mockup 风格切换 + 配置驱动 + 业务侧 slot。
 ///
 /// 整合了：
-/// - 多 line 切换 (M6)
+/// - bbb-video（10 分钟 Big Buck Bunny，国内可访问）+ VTT 缩略图 (M8)
 /// - chapter marks 进度条 (M16)
 /// - Cast / PiP (M15 / M12)
 /// - 顶栏 title / subtitle 显示 (M16)
@@ -27,26 +27,12 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
   @override
   void initState() {
     super.initState();
-    _controller = NiumaPlayerController(
-      NiumaMediaSource.lines(
-        lines: [
-          MediaLine(
-            id: 'high',
-            label: '4K',
-            source: NiumaDataSource.network(
-              'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-            ),
-          ),
-          MediaLine(
-            id: 'mid',
-            label: '1080P',
-            source: NiumaDataSource.network(
-              'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-            ),
-          ),
-        ],
-        defaultLineId: 'high',
+    _controller = NiumaPlayerController.dataSource(
+      NiumaDataSource.network(
+        'https://artplayer.org/assets/sample/bbb-video.mp4',
       ),
+      thumbnailVtt:
+          'https://artplayer.org/assets/sample/bbb-thumbnails.vtt',
     );
     unawaited(_initialize());
   }
@@ -79,7 +65,16 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
               controller: _controller,
               title: '【4K修复】经典动画混剪 致敬童年',
               subtitle: '阿伟动漫研究所 · P1 童年回忆',
-              // inline 默认走 M9 9 按钮，全屏切到 mockup bili 预设
+              // inline 显式给 config 走 _ConfigDrivenBar，避开 M9 _LegacyM9Bar
+              // 在 <420dp 屏宽下 hide 9 按钮的行为。
+              controlBarConfig: const NiumaControlBarConfig(
+                bottomLeft: [
+                  NiumaControlButton.playPause,
+                  NiumaControlButton.timeDisplay,
+                  NiumaControlButton.speed,
+                ],
+                bottomRight: [NiumaControlButton.fullscreen],
+              ),
               fullscreenControlBarConfig: NiumaControlBarConfig.bili,
               chapters: const [
                 Duration(minutes: 2),
@@ -133,10 +128,13 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              '演示：inline 默认 M9 9 按钮；全屏切到 mockup B 站风格（顶栏返回+'
-              '标题/副标题+Cast+PiP+线路 pill+三点菜单；中央大圆 PlayPause；'
-              '底栏精简；右侧互动栏）；进度条 chapter marks；'
-              '弹幕 hook；Cast 分屏 panel；PiP；线路切换。',
+              '演示：inline 自定义 4 按钮 (PlayPause/Time/Speed/Fullscreen)；'
+              '全屏切到 mockup B 站风格（顶栏返回+标题/副标题+Cast+PiP+'
+              '线路 pill+三点菜单；中央大圆 PlayPause；底栏精简；右侧互动栏）；'
+              '进度条 chapter marks；VTT 缩略图（拖动几秒后再 scrub）；'
+              '弹幕 hook；Cast 分屏 panel；PiP。\n\n'
+              '资源：artplayer.org bbb-video.mp4（10 分钟 Big Buck Bunny）+ '
+              'bbb-thumbnails.vtt 缩略图 sprite。',
             ),
           ),
         ],
