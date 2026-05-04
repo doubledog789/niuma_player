@@ -54,6 +54,7 @@ class NiumaFullscreenPage extends StatefulWidget {
     this.fullscreenControlBarConfig = NiumaControlBarConfig.bili,
     this.buttonOverrides,
     this.bottomActionsBuilder,
+    this.bottomTrailingBuilder,
     this.rightRailBuilder,
     this.moreMenuBuilder,
     this.chapters,
@@ -109,6 +110,9 @@ class NiumaFullscreenPage extends StatefulWidget {
   /// M16: 底栏额外 slot（透传给内层 [NiumaPlayer.bottomActionsBuilder]）。
   final WidgetBuilder? bottomActionsBuilder;
 
+  /// M16: 底栏 trailing slot（透传给内层 [NiumaPlayer.bottomTrailingBuilder]）。
+  final WidgetBuilder? bottomTrailingBuilder;
+
   /// M16: 全屏右侧 rail（透传给内层 [NiumaPlayer.rightRailBuilder]）。
   final WidgetBuilder? rightRailBuilder;
 
@@ -151,6 +155,7 @@ class NiumaFullscreenPage extends StatefulWidget {
     NiumaControlBarConfig fullscreenControlBarConfig = NiumaControlBarConfig.bili,
     Map<NiumaControlButton, ButtonOverride>? buttonOverrides,
     WidgetBuilder? bottomActionsBuilder,
+    WidgetBuilder? bottomTrailingBuilder,
     WidgetBuilder? rightRailBuilder,
     List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder,
     List<Duration>? chapters,
@@ -176,6 +181,7 @@ class NiumaFullscreenPage extends StatefulWidget {
         fullscreenControlBarConfig: fullscreenControlBarConfig,
         buttonOverrides: buttonOverrides,
         bottomActionsBuilder: bottomActionsBuilder,
+        bottomTrailingBuilder: bottomTrailingBuilder,
         rightRailBuilder: rightRailBuilder,
         moreMenuBuilder: moreMenuBuilder,
         chapters: chapters,
@@ -280,6 +286,7 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
             fullscreenControlBarConfig: widget.fullscreenControlBarConfig,
             buttonOverrides: widget.buttonOverrides,
             bottomActionsBuilder: widget.bottomActionsBuilder,
+            bottomTrailingBuilder: widget.bottomTrailingBuilder,
             rightRailBuilder: widget.rightRailBuilder,
             moreMenuBuilder: widget.moreMenuBuilder,
             chapters: widget.chapters,

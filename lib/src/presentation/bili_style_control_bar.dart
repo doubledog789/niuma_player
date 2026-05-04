@@ -27,6 +27,7 @@ class BiliStyleControlBar extends StatelessWidget {
     this.buttonOverrides,
     this.actionsBuilder,
     this.bottomActionsBuilder,
+    this.bottomTrailingBuilder,
     this.rightRailBuilder,
     this.onBack,
     this.onCast,
@@ -44,6 +45,7 @@ class BiliStyleControlBar extends StatelessWidget {
   final Map<NiumaControlButton, ButtonOverride>? buttonOverrides;
   final WidgetBuilder? actionsBuilder;
   final WidgetBuilder? bottomActionsBuilder;
+  final WidgetBuilder? bottomTrailingBuilder;
   final WidgetBuilder? rightRailBuilder;
   final VoidCallback? onBack;
   final VoidCallback? onCast;
@@ -129,8 +131,10 @@ class BiliStyleControlBar extends StatelessWidget {
               children: [
                 ..._buildList(context, config.topLeading, resolver),
                 const Spacer(),
-                ..._buildList(context, config.topActions, resolver),
+                // 业务自定义 actions 在 SDK enum 之前渲染，让 enum 末尾的
+                // 三点菜单 [more] 在最右贴边——和 mockup 视觉一致。
                 if (actionsBuilder != null) actionsBuilder!(context),
+                ..._buildList(context, config.topActions, resolver),
               ],
             ),
           ),
@@ -184,6 +188,10 @@ class BiliStyleControlBar extends StatelessWidget {
                     if (bottomActionsBuilder != null)
                       bottomActionsBuilder!(context),
                     const Spacer(),
+                    // 业务自定义 trailing 在右侧 enum 之前渲染——demo 用来
+                    // 把"选集"放在 倍速/线路切换 之前，对齐 mockup 截图。
+                    if (bottomTrailingBuilder != null)
+                      bottomTrailingBuilder!(context),
                     ..._buildList(context, config.bottomRight, resolver),
                   ],
                 ),

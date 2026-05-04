@@ -72,6 +72,7 @@ class FullscreenButton extends StatelessWidget {
               cfg?.fullscreenControlBarConfig ?? NiumaControlBarConfig.bili,
           buttonOverrides: cfg?.buttonOverrides,
           bottomActionsBuilder: cfg?.bottomActionsBuilder,
+          bottomTrailingBuilder: cfg?.bottomTrailingBuilder,
           rightRailBuilder: cfg?.rightRailBuilder,
           moreMenuBuilder: cfg?.moreMenuBuilder,
           chapters: cfg?.chapters,

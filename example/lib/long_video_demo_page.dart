@@ -92,27 +92,21 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
                 ],
               ),
               moreMenuBuilder: (ctx) => [
-                const PopupMenuItem(value: 'subtitle', child: Text('字幕设置')),
                 const PopupMenuItem(value: 'report', child: Text('反馈问题')),
               ],
-              bottomActionsBuilder: (ctx) => Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextButton(
-                    onPressed: () => _showSnack('点击：下一集'),
-                    child: const Text(
-                      '下一集',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => _showSnack('点击：选集'),
-                    child: const Text(
-                      '选集 P1',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ],
+              bottomActionsBuilder: (ctx) => TextButton(
+                onPressed: () => _showSnack('点击：下一集'),
+                child: const Text(
+                  '下一集',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+              bottomTrailingBuilder: (ctx) => TextButton(
+                onPressed: () => _showSnack('点击：选集'),
+                child: const Text(
+                  '选集 P1',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
               ),
               rightRailBuilder: (ctx) => Column(
                 mainAxisSize: MainAxisSize.min,

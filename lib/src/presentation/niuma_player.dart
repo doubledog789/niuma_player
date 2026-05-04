@@ -71,6 +71,7 @@ class NiumaPlayer extends StatefulWidget {
     this.fullscreenControlBarConfig = NiumaControlBarConfig.bili,
     this.buttonOverrides,
     this.bottomActionsBuilder,
+    this.bottomTrailingBuilder,
     this.rightRailBuilder,
     this.moreMenuBuilder,
     this.chapters,
@@ -134,9 +135,13 @@ class NiumaPlayer extends StatefulWidget {
   /// 仅在全屏 [BiliStyleControlBar] 上生效（inline 暂不支持）。
   final Map<NiumaControlButton, ButtonOverride>? buttonOverrides;
 
-  /// 底栏左侧按钮区**之后**的额外 slot——业务想塞 episode/next/prev 等播放
-  /// 列表按钮就放这里。仅全屏生效。
+  /// 底栏左侧按钮区**之后**的额外 slot——业务想塞 next/prev 等"接 playPause"
+  /// 的播放列表按钮就放这里。仅全屏生效。
   final WidgetBuilder? bottomActionsBuilder;
+
+  /// 底栏右侧 enum **之前**的额外 slot——业务想把"选集 / 集数"等放在
+  /// 倍速 / 线路切换 之前就放这里。仅全屏生效。
+  final WidgetBuilder? bottomTrailingBuilder;
 
   /// 全屏右侧 rail（垂直堆叠的浮动按钮，B 站风格"点赞 / 投币 / 收藏 / 分享"）。
   final WidgetBuilder? rightRailBuilder;
@@ -650,6 +655,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 buttonOverrides: widget.buttonOverrides,
                 actionsBuilder: widget.actionsBuilder,
                 bottomActionsBuilder: widget.bottomActionsBuilder,
+                bottomTrailingBuilder: widget.bottomTrailingBuilder,
                 rightRailBuilder: widget.rightRailBuilder,
                 onBack: () => _exitFullscreen(innerContext),
                 onCast: _openCastPicker,
@@ -817,6 +823,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       fullscreenControlBarConfig: widget.fullscreenControlBarConfig,
       buttonOverrides: widget.buttonOverrides,
       bottomActionsBuilder: widget.bottomActionsBuilder,
+      bottomTrailingBuilder: widget.bottomTrailingBuilder,
       rightRailBuilder: widget.rightRailBuilder,
       moreMenuBuilder: widget.moreMenuBuilder,
       chapters: widget.chapters,
@@ -879,6 +886,7 @@ class NiumaPlayerConfigScope extends InheritedWidget {
     required this.fullscreenControlBarConfig,
     required this.buttonOverrides,
     required this.bottomActionsBuilder,
+    required this.bottomTrailingBuilder,
     required this.rightRailBuilder,
     required this.moreMenuBuilder,
     required this.chapters,
@@ -934,6 +942,9 @@ class NiumaPlayerConfigScope extends InheritedWidget {
   /// M16: 底栏额外 slot（透传给全屏页 NiumaPlayer.bottomActionsBuilder）。
   final WidgetBuilder? bottomActionsBuilder;
 
+  /// M16: 底栏 trailing slot（透传给全屏页 NiumaPlayer.bottomTrailingBuilder）。
+  final WidgetBuilder? bottomTrailingBuilder;
+
   /// M16: 全屏右侧 rail（透传给全屏页 NiumaPlayer.rightRailBuilder）。
   final WidgetBuilder? rightRailBuilder;
 
@@ -969,6 +980,7 @@ class NiumaPlayerConfigScope extends InheritedWidget {
       fullscreenControlBarConfig != oldWidget.fullscreenControlBarConfig ||
       buttonOverrides != oldWidget.buttonOverrides ||
       bottomActionsBuilder != oldWidget.bottomActionsBuilder ||
+      bottomTrailingBuilder != oldWidget.bottomTrailingBuilder ||
       rightRailBuilder != oldWidget.rightRailBuilder ||
       moreMenuBuilder != oldWidget.moreMenuBuilder ||
       chapters != oldWidget.chapters ||
