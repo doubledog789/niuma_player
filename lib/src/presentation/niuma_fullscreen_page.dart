@@ -264,9 +264,14 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
   Widget build(BuildContext context) {
     final scaffold = Scaffold(
       backgroundColor: Colors.black,
+      // SafeArea 全关——横屏全屏 immersiveSticky 模式系统 bar 已隐藏，
+      // 默认左右 inset 会把 NiumaPlayer 推离屏幕边缘 24-48px（Android 曲面屏
+      // / cutout），导致顶栏 ⋮ / 底栏元素永远贴不到屏幕真正边缘。
       body: SafeArea(
         top: false,
         bottom: false,
+        left: false,
+        right: false,
         child: NiumaFullscreenScope(
           child: NiumaPlayer(
             controller: widget.controller,
