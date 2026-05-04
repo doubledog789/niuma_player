@@ -30,7 +30,7 @@ class ScrubBar extends StatefulWidget {
   ///
   /// 每个 [Duration] 对应进度条上方一根 1px 宽、5px 高的白线（颜色由
   /// [NiumaPlayerTheme.chapterMarkColor] 控制）。超出 duration 范围的
-  /// 时间点不渲染。标记带 `Key('scrub-chapter-mark')` 供测试查找。
+  /// 时间点不渲染。标记外层 Positioned 带 `ValueKey('scrub-chapter-mark-$i')` 供测试查找。
   final List<Duration>? chapters;
 
   @override
@@ -115,7 +115,6 @@ class _ScrubBarState extends State<ScrubBar> {
                               1,
                           child: IgnorePointer(
                             child: Container(
-                              key: const Key('scrub-chapter-mark'),
                               width: 1,
                               height: theme.scrubBarHeight + 2,
                               color: theme.chapterMarkColor,

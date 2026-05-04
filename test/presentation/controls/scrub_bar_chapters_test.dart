@@ -4,6 +4,13 @@ import 'package:niuma_player/src/presentation/controls/scrub_bar.dart';
 
 import 'fake_controller.dart';
 
+/// Returns a [Finder] that matches Positioned widgets whose key is a
+/// [ValueKey<String>] starting with 'scrub-chapter-mark-'.
+Finder _chapterMarkFinder() => find.byWidgetPredicate((w) {
+      final k = w.key;
+      return k is ValueKey<String> && k.value.startsWith('scrub-chapter-mark-');
+    });
+
 void main() {
   testWidgets('ScrubBar 不传 chapters 时不渲染 chapter mark', (t) async {
     final ctl = FakeNiumaPlayerController();
@@ -11,7 +18,7 @@ void main() {
       home: Scaffold(body: ScrubBar(controller: ctl)),
     ));
     await t.pumpAndSettle();
-    expect(find.byKey(const Key('scrub-chapter-mark')), findsNothing);
+    expect(_chapterMarkFinder(), findsNothing);
     await ctl.dispose();
   });
 
@@ -35,7 +42,7 @@ void main() {
       ),
     ));
     await t.pumpAndSettle();
-    expect(find.byKey(const Key('scrub-chapter-mark')), findsNWidgets(3));
+    expect(_chapterMarkFinder(), findsNWidgets(3));
     await ctl.dispose();
   });
 }
