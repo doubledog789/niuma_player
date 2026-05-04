@@ -12,19 +12,24 @@ class MoreAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
-    // padding/constraints 紧凑，避免 Material 默认 48dp hit area 让
-    // ⋮ 离顶栏右边缘有空隙——mockup 是贴边的。minWidth=24 配合
-    // BiliStyleControlBar 顶栏 Container right padding=0，让 ⋮ 距屏幕右 ~2px。
-    return IconButton(
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-      icon: Icon(
-        Icons.more_horiz,
-        color: theme.actionIconColor,
-        size: theme.actionIconSize,
+    // 不用 IconButton——它默认 MaterialTapTargetSize.padded 强制 48×48
+    // 最小 hit area 且 IconButton 不暴露这个参数让我们关掉。
+    // InkWell + Padding + Icon 自己控制 size，保证 ⋮ icon 紧贴 button 右
+    // 边、配合 BiliStyleControlBar Container right padding=0，icon 距屏幕
+    // 右仅 ~6px (Padding 右 6px)。
+    return Tooltip(
+      message: '更多',
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          child: Icon(
+            Icons.more_horiz,
+            color: theme.actionIconColor,
+            size: theme.actionIconSize,
+          ),
+        ),
       ),
-      onPressed: onTap,
-      tooltip: '更多',
     );
   }
 }

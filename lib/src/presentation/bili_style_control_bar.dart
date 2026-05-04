@@ -119,8 +119,6 @@ class BiliStyleControlBar extends StatelessWidget {
           left: 0,
           right: 0,
           child: Container(
-            // 右内 padding 设 0 让最右元素紧贴屏幕右边缘。配合
-            // [MoreAction] IconButton minWidth=24 让 ⋮ icon 距屏幕右 ~2px。
             padding: const EdgeInsets.fromLTRB(18, 10, 0, 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -133,8 +131,6 @@ class BiliStyleControlBar extends StatelessWidget {
               children: [
                 ..._buildList(context, config.topLeading, resolver),
                 const Spacer(),
-                // 业务自定义 actions 在 SDK enum 之前渲染，让 enum 末尾的
-                // 三点菜单 [more] 在最右贴边——和 mockup 视觉一致。
                 if (actionsBuilder != null) actionsBuilder!(context),
                 ..._buildList(context, config.topActions, resolver),
               ],
