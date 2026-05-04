@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 屏幕外框 -->
+  <rect x="6" y="10" width="36" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 左下角 wifi 信号 (Cast 标志) -->
+  <path d="M 11 32 Q 11 28 15 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 11 27 Q 11 21 17 21 Q 21 21 23 25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="11" cy="32" r="1.5" fill="currentColor"/>
+</svg>

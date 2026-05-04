@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 
 import '../domain/niuma_short_video_theme.dart';
+import '../niuma_sdk_assets.dart';
+import 'controls/niuma_sdk_icon.dart';
 
 /// 短视频暂停态中央粘性图标。
 ///
@@ -33,8 +35,8 @@ class NiumaShortVideoPauseIndicator extends StatelessWidget {
             color: theme.pauseIndicatorBackgroundColor,
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            Icons.play_arrow_rounded,
+          child: NiumaSdkIcon(
+            asset: NiumaSdkAssets.icPlay,
             color: theme.pauseIndicatorIconColor,
             size: theme.pauseIndicatorIconSize,
           ),

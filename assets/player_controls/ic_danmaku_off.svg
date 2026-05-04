@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 弹幕气泡(整体降低不透明度) -->
+  <g opacity="0.5">
+    <path d="M 6 12 Q 6 8 10 8 L 38 8 Q 42 8 42 12 L 42 28 Q 42 32 38 32 L 22 32 L 14 38 L 14 32 L 10 32 Q 6 32 6 28 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+    <line x1="12" y1="15" x2="32" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <line x1="16" y1="20" x2="36" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="25" x2="28" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <!-- 关闭斜线 -->
+  <line x1="6" y1="42" x2="42" y2="6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+</svg>

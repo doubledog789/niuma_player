@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 屏幕外框 -->
+  <rect x="6" y="10" width="36" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="2.5"/>
+  <!-- HD 字样 -->
+  <text x="24" y="26" text-anchor="middle" fill="currentColor" font-family="ui-monospace, monospace" font-size="11" font-weight="700">HD</text>
+  <!-- 底部支架 -->
+  <line x1="18" y1="38" x2="30" y2="38" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="24" y1="32" x2="24" y2="38" stroke="currentColor" stroke-width="2"/>
+</svg>

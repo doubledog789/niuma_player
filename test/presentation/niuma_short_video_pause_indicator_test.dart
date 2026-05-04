@@ -2,7 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 import 'package:niuma_player/src/presentation/niuma_short_video_pause_indicator.dart';
+
+import '../_helpers/svg_finder.dart';
 
 void main() {
   testWidgets('渲染圆形容器 + play_arrow_rounded 图标', (tester) async {
@@ -14,7 +18,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsOneWidget);
   });
 
   testWidgets('容器尺寸 == theme.pauseIndicatorSize', (tester) async {
@@ -45,7 +49,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    final icon = tester.widget<Icon>(find.byType(Icon));
+    final icon = tester.widget<NiumaSdkIcon>(find.byType(NiumaSdkIcon));
     expect(icon.size, 80);
   });
 
@@ -58,7 +62,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    final icon = tester.widget<Icon>(find.byType(Icon));
+    final icon = tester.widget<NiumaSdkIcon>(find.byType(NiumaSdkIcon));
     expect(icon.color, const Color(0xFF112233));
   });
 

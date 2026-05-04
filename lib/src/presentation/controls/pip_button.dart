@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
+import 'niuma_sdk_icon.dart';
 
 /// PiP（画中画）开关按钮。
 ///
@@ -32,8 +34,8 @@ class PipButton extends StatelessWidget {
             ignoring: true,
             child: IconButton(
               onPressed: null,
-              icon: Icon(
-                Icons.picture_in_picture_alt_outlined,
+              icon: NiumaSdkIcon(
+                asset: NiumaSdkAssets.icPip,
                 color: Colors.white38,
               ),
               tooltip: 'PiP（设备不支持）',
@@ -43,8 +45,8 @@ class PipButton extends StatelessWidget {
         if (v.isInPictureInPicture) {
           return IconButton(
             onPressed: () => controller.exitPictureInPicture(),
-            icon: const Icon(
-              Icons.picture_in_picture_alt,
+            icon: const NiumaSdkIcon(
+              asset: NiumaSdkAssets.icPipExit,
               color: Colors.white,
             ),
             tooltip: '退出画中画',
@@ -52,8 +54,8 @@ class PipButton extends StatelessWidget {
         }
         return IconButton(
           onPressed: () => controller.enterPictureInPicture(),
-          icon: const Icon(
-            Icons.picture_in_picture_alt_outlined,
+          icon: const NiumaSdkIcon(
+            asset: NiumaSdkAssets.icPip,
             color: Colors.white,
           ),
           tooltip: '进入画中画',

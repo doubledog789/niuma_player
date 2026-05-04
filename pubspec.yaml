@@ -63,4 +63,6 @@ flutter:
       ios:
         pluginClass: NiumaPlayerPlugin
   assets:
-    - assets/loading/loading_animated.svg
+    - assets/loading/
+    - assets/player_controls/
+    - assets/progress_thumbs/

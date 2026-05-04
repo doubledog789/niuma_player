@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 小窗户 -->
+  <rect x="14" y="16" width="20" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 退出箭头 (向右上) -->
+  <path d="M 26 22 L 38 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <polyline points="32,10 38,10 38,16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

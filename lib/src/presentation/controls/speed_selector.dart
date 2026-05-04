@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 倍速选择按钮——展开 popup 列出 0.5x / 1.0x / 1.5x / 2.0x。
 ///
@@ -23,7 +25,11 @@ class SpeedSelector extends StatelessWidget {
       iconSize: theme.iconSize,
       iconColor: theme.iconColor,
       tooltip: '倍速',
-      icon: const Icon(Icons.speed),
+      icon: NiumaSdkIcon(
+        asset: NiumaSdkAssets.icSpeed,
+        size: theme.iconSize,
+        color: theme.iconColor,
+      ),
       itemBuilder: (context) => [
         for (final s in speeds)
           PopupMenuItem<double>(

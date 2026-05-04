@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 弹幕开关——可视化 toggle，state 驱动外部 `ValueNotifier<bool>`。
 ///
@@ -23,8 +25,8 @@ class DanmakuToggle extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  on ? Icons.message : Icons.message_outlined,
+                NiumaSdkIcon(
+                  asset: NiumaSdkAssets.danmakuToggleIcon(isOn: on),
                   color: theme.actionIconColor,
                   size: 18,
                 ),

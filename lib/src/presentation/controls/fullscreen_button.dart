@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_control_bar_config.dart';
 import '../niuma_fullscreen_page.dart';
 import '../niuma_player.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 全屏切换按钮。
 ///
@@ -91,8 +93,10 @@ class FullscreenButton extends StatelessWidget {
       padding: EdgeInsets.zero,
       iconSize: theme.iconSize,
       color: theme.iconColor,
-      icon: Icon(
-        inFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+      icon: NiumaSdkIcon(
+        asset: NiumaSdkAssets.fullscreenIcon(isFullscreen: inFullscreen),
+        size: theme.iconSize,
+        color: theme.iconColor,
       ),
       onPressed: () => _onPressed(context),
     );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 字幕按钮——M9 阶段**禁用**视觉，M10 启用真实逻辑。
 ///
@@ -21,8 +23,8 @@ class SubtitleButton extends StatelessWidget {
           opacity: 0.4,
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Icon(
-              Icons.subtitles,
+            child: NiumaSdkIcon(
+              asset: NiumaSdkAssets.icSubtitle,
               size: theme.iconSize,
               color: theme.iconColor,
             ),

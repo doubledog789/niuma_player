@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- 外圈光晕 -->
+  <circle cx="12" cy="12" r="11" fill="#EF9F27" fill-opacity="0.2"/>
+  <!-- 主体 -->
+  <circle cx="12" cy="12" r="7" fill="#FAC775" stroke="#1a1410" stroke-width="1.5"/>
+  <!-- 中心点 -->
+  <circle cx="12" cy="12" r="2.5" fill="#EF9F27"/>
+</svg>

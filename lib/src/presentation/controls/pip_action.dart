@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
 import 'icon_label_action.dart';
+import 'niuma_sdk_icon.dart';
 
 /// mockup 风格的画中画按钮——icon + 「画中画」中文 label 垂直布局。
 ///
@@ -19,7 +21,7 @@ class PipAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconLabelAction(
-      icon: const Icon(Icons.picture_in_picture_alt),
+      icon: const NiumaSdkIcon(asset: NiumaSdkAssets.icPip),
       label: '画中画',
       onTap: onTap ?? () {},
     );

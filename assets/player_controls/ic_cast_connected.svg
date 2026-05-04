@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <rect x="6" y="10" width="36" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 内部填充小屏幕 (已连接) -->
+  <rect x="14" y="16" width="22" height="14" rx="1" fill="currentColor"/>
+  <!-- 左下信号点 -->
+  <circle cx="11" cy="32" r="1.8" fill="currentColor"/>
+</svg>

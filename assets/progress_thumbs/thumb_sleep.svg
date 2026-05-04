@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="30" fill="#1a1410"/>
+  <circle cx="32" cy="32" r="28" fill="#FAC775"/>
+  <polygon points="14,18 8,4 18,12" fill="#854F0B"/>
+  <polygon points="50,18 56,4 46,12" fill="#854F0B"/>
+  <polygon points="22,8 24,2 26,8" fill="#854F0B"/>
+  <polygon points="32,5 34,-1 36,5" fill="#854F0B"/>
+  <polygon points="40,8 42,2 44,8" fill="#854F0B"/>
+  <!-- 闭眼 -->
+  <line x1="20" y1="30" x2="28" y2="30" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="36" y1="30" x2="44" y2="30" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+  <rect x="27" y="40" width="10" height="5" rx="2.5" fill="#854F0B"/>
+  <!-- Z 字 -->
+  <text x="48" y="20" fill="#FAC775" font-family="monospace" font-size="14" font-weight="700">z</text>
+  <text x="54" y="12" fill="#FAC775" font-family="monospace" font-size="10" font-weight="700">z</text>
+</svg>

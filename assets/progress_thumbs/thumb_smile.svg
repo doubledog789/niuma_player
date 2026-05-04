@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="30" fill="#1a1410"/>
+  <circle cx="32" cy="32" r="28" fill="#FAC775"/>
+  <polygon points="14,18 8,4 18,12" fill="#854F0B"/>
+  <polygon points="50,18 56,4 46,12" fill="#854F0B"/>
+  <polygon points="22,8 24,2 26,8" fill="#854F0B"/>
+  <polygon points="32,5 34,-1 36,5" fill="#854F0B"/>
+  <polygon points="40,8 42,2 44,8" fill="#854F0B"/>
+  <!-- 眯眼笑 -->
+  <path d="M 20 30 Q 24 26 28 30" stroke="#1a1410" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M 36 30 Q 40 26 44 30" stroke="#1a1410" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <rect x="27" y="40" width="10" height="5" rx="2.5" fill="#854F0B"/>
+  <!-- 微笑嘴 -->
+  <path d="M 27 50 Q 32 54 37 50" stroke="#1a1410" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+</svg>

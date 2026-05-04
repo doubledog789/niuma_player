@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/player_state.dart';
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 播放 / 暂停切换按钮。
 ///
@@ -30,7 +32,11 @@ class PlayPauseButton extends StatelessWidget {
           padding: EdgeInsets.zero,
           iconSize: theme.iconSize,
           color: theme.iconColor,
-          icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+          icon: NiumaSdkIcon(
+            asset: NiumaSdkAssets.playPauseIcon(isPlaying: isPlaying),
+            size: theme.iconSize,
+            color: theme.iconColor,
+          ),
           onPressed: () {
             if (isPlaying) {
               controller.pause();

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 弹幕外框 -->
+  <path d="M 6 12 Q 6 8 10 8 L 30 8 Q 34 8 34 12 L 34 24 Q 34 28 30 28 L 18 28 L 12 33 L 12 28 L 10 28 Q 6 28 6 24 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+  <line x1="11" y1="14" x2="26" y2="14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="14" y1="20" x2="29" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 右下小齿轮 -->
+  <g transform="translate(36, 32)">
+    <circle r="6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+    <circle r="2" fill="currentColor"/>
+    <line x1="0" y1="-9" x2="0" y2="-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="0" y1="7" x2="0" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="-9" y1="0" x2="-7" y2="0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="7" y1="0" x2="9" y2="0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+</svg>

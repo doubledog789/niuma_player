@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 8齿齿轮 -->
+  <g fill="currentColor">
+    <rect x="22" y="4" width="4" height="8" rx="1"/>
+    <rect x="22" y="36" width="4" height="8" rx="1"/>
+    <rect x="4" y="22" width="8" height="4" rx="1"/>
+    <rect x="36" y="22" width="8" height="4" rx="1"/>
+    <rect x="22" y="4" width="4" height="8" rx="1" transform="rotate(45 24 24)"/>
+    <rect x="22" y="4" width="4" height="8" rx="1" transform="rotate(-45 24 24)"/>
+    <rect x="4" y="22" width="8" height="4" rx="1" transform="rotate(45 24 24)"/>
+    <rect x="4" y="22" width="8" height="4" rx="1" transform="rotate(-45 24 24)"/>
+  </g>
+  <!-- 中间圆 -->
+  <circle cx="24" cy="24" r="11" fill="currentColor"/>
+  <circle cx="24" cy="24" r="5" fill="#1a1410"/>
+</svg>

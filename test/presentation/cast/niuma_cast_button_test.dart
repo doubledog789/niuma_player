@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 
+import '../../_helpers/svg_finder.dart';
 import '../controls/fake_controller.dart';
 
 void main() {
@@ -11,8 +12,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: NiumaCastButton(controller: ctl)),
     ));
-    expect(find.byIcon(Icons.cast), findsOneWidget);
-    expect(find.byIcon(Icons.cast_connected), findsNothing);
+    expect(findNiumaIcon(NiumaSdkAssets.icCast), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icCastConnected), findsNothing);
   });
 
   testWidgets('castSession 非 null → 显示 cast_connected 图标 + 设备名', (tester) async {
@@ -21,7 +22,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: NiumaCastButton(controller: ctl)),
     ));
-    expect(find.byIcon(Icons.cast_connected), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icCastConnected), findsOneWidget);
     expect(find.text('客厅小米电视'), findsOneWidget);
   });
 }

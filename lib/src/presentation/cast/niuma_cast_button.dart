@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../cast/cast_session.dart';
+import '../../niuma_sdk_assets.dart';
+import '../controls/niuma_sdk_icon.dart';
 import '../niuma_player_controller.dart';
 
 /// 投屏按钮。inline / 投屏中两态自动切。
@@ -30,7 +32,10 @@ class NiumaCastButton extends StatelessWidget {
       builder: (ctx, session, _) {
         if (session == null) {
           return IconButton(
-            icon: const Icon(Icons.cast, color: Colors.white),
+            icon: const NiumaSdkIcon(
+              asset: NiumaSdkAssets.icCast,
+              color: Colors.white,
+            ),
             onPressed: onTap,
             tooltip: '投屏',
           );
@@ -39,8 +44,8 @@ class NiumaCastButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(
-                Icons.cast_connected,
+              icon: const NiumaSdkIcon(
+                asset: NiumaSdkAssets.icCastConnected,
                 color: Colors.lightBlueAccent,
               ),
               onPressed: onTap,

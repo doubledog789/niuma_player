@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../niuma_sdk_assets.dart';
+import 'controls/niuma_sdk_icon.dart';
 import 'glass_card.dart';
 import 'niuma_danmaku_controller.dart';
 import 'niuma_fullscreen_page.dart';
@@ -56,8 +58,8 @@ class NiumaShortVideoFullscreenButton extends StatelessWidget {
       child: GlassCard(
         radius: 999,
         padding: EdgeInsets.all(size * 0.18),
-        child: Icon(
-          inFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+        child: NiumaSdkIcon(
+          asset: NiumaSdkAssets.fullscreenIcon(isFullscreen: inFullscreen),
           color: Colors.white,
           size: size * 0.55,
         ),

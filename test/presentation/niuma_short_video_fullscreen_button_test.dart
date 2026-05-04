@@ -4,6 +4,7 @@ import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/niuma_fullscreen_page.dart'
     show NiumaFullscreenPage, NiumaFullscreenScope;
 
+import '../_helpers/svg_finder.dart';
 import 'controls/fake_controller.dart';
 
 void main() {
@@ -18,8 +19,8 @@ void main() {
       ),
     ));
 
-    expect(find.byIcon(Icons.fullscreen), findsOneWidget);
-    expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
+    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenEnter), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenExit), findsNothing);
   });
 
   testWidgets('在 M9 NiumaFullscreenScope 内显示 Icons.fullscreen_exit',
@@ -34,8 +35,8 @@ void main() {
       ),
     ));
 
-    expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
-    expect(find.byIcon(Icons.fullscreen), findsNothing);
+    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenExit), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenEnter), findsNothing);
   });
 
   testWidgets('不在 scope 时点击 push 一个新 route', (tester) async {

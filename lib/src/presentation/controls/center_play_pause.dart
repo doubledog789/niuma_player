@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// mockup 屏幕中央的大圆 PlayPause 按钮。
 ///
@@ -37,8 +39,8 @@ class CenterPlayPause extends StatelessWidget {
               child: SizedBox(
                 width: theme.centerPlayPauseSize,
                 height: theme.centerPlayPauseSize,
-                child: Icon(
-                  Icons.play_arrow,
+                child: NiumaSdkIcon(
+                  asset: NiumaSdkAssets.icPlay,
                   color: theme.actionIconColor,
                   size: theme.centerPlayPauseSize / 2,
                 ),

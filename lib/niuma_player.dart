@@ -41,6 +41,11 @@ export 'src/presentation/niuma_fullscreen_page.dart' show NiumaFullscreenPage;
 export 'src/presentation/niuma_loading_indicator.dart'
     show NiumaLoadingIndicator;
 
+// 资源包路径常量 + 进度条牛马表情 thumb（5 状态）
+export 'src/niuma_sdk_assets.dart'
+    show NiumaSdkAssets, NiumaProgressThumbState;
+export 'src/presentation/niuma_progress_thumb.dart' show NiumaProgressThumb;
+
 // M9 缩略图悬浮预览
 export 'src/presentation/niuma_scrub_preview.dart' show NiumaScrubPreview;
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 
+import '../../_helpers/svg_finder.dart';
 import 'fake_controller.dart';
 
 void main() {
@@ -13,7 +14,7 @@ void main() {
     ));
 
     // length == 1 → SizedBox.shrink，没有图标。
-    expect(find.byIcon(Icons.high_quality), findsNothing);
+    expect(findNiumaIcon(NiumaSdkAssets.icQuality), findsNothing);
   });
 
   testWidgets('source.lines.length > 1 时渲染并展开 popup', (tester) async {
@@ -38,7 +39,7 @@ void main() {
       home: Scaffold(body: Center(child: QualitySelector(controller: ctl))),
     ));
 
-    expect(find.byIcon(Icons.high_quality), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icQuality), findsOneWidget);
 
     await tester.tap(find.byType(QualitySelector));
     await tester.pumpAndSettle();

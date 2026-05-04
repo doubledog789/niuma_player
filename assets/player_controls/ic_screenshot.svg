@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 相机外框 -->
+  <rect x="6" y="14" width="36" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 顶部凸起 -->
+  <path d="M 16 14 L 18 10 L 30 10 L 32 14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 镜头 -->
+  <circle cx="24" cy="27" r="6" fill="none" stroke="currentColor" stroke-width="2.5"/>
+</svg>

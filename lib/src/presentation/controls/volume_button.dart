@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 静音 / 取消静音切换按钮。
 ///
@@ -35,7 +37,11 @@ class _VolumeButtonState extends State<VolumeButton> {
       padding: EdgeInsets.zero,
       iconSize: theme.iconSize,
       color: theme.iconColor,
-      icon: Icon(_muted ? Icons.volume_off : Icons.volume_up),
+      icon: NiumaSdkIcon(
+        asset: NiumaSdkAssets.volumeIcon(volume: _muted ? 0.0 : 1.0),
+        size: theme.iconSize,
+        color: theme.iconColor,
+      ),
       onPressed: _toggle,
     );
   }

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 双三角加速箭头风格 -->
+  <polygon points="8,14 8,34 22,24" fill="currentColor"/>
+  <polygon points="22,14 22,34 36,24" fill="currentColor"/>
+  <!-- 小角标 x -->
+  <text x="40" y="14" text-anchor="middle" fill="currentColor" font-family="ui-monospace, monospace" font-size="9" font-weight="700">x</text>
+</svg>

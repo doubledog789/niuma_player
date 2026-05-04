@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 
+import '../../_helpers/svg_finder.dart';
 import 'fake_controller.dart';
 
 void main() {
@@ -31,7 +32,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: PipButton(controller: c)),
     ));
-    expect(find.byIcon(Icons.picture_in_picture_alt_outlined), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icPip), findsOneWidget);
     expect(c.enterPictureInPictureCalled, 0);
     await tester.tap(find.byType(PipButton));
     await tester.pump();
@@ -48,7 +49,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: PipButton(controller: c)),
     ));
-    expect(find.byIcon(Icons.picture_in_picture_alt), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icPipExit), findsOneWidget);
     await tester.tap(find.byType(PipButton));
     await tester.pump();
     expect(c.exitPictureInPictureCalled, 1);
@@ -72,6 +73,6 @@ void main() {
     // 翻 supported=true → 普通态
     c.value = c.value.copyWith(isPictureInPictureSupported: true);
     await tester.pump();
-    expect(find.byIcon(Icons.picture_in_picture_alt_outlined), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icPip), findsOneWidget);
   });
 }

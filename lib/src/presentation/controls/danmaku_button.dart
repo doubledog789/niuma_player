@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_danmaku_controller.dart';
 import '../niuma_danmaku_scope.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 弹幕开关按钮。
 ///
@@ -27,7 +29,10 @@ class DanmakuButton extends StatelessWidget {
         ignoring: true,
         child: IconButton(
           onPressed: null,
-          icon: Icon(Icons.subtitles_off, color: Colors.white38),
+          icon: NiumaSdkIcon(
+            asset: NiumaSdkAssets.icDanmakuOff,
+            color: Colors.white38,
+          ),
           tooltip: '弹幕（未注入 controller）',
         ),
       );
@@ -39,8 +44,8 @@ class DanmakuButton extends StatelessWidget {
         return IconButton(
           onPressed: () => ctl.updateSettings(
               ctl.settings.copyWith(visible: !on)),
-          icon: Icon(
-            on ? Icons.subtitles : Icons.subtitles_off,
+          icon: NiumaSdkIcon(
+            asset: NiumaSdkAssets.danmakuToggleIcon(isOn: on),
             color: Colors.white,
           ),
           tooltip: on ? '关闭弹幕' : '开启弹幕',

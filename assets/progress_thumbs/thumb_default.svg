@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 默认状态: × × 死机眼,Debug风格主图 -->
+  <circle cx="32" cy="32" r="30" fill="#1a1410"/>
+  <circle cx="32" cy="32" r="28" fill="#FAC775"/>
+  <!-- 角 -->
+  <polygon points="14,18 8,4 18,12" fill="#854F0B"/>
+  <polygon points="50,18 56,4 46,12" fill="#854F0B"/>
+  <!-- 鬃毛 -->
+  <polygon points="22,8 24,2 26,8" fill="#854F0B"/>
+  <polygon points="32,5 34,-1 36,5" fill="#854F0B"/>
+  <polygon points="40,8 42,2 44,8" fill="#854F0B"/>
+  <!-- X 眼 -->
+  <line x1="20" y1="26" x2="28" y2="34" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="20" y1="34" x2="28" y2="26" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="36" y1="26" x2="44" y2="34" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="36" y1="34" x2="44" y2="26" stroke="#1a1410" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- 鼻 -->
+  <rect x="27" y="40" width="10" height="5" rx="2.5" fill="#854F0B"/>
+  <!-- O 嘴 -->
+  <ellipse cx="32" cy="50" rx="3" ry="2" fill="#1a1410"/>
+</svg>

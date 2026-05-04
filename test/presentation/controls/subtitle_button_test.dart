@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
 import 'package:niuma_player/src/presentation/controls/subtitle_button.dart';
+
+import '../../_helpers/svg_finder.dart';
 
 void main() {
   testWidgets('disabled 视觉——降低 opacity / 灰色', (tester) async {
@@ -8,10 +11,13 @@ void main() {
       home: Scaffold(body: SubtitleButton()),
     ));
 
-    expect(find.byIcon(Icons.subtitles), findsOneWidget);
+    expect(findNiumaIcon(NiumaSdkAssets.icSubtitle), findsOneWidget);
     // disabled 视觉：用 Opacity wrap，opacity < 1.0
     final opacityWidget = tester.widget<Opacity>(
-      find.ancestor(of: find.byIcon(Icons.subtitles), matching: find.byType(Opacity)),
+      find.ancestor(
+        of: findNiumaIcon(NiumaSdkAssets.icSubtitle),
+        matching: find.byType(Opacity),
+      ),
     );
     expect(opacityWidget.opacity, lessThan(1.0));
   });

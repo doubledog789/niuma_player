@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 大屏幕外框 -->
+  <rect x="6" y="10" width="36" height="28" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 右下角小窗 -->
+  <rect x="24" y="22" width="14" height="11" rx="1.5" fill="currentColor"/>
+</svg>

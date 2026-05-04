@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
 import 'icon_label_action.dart';
+import 'niuma_sdk_icon.dart';
 
 /// mockup 风格的投屏按钮——icon + 「投屏」中文 label 垂直布局。
 ///
@@ -20,7 +22,7 @@ class CastAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconLabelAction(
-      icon: const Icon(Icons.cast),
+      icon: const NiumaSdkIcon(asset: NiumaSdkAssets.icCast),
       label: '投屏',
       onTap: onTap ?? () {},
     );

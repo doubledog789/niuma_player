@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../niuma_sdk_assets.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
+import 'niuma_sdk_icon.dart';
 
 /// 画质 / 线路选择按钮——读 [NiumaPlayerController.source]'s `lines`，
 /// 展开 popup 列出全部线路；选中时调 [NiumaPlayerController.switchLine]。
@@ -25,7 +27,11 @@ class QualitySelector extends StatelessWidget {
       iconSize: theme.iconSize,
       iconColor: theme.iconColor,
       tooltip: '画质',
-      icon: const Icon(Icons.high_quality),
+      icon: NiumaSdkIcon(
+        asset: NiumaSdkAssets.icQuality,
+        size: theme.iconSize,
+        color: theme.iconColor,
+      ),
       itemBuilder: (context) => [
         for (final line in lines)
           PopupMenuItem<String>(
