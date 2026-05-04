@@ -17,7 +17,7 @@ void main() {
       expect(t.pauseIndicatorBackgroundColor,
           Colors.black.withValues(alpha: 0.5));
       expect(t.pauseIndicatorIconColor, Colors.white);
-      expect(t.pauseIndicatorSize, 96);
+      expect(t.pauseIndicatorSize, 56);
       expect(t.pauseIndicatorIconSize, 56);
       expect(t.scrubLabelTextColor, Colors.white);
       expect(t.scrubLabelBackgroundColor,

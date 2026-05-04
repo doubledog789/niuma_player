@@ -73,6 +73,7 @@ class FullscreenButton extends StatelessWidget {
           buttonOverrides: cfg?.buttonOverrides,
           bottomActionsBuilder: cfg?.bottomActionsBuilder,
           bottomTrailingBuilder: cfg?.bottomTrailingBuilder,
+          pausedOverlayBuilder: cfg?.pausedOverlayBuilder,
           rightRailBuilder: cfg?.rightRailBuilder,
           moreMenuBuilder: cfg?.moreMenuBuilder,
           chapters: cfg?.chapters,

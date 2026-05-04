@@ -40,3 +40,4 @@ build/
 # Keep .pom (version record) in git, keep .aar out (13 MB binary).
 android/libs/
 android/localmaven/**/*.aar
+AGENTS.md

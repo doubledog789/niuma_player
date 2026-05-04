@@ -127,6 +127,31 @@ void main() {
     expect(find.text('actions-marker'), findsOneWidget);
   });
 
+  testWidgets('more 按钮在全屏顶栏中贴近右边界', (t) async {
+    final ctl = FakeNiumaPlayerController();
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 800,
+          height: 400,
+          child: BiliStyleControlBar(
+            controller: ctl,
+            config: NiumaControlBarConfig.bili,
+            title: '一个比较长的标题，验证右侧 more 不会被标题布局拖离右边',
+            subtitle: '副标题',
+            onBack: () {},
+            onMore: () {},
+          ),
+        ),
+      ),
+    ));
+
+    final moreRight = t.getTopRight(find.byType(MoreAction)).dx;
+    // 800 屏宽 - Container right padding 12 = 788：MoreAction 右边贴
+    // Container 右内边。阈值 786 给 ±2 容错（IconButton 内 padding 等）。
+    expect(moreRight, greaterThanOrEqualTo(786));
+  });
+
   testWidgets('buttonOverrides BuilderOverride 完全替换 more 按钮', (t) async {
     final ctl = FakeNiumaPlayerController();
     await t.pumpWidget(MaterialApp(

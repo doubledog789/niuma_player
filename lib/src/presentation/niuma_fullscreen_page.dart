@@ -55,6 +55,7 @@ class NiumaFullscreenPage extends StatefulWidget {
     this.buttonOverrides,
     this.bottomActionsBuilder,
     this.bottomTrailingBuilder,
+    this.pausedOverlayBuilder,
     this.rightRailBuilder,
     this.moreMenuBuilder,
     this.chapters,
@@ -113,6 +114,9 @@ class NiumaFullscreenPage extends StatefulWidget {
   /// M16: 底栏 trailing slot（透传给内层 [NiumaPlayer.bottomTrailingBuilder]）。
   final WidgetBuilder? bottomTrailingBuilder;
 
+  /// M16: 暂停态 overlay（透传给内层 [NiumaPlayer.pausedOverlayBuilder]）。
+  final WidgetBuilder? pausedOverlayBuilder;
+
   /// M16: 全屏右侧 rail（透传给内层 [NiumaPlayer.rightRailBuilder]）。
   final WidgetBuilder? rightRailBuilder;
 
@@ -156,6 +160,7 @@ class NiumaFullscreenPage extends StatefulWidget {
     Map<NiumaControlButton, ButtonOverride>? buttonOverrides,
     WidgetBuilder? bottomActionsBuilder,
     WidgetBuilder? bottomTrailingBuilder,
+    WidgetBuilder? pausedOverlayBuilder,
     WidgetBuilder? rightRailBuilder,
     List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder,
     List<Duration>? chapters,
@@ -182,6 +187,7 @@ class NiumaFullscreenPage extends StatefulWidget {
         buttonOverrides: buttonOverrides,
         bottomActionsBuilder: bottomActionsBuilder,
         bottomTrailingBuilder: bottomTrailingBuilder,
+        pausedOverlayBuilder: pausedOverlayBuilder,
         rightRailBuilder: rightRailBuilder,
         moreMenuBuilder: moreMenuBuilder,
         chapters: chapters,
@@ -265,8 +271,8 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
     final scaffold = Scaffold(
       backgroundColor: Colors.black,
       // SafeArea 全关——横屏全屏 immersiveSticky 模式系统 bar 已隐藏，
-      // 默认左右 inset 会把 NiumaPlayer 推离屏幕边缘 24-48px（Android 曲面屏
-      // / cutout），导致顶栏 ⋮ / 底栏元素永远贴不到屏幕真正边缘。
+      // 默认左右 inset 会把 NiumaPlayer 推离屏幕边缘 24-48px（Android
+      // 曲面屏 / cutout），导致顶栏 ⋮ / 底栏元素永远贴不到屏幕真正边缘。
       body: SafeArea(
         top: false,
         bottom: false,
@@ -292,6 +298,7 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
             buttonOverrides: widget.buttonOverrides,
             bottomActionsBuilder: widget.bottomActionsBuilder,
             bottomTrailingBuilder: widget.bottomTrailingBuilder,
+            pausedOverlayBuilder: widget.pausedOverlayBuilder,
             rightRailBuilder: widget.rightRailBuilder,
             moreMenuBuilder: widget.moreMenuBuilder,
             chapters: widget.chapters,

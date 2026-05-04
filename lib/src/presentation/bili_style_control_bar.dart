@@ -119,7 +119,7 @@ class BiliStyleControlBar extends StatelessWidget {
           left: 0,
           right: 0,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 10, 0, 10),
+            padding: const EdgeInsets.fromLTRB(0, 10, 12, 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -129,8 +129,13 @@ class BiliStyleControlBar extends StatelessWidget {
             ),
             child: Row(
               children: [
-                ..._buildList(context, config.topLeading, resolver),
-                const Spacer(),
+                Expanded(
+                  child: Row(
+                    children: [
+                      ..._buildList(context, config.topLeading, resolver),
+                    ],
+                  ),
+                ),
                 if (actionsBuilder != null) actionsBuilder!(context),
                 ..._buildList(context, config.topActions, resolver),
               ],
@@ -154,7 +159,7 @@ class BiliStyleControlBar extends StatelessWidget {
           left: 0,
           right: 0,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,

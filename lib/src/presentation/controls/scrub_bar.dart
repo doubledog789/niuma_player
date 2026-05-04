@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/player_state.dart';
+import '../niuma_fullscreen_page.dart';
 import '../niuma_player_controller.dart';
 import '../niuma_player_theme.dart';
 import '../niuma_scrub_preview.dart';
@@ -43,7 +44,11 @@ class _ScrubBarState extends State<ScrubBar> {
 
   bool get _scrubbing => _scrubMs != null;
 
-  bool get _hasThumbnail => widget.controller.source.thumbnailVtt != null;
+  /// inline 状态不显示 VTT 缩略图预览（仅全屏沉浸式拖动需要）——
+  /// 通过检测当前 BuildContext 是否在 [NiumaFullscreenScope] 内决定。
+  bool get _hasThumbnail =>
+      widget.controller.source.thumbnailVtt != null &&
+      NiumaFullscreenScope.maybeOf(context) != null;
 
   /// 进度条本体的高度——足以容纳"拖动 thumb"圆点（thumbRadiusActive=9 → 18px
   /// 直径）和上下安全区。如果调用方需要更大点击区，外面包 [SizedBox] 即可。

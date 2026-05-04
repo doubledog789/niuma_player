@@ -12,10 +12,9 @@ import '../orchestration/ad_schedule.dart';
 import '../orchestration/ad_scheduler.dart';
 import 'bili_style_control_bar.dart';
 import 'button_override.dart';
-import 'cast/niuma_cast_button.dart';
 import 'cast/niuma_cast_overlay.dart';
 import 'cast/niuma_cast_picker_panel.dart';
-import 'controls/pip_button.dart';
+import 'controls/back_action.dart';
 import 'niuma_ad_overlay.dart';
 import 'niuma_control_bar.dart';
 import 'niuma_control_bar_config.dart';
@@ -72,6 +71,7 @@ class NiumaPlayer extends StatefulWidget {
     this.buttonOverrides,
     this.bottomActionsBuilder,
     this.bottomTrailingBuilder,
+    this.pausedOverlayBuilder,
     this.rightRailBuilder,
     this.moreMenuBuilder,
     this.chapters,
@@ -142,6 +142,11 @@ class NiumaPlayer extends StatefulWidget {
   /// 底栏右侧 enum **之前**的额外 slot——业务想把"选集 / 集数"等放在
   /// 倍速 / 线路切换 之前就放这里。仅全屏生效。
   final WidgetBuilder? bottomTrailingBuilder;
+
+  /// 视频暂停时中央显示的 overlay——常用于"短视频 ▶ 圆按钮"风格 indicator。
+  /// 接 BuildContext，用户可基于 controller 状态自渲染 widget。null = 不显示。
+  /// inline 和 fullscreen 都生效（fullscreen 走 NiumaPlayerConfigScope 透传）。
+  final WidgetBuilder? pausedOverlayBuilder;
 
   /// 全屏右侧 rail（垂直堆叠的浮动按钮，B 站风格"点赞 / 投币 / 收藏 / 分享"）。
   final WidgetBuilder? rightRailBuilder;
@@ -727,8 +732,9 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   ),
                 ),
               ),
-            // M12: 右上角 PipButton + Cast 浮层（仅 inline；全屏的 Cast/PiP
-            // 在 BiliStyleControlBar 的 topActions 里走 enum 渲染）。
+            // M16: inline 左上 BackAction 浮层——controlsVisible 时显示，
+            // 点击退出当前 demo route。Cast/PiP 不再 inline 显示（M16 设计：
+            // 只全屏才需要，全屏 BiliStyleControlBar 顶栏 [more] 菜单内置）。
             if (!isFullscreen)
               AnimatedOpacity(
                 opacity: _controlsVisible ? 1.0 : 0.0,
@@ -736,20 +742,10 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 child: IgnorePointer(
                   ignoring: !_controlsVisible,
                   child: Align(
-                    alignment: Alignment.topRight,
+                    alignment: Alignment.topLeft,
                     child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        // 右上 actions 区——投屏 + PiP 集中放这里，跟主流
-                        // 播放器的"top-right action bar"惯例一致，不再挤
-                        // 底部 ControlBar。
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            NiumaCastButton(controller: widget.controller, onTap: _openCastPicker),
-                            PipButton(controller: widget.controller),
-                          ],
-                        ),
+                      child: BackAction(
+                        onBack: () => Navigator.of(innerContext).maybePop(),
                       ),
                     ),
                   ),
@@ -776,6 +772,21 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   onSelectDevice: _onSelectCastDevice,
                   onRefresh: _startCastScan,
                 ),
+              ),
+            // M16: pausedOverlayBuilder——视频暂停时中央渲染业务自定义
+            // overlay（典型用例：可点击的 "▶ 继续播放" 圆按钮）。inline +
+            // fullscreen 都走这层；放在 ad overlay / cast picker 之上。
+            if (widget.pausedOverlayBuilder != null)
+              ValueListenableBuilder<NiumaPlayerValue>(
+                valueListenable: widget.controller,
+                builder: (ctx, v, _) {
+                  if (v.isPlaying || !v.initialized) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned.fill(
+                    child: Center(child: widget.pausedOverlayBuilder!(ctx)),
+                  );
+                },
               ),
           ],
         );
@@ -823,6 +834,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       buttonOverrides: widget.buttonOverrides,
       bottomActionsBuilder: widget.bottomActionsBuilder,
       bottomTrailingBuilder: widget.bottomTrailingBuilder,
+      pausedOverlayBuilder: widget.pausedOverlayBuilder,
       rightRailBuilder: widget.rightRailBuilder,
       moreMenuBuilder: widget.moreMenuBuilder,
       chapters: widget.chapters,
@@ -886,6 +898,7 @@ class NiumaPlayerConfigScope extends InheritedWidget {
     required this.buttonOverrides,
     required this.bottomActionsBuilder,
     required this.bottomTrailingBuilder,
+    required this.pausedOverlayBuilder,
     required this.rightRailBuilder,
     required this.moreMenuBuilder,
     required this.chapters,
@@ -944,6 +957,9 @@ class NiumaPlayerConfigScope extends InheritedWidget {
   /// M16: 底栏 trailing slot（透传给全屏页 NiumaPlayer.bottomTrailingBuilder）。
   final WidgetBuilder? bottomTrailingBuilder;
 
+  /// M16: 暂停态 overlay（透传给全屏页 NiumaPlayer.pausedOverlayBuilder）。
+  final WidgetBuilder? pausedOverlayBuilder;
+
   /// M16: 全屏右侧 rail（透传给全屏页 NiumaPlayer.rightRailBuilder）。
   final WidgetBuilder? rightRailBuilder;
 
@@ -980,6 +996,7 @@ class NiumaPlayerConfigScope extends InheritedWidget {
       buttonOverrides != oldWidget.buttonOverrides ||
       bottomActionsBuilder != oldWidget.bottomActionsBuilder ||
       bottomTrailingBuilder != oldWidget.bottomTrailingBuilder ||
+      pausedOverlayBuilder != oldWidget.pausedOverlayBuilder ||
       rightRailBuilder != oldWidget.rightRailBuilder ||
       moreMenuBuilder != oldWidget.moreMenuBuilder ||
       chapters != oldWidget.chapters ||

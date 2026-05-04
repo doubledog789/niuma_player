@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/presentation/controls/back_action.dart';
 import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
@@ -647,8 +648,8 @@ void main() {
     });
   });
 
-  group('NiumaPlayer 右上角 actions 区（Cast + PiP）', () {
-    testWidgets('默认渲染 NiumaCastButton + PipButton 在右半 + 上半',
+  group('NiumaPlayer inline 左上 BackAction 浮层（M16 后）', () {
+    testWidgets('inline 状态默认渲染 BackAction 在左半 + 上半，无 Cast/Pip',
         (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
@@ -659,24 +660,21 @@ void main() {
         ),
       ));
       await tester.pump();
-      expect(find.byType(PipButton), findsOneWidget);
-      expect(find.byType(NiumaCastButton), findsOneWidget,
-          reason: 'M15 后右上 actions 区也含 NiumaCastButton');
-      // 验位置：两个 button 中心点都在右半 + 上半
-      final pipCenter = tester.getCenter(find.byType(PipButton));
-      final castCenter = tester.getCenter(find.byType(NiumaCastButton));
+      expect(find.byType(BackAction), findsOneWidget,
+          reason: 'M16 inline 左上 overlay 是 BackAction');
+      expect(find.byType(PipButton), findsNothing,
+          reason: 'M16 后 inline 不再渲染 PipButton 浮层（仅全屏 more 菜单）');
+      expect(find.byType(NiumaCastButton), findsNothing,
+          reason: 'M16 后 inline 不再渲染 Cast 浮层（仅全屏 more 菜单）');
+      final backCenter = tester.getCenter(find.byType(BackAction));
       final playerCenter = tester.getCenter(find.byType(NiumaPlayer));
-      expect(pipCenter.dx, greaterThan(playerCenter.dx),
-          reason: 'PipButton 应在右半屏');
-      expect(pipCenter.dy, lessThan(playerCenter.dy),
-          reason: 'PipButton 应在上半屏');
-      expect(castCenter.dx, greaterThan(playerCenter.dx),
-          reason: 'CastButton 应在右半屏（actions 区）');
-      expect(castCenter.dy, lessThan(playerCenter.dy),
-          reason: 'CastButton 应在上半屏（actions 区）');
+      expect(backCenter.dx, lessThan(playerCenter.dx),
+          reason: 'BackAction 应在左半屏');
+      expect(backCenter.dy, lessThan(playerCenter.dy),
+          reason: 'BackAction 应在上半屏');
     });
 
-    testWidgets('PipButton 跟控件条 auto-hide 同步', (tester) async {
+    testWidgets('BackAction 跟控件条 auto-hide 同步', (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: SizedBox(
@@ -688,18 +686,16 @@ void main() {
           ),
         ),
       ));
-      // 进 playing → 5s 后 controls + PipButton 一起隐藏
       video.value = video.value.copyWith(phase: PlayerPhase.playing);
       await tester.pump();
       await tester.pump(const Duration(seconds: 6));
-      // 找包 PipButton 的最近 AnimatedOpacity 祖先，opacity 应为 0
-      final pipOpacity = tester.widget<AnimatedOpacity>(
+      final backOpacity = tester.widget<AnimatedOpacity>(
         find.ancestor(
-          of: find.byType(PipButton),
+          of: find.byType(BackAction),
           matching: find.byType(AnimatedOpacity),
         ).first,
       );
-      expect(pipOpacity.opacity, 0.0);
+      expect(backOpacity.opacity, 0.0);
     });
   });
 

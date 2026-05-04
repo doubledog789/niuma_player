@@ -109,7 +109,7 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('长视频 demo')),
+      extendBodyBehindAppBar: false,
       body: ListView(
         children: [
           AspectRatio(
@@ -117,6 +117,7 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
             child: NiumaPlayer(
               controller: _controller,
               danmakuController: _danmaku,
+              gesturesEnabledInline: true,
               title: '【4K修复】经典动画混剪 致敬童年',
               subtitle: '阿伟动漫研究所 · P1 童年回忆',
               // inline 显式给 config 走 _ConfigDrivenBar，避开 M9 _LegacyM9Bar
@@ -199,6 +200,11 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
                   ),
                 ],
               ),
+              // 短视频风格 pause indicator——paused 时中央显示，play 后
+              // 立刻消失。inline + fullscreen 都生效（NiumaPlayer 内部
+              // ValueListenableBuilder 监听 controller，全屏页通过
+              // NiumaPlayerConfigScope 透传也接到）。可点击：tap → play。
+            
             ),
           ),
           const Padding(

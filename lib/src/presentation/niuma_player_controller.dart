@@ -629,11 +629,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       '[niuma_player] play() backend=${_backend?.kind.name ?? "<null>"}',
     );
     await _backend?.play();
-    // PiP 期间立即同步 RemoteAction icon——不等 valueStream 异步 round-trip
-    // （某些 backend 推送 value 时机不稳定 / 可能被覆盖）。
-    if (value.isInPictureInPicture) {
-      unawaited(_backend?.updatePictureInPictureActions(isPlaying: true));
-    }
+    // PiP RemoteAction 同步走 value setter（valueStream listener 保留
+    // isInPictureInPicture，setter 检测 isPlaying 变化自动触发 update）。
+    // 不在这里主动 push——之前主动 push + setter 双调 setPictureInPictureParams
+    // 会让 OS PiP system UI（关闭 / 放大 / RemoteAction）反复重置闪掉。
   }
 
   Future<void> pause() async {
@@ -646,9 +645,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       '[niuma_player] pause() backend=${_backend?.kind.name ?? "<null>"}',
     );
     await _backend?.pause();
-    if (value.isInPictureInPicture) {
-      unawaited(_backend?.updatePictureInPictureActions(isPlaying: false));
-    }
   }
 
   Future<void> seekTo(Duration position) async {

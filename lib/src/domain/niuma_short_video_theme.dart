@@ -38,7 +38,7 @@ class NiumaShortVideoTheme {
         progressThumbRadius: 6.0,
         pauseIndicatorBackgroundColor: Colors.black.withValues(alpha: 0.5),
         pauseIndicatorIconColor: Colors.white,
-        pauseIndicatorSize: 96,
+        pauseIndicatorSize: 56,
         pauseIndicatorIconSize: 56,
         scrubLabelTextColor: Colors.white,
         scrubLabelBackgroundColor: Colors.black.withValues(alpha: 0.55),

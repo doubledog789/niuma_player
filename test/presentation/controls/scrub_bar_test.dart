@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player/src/presentation/niuma_fullscreen_page.dart';
 
 import 'fake_controller.dart';
 
@@ -61,15 +62,19 @@ void main() {
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
-          body: SizedBox(
-            width: 200,
-            height: 200,
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: SizedBox(
-                width: 200,
-                height: 60,
-                child: ScrubBar(controller: ctl),
+          // M16: thumbnail preview 仅在 NiumaFullscreenScope 内显示——
+          // inline 状态下即使 thumbnailVtt 非 null 也不渲染。
+          body: NiumaFullscreenScope(
+            child: SizedBox(
+              width: 200,
+              height: 200,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: SizedBox(
+                  width: 200,
+                  height: 60,
+                  child: ScrubBar(controller: ctl),
+                ),
               ),
             ),
           ),
