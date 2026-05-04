@@ -517,8 +517,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       rethrow;
     }
     final native = lastBackend;
-    final fromMemory =
-        native is NativeBackend ? native.fromMemory : false;
+    final fromMemory = native is NativeBackend ? native.fromMemory : false;
     _emit(BackendSelected(
       PlayerBackendKind.native,
       fromMemory: fromMemory,
@@ -538,7 +537,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     final isPlaying = newValue.isPlaying;
     // 在 PiP 中且（play↔pause 边沿 OR 刚进 PiP 还没 push 过）就同步
     // RemoteAction 图标。出 PiP 时 reset 缓存，下次进 PiP 重新初始化。
-    if (inPip && (isPlaying != wasPlaying || _lastPipActionsIsPlaying != isPlaying)) {
+    if (inPip &&
+        (isPlaying != wasPlaying || _lastPipActionsIsPlaying != isPlaying)) {
       _lastPipActionsIsPlaying = isPlaying;
       unawaited(
         _backend?.updatePictureInPictureActions(isPlaying: isPlaying),
@@ -641,10 +641,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     }
     await _backend?.seekTo(position);
   }
+
   Future<void> setPlaybackSpeed(double speed) async {
     value = value.copyWith(playbackSpeed: speed);
     await _backend?.setSpeed(speed);
   }
+
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
   Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
 
@@ -723,6 +725,15 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// app 级"清缓存 / 重置"流程应调用此方法，让下次 initialize 重新
   /// 探测 ExoPlayer，而不是直接走 IJK。
   static Future<void> clearDeviceMemory() => DeviceMemory().clear();
+
+  // ────────────── M16 弹幕显示开关 ──────────────
+
+  /// 弹幕显示开关。业务接弹幕系统时监听此 ValueNotifier 决定渲染弹幕层。
+  ///
+  /// 默认 `true`（显示弹幕）。业务层或 [DanmakuToggleButton]（T9）
+  /// 直接写 `.value = false` 即可关闭；[NiumaPlayerController.dispose]
+  /// 会自动 dispose 此 notifier。
+  final ValueNotifier<bool> danmakuVisibility = ValueNotifier(true);
 
   // ────────────── M13 手势 HUD ──────────────
 
@@ -919,6 +930,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     await _disposeCurrentBackend();
     await _eventController.close();
     _thumbnailCache.clear();
+    danmakuVisibility.dispose();
     _gestureFeedback.dispose();
     _castSession.dispose();
     super.dispose();
