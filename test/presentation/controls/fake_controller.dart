@@ -100,6 +100,17 @@ class FakeNiumaPlayerController extends NiumaPlayerController {
     notifyListeners();
   }
 
+  /// 测试辅助：直接改播放状态（isPlaying setter）。
+  ///
+  /// `isPlaying = true`  → phase = playing
+  /// `isPlaying = false` → phase = paused
+  set isPlaying(bool playing) {
+    value = value.copyWith(
+      phase: playing ? PlayerPhase.playing : PlayerPhase.paused,
+    );
+    notifyListeners();
+  }
+
   /// 测试辅助：模拟 backend 推 `PipModeChanged`，把 PiP 状态写进 value。
   void setPipState(bool inPip) {
     value = value.copyWith(isInPictureInPicture: inPip);
