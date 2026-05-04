@@ -1,23 +1,23 @@
-// example/lib/m14_short_video_demo_page.dart
+// example/lib/short_video_demo_page.dart
 import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
 
-/// M14 短视频 PageView 示例。
+/// 短视频 PageView 示例。
 ///
 /// 每条短视频带一个独立 [NiumaDanmakuController]，演示弹幕在短视频沉浸 UX
 /// 中的渲染（透传到全屏后弹幕也跟过去）。
-class M14ShortVideoDemoPage extends StatefulWidget {
+class ShortVideoDemoPage extends StatefulWidget {
   /// 创建 demo。
-  const M14ShortVideoDemoPage({super.key});
+  const ShortVideoDemoPage({super.key});
 
   @override
-  State<M14ShortVideoDemoPage> createState() => _M14ShortVideoDemoPageState();
+  State<ShortVideoDemoPage> createState() => _ShortVideoDemoPageState();
 }
 
-class _M14ShortVideoDemoPageState extends State<M14ShortVideoDemoPage> {
+class _ShortVideoDemoPageState extends State<ShortVideoDemoPage> {
   // 用 test-videos.co.uk 的样本（与项目其他 demo 同源）。
   // 三个不同分辨率/编码，模拟短视频流多样性。
   // 三条都用 H.264——iOS video_player 解 H.265 在某些 profile 下黑屏不报错。
