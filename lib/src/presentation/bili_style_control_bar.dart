@@ -7,6 +7,7 @@ import 'controls/center_play_pause.dart';
 import 'controls/danmaku_input_pill.dart';
 import 'controls/danmaku_toggle.dart';
 import 'controls/fullscreen_button.dart';
+import 'controls/icon_label_action.dart';
 import 'controls/line_switch_pill.dart';
 import 'controls/more_action.dart';
 import 'controls/pip_action.dart';
@@ -20,6 +21,7 @@ import 'controls/volume_button.dart';
 import 'niuma_control_bar_config.dart';
 import 'niuma_control_button.dart';
 import 'niuma_player_controller.dart';
+import 'niuma_player_theme.dart';
 
 /// mockup B 站风格全屏控件层。
 ///
@@ -66,15 +68,10 @@ class BiliStyleControlBar extends StatelessWidget {
     if (ov is BuilderOverride) return ov.builder(ctx);
     if (ov is FieldsOverride) {
       // FieldsOverride 应用在 icon+label 类按钮（cast/pip 等）；其他类型回退默认。
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (ov.icon != null) ov.icon!,
-            if (ov.label != null) Text(ov.label!),
-          ],
-        ),
+      return IconLabelAction(
+        icon: ov.icon ?? const Icon(Icons.help_outline),
+        label: ov.label ?? '',
+        onTap: ov.onTap ?? () {},
       );
     }
     return _renderDefault(btn);
@@ -127,6 +124,8 @@ class BiliStyleControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = NiumaPlayerTheme.of(context);
+    final gradColors = theme.controlsBackgroundGradient;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -137,11 +136,11 @@ class BiliStyleControlBar extends StatelessWidget {
           right: 0,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0x99000000), Color(0x00000000)],
+                colors: gradColors.reversed.toList(),
               ),
             ),
             child: Row(
@@ -172,11 +171,11 @@ class BiliStyleControlBar extends StatelessWidget {
           right: 0,
           child: Container(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
-                colors: [Color(0xBF000000), Color(0x00000000)],
+                colors: gradColors.reversed.toList(),
               ),
             ),
             child: Column(

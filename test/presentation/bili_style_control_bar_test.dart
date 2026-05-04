@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/bili_style_control_bar.dart';
+import 'package:niuma_player/src/presentation/button_override.dart';
 import 'package:niuma_player/src/presentation/controls/back_action.dart';
 import 'package:niuma_player/src/presentation/controls/cast_action.dart';
 import 'package:niuma_player/src/presentation/controls/center_play_pause.dart';
@@ -10,6 +11,7 @@ import 'package:niuma_player/src/presentation/controls/more_action.dart';
 import 'package:niuma_player/src/presentation/controls/pip_action.dart';
 import 'package:niuma_player/src/presentation/controls/title_bar.dart';
 import 'package:niuma_player/src/presentation/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/niuma_control_button.dart';
 
 import 'controls/fake_controller.dart';
 
@@ -66,7 +68,8 @@ void main() {
     await t.pumpWidget(MaterialApp(
       home: Scaffold(
         body: SizedBox(
-          width: 800, height: 400,
+          width: 800,
+          height: 400,
           child: BiliStyleControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.minimal,
@@ -87,7 +90,8 @@ void main() {
     await t.pumpWidget(MaterialApp(
       home: Scaffold(
         body: SizedBox(
-          width: 800, height: 400,
+          width: 800,
+          height: 400,
           child: BiliStyleControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
@@ -109,7 +113,8 @@ void main() {
     await t.pumpWidget(MaterialApp(
       home: Scaffold(
         body: SizedBox(
-          width: 800, height: 400,
+          width: 800,
+          height: 400,
           child: BiliStyleControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
@@ -124,5 +129,66 @@ void main() {
       ),
     ));
     expect(find.text('actions-marker'), findsOneWidget);
+  });
+
+  testWidgets('buttonOverrides BuilderOverride 完全替换 cast 按钮', (t) async {
+    final ctl = FakeNiumaPlayerController();
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 800,
+          height: 400,
+          child: BiliStyleControlBar(
+            controller: ctl,
+            config: NiumaControlBarConfig.bili,
+            title: '视频',
+            buttonOverrides: {
+              NiumaControlButton.cast:
+                  ButtonOverride.builder((_) => const Text('custom-cast')),
+            },
+            onBack: () {},
+            onCast: () {},
+            onPip: () {},
+            onMore: () {},
+          ),
+        ),
+      ),
+    ));
+    expect(find.text('custom-cast'), findsOneWidget);
+    expect(find.byType(CastAction), findsNothing);
+  });
+
+  testWidgets('buttonOverrides FieldsOverride 替换 cast 字段且 onTap 可点击',
+      (t) async {
+    final ctl = FakeNiumaPlayerController();
+    bool tapped = false;
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 800,
+          height: 400,
+          child: BiliStyleControlBar(
+            controller: ctl,
+            config: NiumaControlBarConfig.bili,
+            title: '视频',
+            buttonOverrides: {
+              NiumaControlButton.cast: ButtonOverride.fields(
+                icon: const Icon(Icons.flutter_dash),
+                label: '自定义投屏',
+                onTap: () => tapped = true,
+              ),
+            },
+            onBack: () {},
+            onCast: () {},
+            onPip: () {},
+            onMore: () {},
+          ),
+        ),
+      ),
+    ));
+    expect(find.text('自定义投屏'), findsOneWidget);
+    expect(find.byIcon(Icons.flutter_dash), findsOneWidget);
+    await t.tap(find.text('自定义投屏'));
+    expect(tapped, isTrue);
   });
 }
