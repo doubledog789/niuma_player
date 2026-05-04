@@ -4,6 +4,8 @@ PODS:
     - Flutter
   - niuma_player (0.0.1):
     - Flutter
+  - niuma_player_airplay (0.1.0):
+    - Flutter
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -15,6 +17,7 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - niuma_player (from `.symlinks/plugins/niuma_player/ios`)
+  - niuma_player_airplay (from `.symlinks/plugins/niuma_player_airplay/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - video_player_avfoundation (from `.symlinks/plugins/video_player_avfoundation/darwin`)
 
@@ -25,6 +28,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/integration_test/ios"
   niuma_player:
     :path: ".symlinks/plugins/niuma_player/ios"
+  niuma_player_airplay:
+    :path: ".symlinks/plugins/niuma_player_airplay/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   video_player_avfoundation:
@@ -34,6 +39,7 @@ SPEC CHECKSUMS:
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
   niuma_player: 251f33424928beac8d34de49401eb1e1af975be2
+  niuma_player_airplay: 94aa8d10c616adfb8d3a6eb667bc37fcd2525e09
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
   video_player_avfoundation: 2cef49524dd1f16c5300b9cd6efd9611ce03639b
 
