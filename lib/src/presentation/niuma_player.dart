@@ -503,18 +503,17 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 两项，之后追加业务侧 [moreMenuBuilder] 返回的条目（用分隔线隔开）。
   void _showMoreMenu(BuildContext ctx) {
     final extra = widget.moreMenuBuilder?.call(ctx) ?? <PopupMenuEntry<dynamic>>[];
-    final overlay = Overlay.of(ctx).context.findRenderObject() as RenderBox?;
-    final box = ctx.findRenderObject() as RenderBox?;
-    final position = (overlay != null && box != null)
-        ? RelativeRect.fromRect(
-            Rect.fromPoints(
-              box.localToGlobal(Offset.zero, ancestor: overlay),
-              box.localToGlobal(box.size.bottomRight(Offset.zero),
-                  ancestor: overlay),
-            ),
-            Offset.zero & overlay.size,
-          )
-        : const RelativeRect.fromLTRB(1000, 80, 0, 0);
+    // ctx 是 NiumaPlayer 整体 BuildContext，而不是 ⋮ 按钮——之前用
+    // ctx.findRenderObject() 算 popup 位置会锚到 player 左上角，导致
+    // 用户看到"菜单弹到左边"。改用屏幕宽度算右上锚位，让 popup 从
+    // 顶栏下方右侧弹出，视觉上跟随 ⋮ 按钮位置。
+    final size = MediaQuery.of(ctx).size;
+    final position = RelativeRect.fromLTRB(
+      size.width - 200, // popup 右上角离屏左 (size.width - 200)
+      60, // 顶栏高度 ~50，60 让 popup 在顶栏下方
+      8, // popup 离屏幕右 8px
+      0,
+    );
     showMenu<dynamic>(
       context: ctx,
       position: position,
