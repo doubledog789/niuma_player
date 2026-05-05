@@ -35,8 +35,12 @@ class NiumaShortVideoPauseIndicator extends StatelessWidget {
             color: theme.pauseIndicatorBackgroundColor,
             shape: BoxShape.circle,
           ),
+          // 外层 Container 已经画了 dark 半透明圆形 (pauseIndicatorBackgroundColor)
+          // 当底，所以中间用 icPlay（光三角）让 ColorFilter 干净地染 brand 橙；
+          // 用 icPlayCircle 会再画一个 SVG 内置圆环，srcIn 强行染色后双圆叠
+          // 出来奇怪的半透明轮廓。
           child: NiumaSdkIcon(
-            asset: NiumaSdkAssets.icPlayCircle,
+            asset: NiumaSdkAssets.icPlay,
             color: theme.pauseIndicatorIconColor,
             size: theme.pauseIndicatorIconSize,
           ),

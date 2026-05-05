@@ -39,8 +39,12 @@ class CenterPlayPause extends StatelessWidget {
               child: SizedBox(
                 width: theme.centerPlayPauseSize,
                 height: theme.centerPlayPauseSize,
+                // Material 圆环外壳 (theme.centerPlayPauseBackground) 已经
+                // 是按钮底；中间走 icPlay 三角让 ColorFilter 干净地染 brand
+                // 橙——不用 icPlayCircle 避免 SVG 内置圆环 srcIn 后变成不
+                // 透明色块跟外层 Material 圆叠出怪异轮廓。
                 child: NiumaSdkIcon(
-                  asset: NiumaSdkAssets.icPlayCircle,
+                  asset: NiumaSdkAssets.icPlay,
                   color: theme.actionIconColor,
                   size: theme.centerPlayPauseSize / 2,
                 ),

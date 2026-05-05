@@ -24,20 +24,21 @@ class NiumaShortVideoTheme {
     required this.scrubLabelBackgroundColor,
   });
 
-  /// 文档默认值（抖音风）。
+  /// 文档默认值（牛马风：橙色 played fill + 橙色中央三角，
+  /// 不再硬编码白色把 SVG 图标 ColorFilter 干成纯白）。
   ///
   /// 每次调用分配新实例——默认色含 [Color.withValues] 调用，
   /// 无法 const。host 可以在 build 之外缓存实例避免重复分配。
   factory NiumaShortVideoTheme.defaults() => NiumaShortVideoTheme(
         progressIdleHeight: 1.5,
         progressActiveHeight: 3.5,
-        progressPlayedColor: Colors.white,
+        progressPlayedColor: const Color(0xFFEF9F27),
         progressTrackColor: Colors.white.withValues(alpha: 0.18),
         progressBufferedColor: Colors.white.withValues(alpha: 0.3),
-        progressThumbColor: Colors.white,
+        progressThumbColor: const Color(0xFFEF9F27),
         progressThumbRadius: 6.0,
         pauseIndicatorBackgroundColor: Colors.black.withValues(alpha: 0.5),
-        pauseIndicatorIconColor: Colors.white,
+        pauseIndicatorIconColor: const Color(0xFFEF9F27),
         pauseIndicatorSize: 56,
         pauseIndicatorIconSize: 56,
         scrubLabelTextColor: Colors.white,

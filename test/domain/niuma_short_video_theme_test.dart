@@ -9,14 +9,16 @@ void main() {
       final t = NiumaShortVideoTheme.defaults();
       expect(t.progressIdleHeight, 1.5);
       expect(t.progressActiveHeight, 3.5);
-      expect(t.progressPlayedColor, Colors.white);
+      // 牛马橙 #EF9F27 作为 played / thumb / pause icon 默认色，
+      // 替代之前一律白色的设计。
+      expect(t.progressPlayedColor, const Color(0xFFEF9F27));
       expect(t.progressTrackColor, Colors.white.withValues(alpha: 0.18));
       expect(t.progressBufferedColor, Colors.white.withValues(alpha: 0.3));
-      expect(t.progressThumbColor, Colors.white);
+      expect(t.progressThumbColor, const Color(0xFFEF9F27));
       expect(t.progressThumbRadius, 6.0);
       expect(t.pauseIndicatorBackgroundColor,
           Colors.black.withValues(alpha: 0.5));
-      expect(t.pauseIndicatorIconColor, Colors.white);
+      expect(t.pauseIndicatorIconColor, const Color(0xFFEF9F27));
       expect(t.pauseIndicatorSize, 56);
       expect(t.pauseIndicatorIconSize, 56);
       expect(t.scrubLabelTextColor, Colors.white);
