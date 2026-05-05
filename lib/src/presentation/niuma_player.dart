@@ -527,17 +527,25 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         Overlay.of(ctx).context.findRenderObject() as RenderBox?;
     if (btnBox == null || overlayBox == null) return;
 
-    final btnRect = Rect.fromPoints(
-      btnBox.localToGlobal(Offset.zero, ancestor: overlayBox),
-      btnBox.localToGlobal(
-        btnBox.size.bottomRight(Offset.zero),
-        ancestor: overlayBox,
-      ),
+    final btnTopLeft =
+        btnBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final btnBottomRight = btnBox.localToGlobal(
+      btnBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
     );
-    final position = RelativeRect.fromRect(
-      btnRect,
-      Offset.zero & overlayBox.size,
+    // showMenu 的 _PopupMenuRouteLayout 用 position.top 作菜单 y 起点。
+    // 直接把 RelativeRect 的 top 设到按钮**底部 + 4**，让菜单贴在按钮
+    // 正下方展开，而不是跟按钮上下重叠。iOS / Android 行为一致。
+    const popupGap = 4.0;
+    final position = RelativeRect.fromLTRB(
+      btnTopLeft.dx,
+      btnBottomRight.dy + popupGap,
+      overlayBox.size.width - btnBottomRight.dx,
+      0,
     );
+    // 默认 popup BG 走 Theme.colorScheme.surface（demo 是 #252526 暗灰），
+    // 图标用白色才看得清——之前误用 #1A1410（更暗）等于直接看不见。
+    const itemIconColor = Colors.white;
     showMenu<dynamic>(
       context: ctx,
       position: position,
@@ -549,7 +557,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
               NiumaSdkIcon(
                 asset: NiumaSdkAssets.icCast,
                 size: 18,
-                color: Color(0xFF1A1410),
+                color: itemIconColor,
               ),
               SizedBox(width: 8),
               Text('投屏'),
@@ -563,7 +571,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
               NiumaSdkIcon(
                 asset: NiumaSdkAssets.icPip,
                 size: 18,
-                color: Color(0xFF1A1410),
+                color: itemIconColor,
               ),
               SizedBox(width: 8),
               Text('画中画'),
