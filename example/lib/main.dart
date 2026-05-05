@@ -5,6 +5,7 @@ import 'package:niuma_player_airplay/niuma_player_airplay.dart';
 import 'package:niuma_player_dlna/niuma_player_dlna.dart';
 
 import 'long_video_demo_page.dart';
+import 'niuma_splash_screen.dart';
 import 'short_video_demo_page.dart';
 
 /// Niuma 品牌色——design-tokens.json 中的 primary。
@@ -48,7 +49,7 @@ class NiumaPlayerExampleApp extends StatelessWidget {
           textColor: Colors.white,
         ),
       ),
-      home: const _Home(),
+      home: NiumaSplashScreen(next: (_) => const _Home()),
     );
   }
 }

@@ -16,10 +16,11 @@ class NiumaPlayerTheme {
   /// 所有字段都是可选的——不传任何字段得到的就是 niuma_player 默认外观。
   const NiumaPlayerTheme({
     this.accentColor,
-    // 默认走牛马橙 #EF9F27（design-tokens.json brand.primary）。
-    // 上层有自己的品牌色就传 NiumaPlayerThemeData(data: NiumaPlayerTheme(
-    //   iconColor: ..., ...)) 覆盖。
-    this.iconColor = const Color(0xFFEF9F27),
+    // 控件 icon 默认白色——浮在视频上需要高对比度（任意视频底色都
+    // 看得清）。品牌色仅留在"该橙的地方"：进度条 fill (accentColor /
+    // 走 Theme.primary)、active 状态 (primaryAccent)、暂停中央三角
+    // (NiumaShortVideoTheme.pauseIndicatorIconColor)、loading 动画。
+    this.iconColor = Colors.white,
     this.iconSize = 24,
     this.bigIconSize = 36,
     this.controlBarPadding =
@@ -40,8 +41,8 @@ class NiumaPlayerTheme {
       fontSize: 12,
     ),
     // M16 fields
-    this.primaryAccent = const Color(0xFFEF9F27), // 牛马橙（替代 B 站粉）
-    this.actionIconColor = const Color(0xFFEF9F27),
+    this.primaryAccent = const Color(0xFFEF9F27), // 牛马橙——active 状态 / 高亮用
+    this.actionIconColor = const Color(0xFFFFFFFF), // 顶栏 icon 同样浮在视频上，白色高对比
     this.actionIconSize = 20,
     this.actionLabelStyle = const TextStyle(
       fontSize: 8,

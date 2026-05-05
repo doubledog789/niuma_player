@@ -6,10 +6,12 @@ import 'controls/danmaku_input_pill.dart';
 import 'controls/danmaku_toggle.dart';
 import 'controls/fullscreen_button.dart';
 import 'controls/line_switch_pill.dart';
+import 'controls/lock_button.dart';
 import 'controls/more_action.dart';
 import 'controls/pip_action.dart';
 import 'controls/play_pause_button.dart';
 import 'controls/scrub_bar.dart';
+import 'controls/settings_button.dart';
 import 'controls/speed_selector.dart';
 import 'controls/subtitle_button.dart';
 import 'controls/time_display.dart';
@@ -32,6 +34,7 @@ class NiumaControlButtonResolver {
     this.onCast,
     this.onPip,
     this.onMore,
+    this.onSettings,
     this.onDanmakuInputTap,
   });
 
@@ -43,6 +46,7 @@ class NiumaControlButtonResolver {
   final VoidCallback? onCast;
   final VoidCallback? onPip;
   final VoidCallback? onMore;
+  final VoidCallback? onSettings;
   final VoidCallback? onDanmakuInputTap;
 
   /// 返回 enum 对应的默认 widget。返回 null 表示该 enum 在当前上下文不渲染（如
@@ -81,6 +85,10 @@ class NiumaControlButtonResolver {
         return TimeDisplay(controller: controller);
       case NiumaControlButton.scrubBar:
         return ScrubBar(controller: controller, chapters: chapters);
+      case NiumaControlButton.lock:
+        return const LockButton();
+      case NiumaControlButton.settings:
+        return SettingsButton(onTap: onSettings);
     }
   }
 }

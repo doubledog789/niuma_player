@@ -676,6 +676,9 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 onCast: _openCastPicker,
                 onPip: _enterPip,
                 onMore: () => _showMoreMenu(innerContext),
+                // 默认设置 = 复用 more 弹出菜单——业务想分开走自己的
+                // 设置面板时通过 buttonOverrides[settings] 注入。
+                onSettings: () => _showMoreMenu(innerContext),
                 onDanmakuInputTap: widget.onDanmakuInputTap,
               )
             : NiumaControlBar(

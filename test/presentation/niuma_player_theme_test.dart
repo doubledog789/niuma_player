@@ -8,8 +8,9 @@ void main() {
       const theme = NiumaPlayerTheme();
 
       expect(theme.accentColor, isNull);
-      // 牛马橙作为默认 iconColor（以前是 Colors.white）。
-      expect(theme.iconColor, const Color(0xFFEF9F27));
+      // 控件 icon 默认白（高对比度浮在视频上）。primaryAccent 才是
+      // 牛马橙，留给 active 状态 / 高亮位。
+      expect(theme.iconColor, Colors.white);
       expect(theme.iconSize, 24);
       expect(theme.bigIconSize, 36);
       expect(
@@ -145,9 +146,9 @@ void main() {
       expect(theme.primaryAccent, const Color(0xFFEF9F27));
     });
 
-    test('actionIconColor 默认牛马橙 #EF9F27', () {
+    test('actionIconColor 默认白色（顶栏浮在视频上需要高对比）', () {
       const theme = NiumaPlayerTheme();
-      expect(theme.actionIconColor, const Color(0xFFEF9F27));
+      expect(theme.actionIconColor, const Color(0xFFFFFFFF));
     });
 
     test('actionIconSize 默认 20', () {

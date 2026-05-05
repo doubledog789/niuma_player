@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920" preserveAspectRatio="xMidYMid slice">
+  <!-- 深色背景 -->
+  <rect width="1080" height="1920" fill="#0d0a08"/>
+
+  <!-- 顶部装饰 - 终端 prompt -->
+  <text x="60" y="100" fill="#5F5E5A" font-family="ui-monospace, 'SF Mono', monospace" font-size="28">$ ./niuma --start</text>
+  <text x="60" y="150" fill="#1D9E75" font-family="ui-monospace, monospace" font-size="28">[OK] init engine v1.0</text>
+  <text x="60" y="200" fill="#1D9E75" font-family="ui-monospace, monospace" font-size="28">[OK] load codec...</text>
+  <text x="60" y="250" fill="#EF9F27" font-family="ui-monospace, monospace" font-size="28">[..] mounting drives</text>
+
+  <!-- 中央 Logo (放大) -->
+  <g transform="translate(540, 920)">
+    <!-- 飞 Bug 1 -->
+    <g transform="translate(-220, -230)">
+      <ellipse cx="0" cy="0" rx="22" ry="14" fill="#FAC775"/>
+      <line x1="-15" y1="-12" x2="-28" y2="-26" stroke="#FAC775" stroke-width="6" stroke-linecap="round"/>
+      <line x1="15" y1="-12" x2="28" y2="-26" stroke="#FAC775" stroke-width="6" stroke-linecap="round"/>
+      <line x1="-22" y1="0" x2="-36" y2="0" stroke="#FAC775" stroke-width="6" stroke-linecap="round"/>
+      <line x1="22" y1="0" x2="36" y2="0" stroke="#FAC775" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <!-- 飞 Bug 2 -->
+    <g transform="translate(220, -190)">
+      <ellipse cx="0" cy="0" rx="18" ry="12" fill="#FAC775"/>
+      <line x1="-12" y1="-10" x2="-22" y2="-22" stroke="#FAC775" stroke-width="5" stroke-linecap="round"/>
+      <line x1="12" y1="-10" x2="22" y2="-22" stroke="#FAC775" stroke-width="5" stroke-linecap="round"/>
+    </g>
+
+    <!-- 主头部 -->
+    <polygon points="-220,-160 -290,-280 -190,-200" fill="#854F0B"/>
+    <polygon points="220,-160 290,-280 190,-200" fill="#854F0B"/>
+    <rect x="-200" y="-160" width="400" height="400" rx="140" fill="#FAC775"/>
+    <polygon points="-90,-160 -65,-220 -45,-160" fill="#854F0B"/>
+    <polygon points="0,-180 25,-240 45,-180" fill="#854F0B"/>
+    <polygon points="85,-160 110,-220 130,-160" fill="#854F0B"/>
+    <line x1="-115" y1="-20" x2="-70" y2="20" stroke="#1a1410" stroke-width="16" stroke-linecap="round"/>
+    <line x1="-115" y1="20" x2="-70" y2="-20" stroke="#1a1410" stroke-width="16" stroke-linecap="round"/>
+    <line x1="70" y1="-20" x2="115" y2="20" stroke="#1a1410" stroke-width="16" stroke-linecap="round"/>
+    <line x1="70" y1="20" x2="115" y2="-20" stroke="#1a1410" stroke-width="16" stroke-linecap="round"/>
+    <rect x="-36" y="92" width="72" height="36" rx="18" fill="#854F0B"/>
+    <ellipse cx="0" cy="184" rx="28" ry="18" fill="#1a1410"/>
+  </g>
+
+  <!-- 品牌名 -->
+  <text x="540" y="1280" text-anchor="middle" fill="#FAC775" font-family="-apple-system, system-ui" font-size="84" font-weight="500" letter-spacing="12">牛马播放器</text>
+  <text x="540" y="1340" text-anchor="middle" fill="#5F5E5A" font-family="ui-monospace, monospace" font-size="28" letter-spacing="8">NiuMa Player SDK</text>
+
+  <!-- Slogan -->
+  <text x="540" y="1450" text-anchor="middle" fill="#888780" font-family="ui-monospace, monospace" font-size="32">// 给搬砖的码农留点喘息</text>
+
+  <!-- 进度条 -->
+  <rect x="340" y="1620" width="400" height="6" rx="3" fill="#1a1410"/>
+  <rect x="340" y="1620" width="240" height="6" rx="3" fill="#1D9E75"/>
+  <text x="340" y="1600" fill="#5F5E5A" font-family="ui-monospace, monospace" font-size="28">loading</text>
+  <text x="740" y="1600" text-anchor="end" fill="#FAC775" font-family="ui-monospace, monospace" font-size="28">62%</text>
+
+  <!-- 底部版本 -->
+  <text x="540" y="1820" text-anchor="middle" fill="#5F5E5A" font-family="ui-monospace, monospace" font-size="24">v1.0.0 · powered by NiuMa Engine</text>
+</svg>

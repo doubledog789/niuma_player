@@ -60,7 +60,7 @@ class NiumaShortVideoFullscreenButton extends StatelessWidget {
         padding: EdgeInsets.all(size * 0.18),
         child: NiumaSdkIcon(
           asset: NiumaSdkAssets.fullscreenIcon(isFullscreen: inFullscreen),
-          color: const Color(0xFFEF9F27),
+          color: Colors.white,
           size: size * 0.55,
         ),
       ),
