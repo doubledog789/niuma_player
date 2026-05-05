@@ -159,9 +159,17 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
               actionsBuilder: (ctx) => Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  _TopActionButton(icon: Icons.thumb_up_outlined, label: '6.1万'),
+                  _TopActionButton(
+                    icon: Icons.thumb_up_outlined,
+                    label: '6.1万',
+                    color: Color(0xFFEF9F27),
+                  ),
                   SizedBox(width: 12),
-                  _TopActionButton(icon: Icons.share_outlined, label: '分享'),
+                  _TopActionButton(
+                    icon: Icons.share_outlined,
+                    label: '分享',
+                    color: Color(0xFFEF9F27),
+                  ),
                   SizedBox(width: 12),
                 ],
               ),
@@ -187,14 +195,14 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
                 children: [
                   _RailItem(
                     icon: Icons.favorite,
-                    color: const Color(0xFFFB7299),
+                    color: const Color(0xFFEF9F27),
                     label: '12.3万',
                     onTap: () => _showSnack('点赞'),
                   ),
                   const SizedBox(height: 12),
                   _RailItem(
                     icon: Icons.share_outlined,
-                    color: Colors.white,
+                    color: const Color(0xFFEF9F27),
                     label: '分享',
                     onTap: () => _showSnack('分享'),
                   ),
@@ -301,17 +309,22 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
 }
 
 class _TopActionButton extends StatelessWidget {
-  const _TopActionButton({required this.icon, required this.label});
+  const _TopActionButton({
+    required this.icon,
+    required this.label,
+    this.color = Colors.white,
+  });
 
   final IconData icon;
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: Colors.white, size: 18),
+        Icon(icon, color: color, size: 18),
         const SizedBox(height: 2),
         Text(
           label,

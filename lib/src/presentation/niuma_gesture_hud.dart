@@ -5,6 +5,10 @@ import '../domain/gesture_kind.dart';
 import 'controls/niuma_sdk_icon.dart';
 import 'glass_card.dart';
 
+// 牛马品牌色（design-tokens.json brand.primary / primary_light）
+const _brandOrange = Color(0xFFEF9F27);
+const _brandLight = Color(0xFFFAC775);
+
 /// 默认手势 HUD（B 站 / YouTube 风）。
 ///
 /// 按 [GestureFeedbackState.kind] 选不同视觉：
@@ -100,7 +104,8 @@ class _ValueCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBrightness = state.kind == GestureKind.brightness;
-    final accent = isBrightness ? const Color(0xFFFCD34D) : Colors.white;
+    // 亮度走牛马 highlight（暖金 #FAC775），音量走牛马 primary（橙 #EF9F27）
+    final accent = isBrightness ? _brandLight : _brandOrange;
     return GlassCard(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -146,12 +151,12 @@ class _SpeedPill extends StatelessWidget {
           if (state.iconAsset != null) ...[
             NiumaSdkIcon(
               asset: state.iconAsset!,
-              color: Colors.white,
+              color: _brandOrange,
               size: 18,
             ),
             const SizedBox(width: 6),
           ] else if (state.icon != null) ...[
-            Icon(state.icon, color: Colors.white, size: 18),
+            Icon(state.icon, color: _brandOrange, size: 18),
             const SizedBox(width: 6),
           ],
           if (state.label != null)
@@ -194,12 +199,12 @@ class _IconFlash extends StatelessWidget {
               ? Center(
                   child: NiumaSdkIcon(
                     asset: state.iconAsset!,
-                    color: Colors.white,
+                    color: _brandOrange,
                     size: 44,
                   ),
                 )
               : (state.icon != null
-                  ? Icon(state.icon, color: Colors.white, size: 44)
+                  ? Icon(state.icon, color: _brandOrange, size: 44)
                   : null),
         ),
         if (state.label != null) ...[

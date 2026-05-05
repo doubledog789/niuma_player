@@ -16,7 +16,10 @@ class NiumaPlayerTheme {
   /// 所有字段都是可选的——不传任何字段得到的就是 niuma_player 默认外观。
   const NiumaPlayerTheme({
     this.accentColor,
-    this.iconColor = Colors.white,
+    // 默认走牛马橙 #EF9F27（design-tokens.json brand.primary）。
+    // 上层有自己的品牌色就传 NiumaPlayerThemeData(data: NiumaPlayerTheme(
+    //   iconColor: ..., ...)) 覆盖。
+    this.iconColor = const Color(0xFFEF9F27),
     this.iconSize = 24,
     this.bigIconSize = 36,
     this.controlBarPadding =
@@ -37,8 +40,8 @@ class NiumaPlayerTheme {
       fontSize: 12,
     ),
     // M16 fields
-    this.primaryAccent = const Color(0xFFFB7299),
-    this.actionIconColor = const Color(0xFFFFFFFF),
+    this.primaryAccent = const Color(0xFFEF9F27), // 牛马橙（替代 B 站粉）
+    this.actionIconColor = const Color(0xFFEF9F27),
     this.actionIconSize = 20,
     this.actionLabelStyle = const TextStyle(
       fontSize: 8,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../niuma_sdk_assets.dart';
 import '../niuma_danmaku_controller.dart';
 import '../niuma_danmaku_scope.dart';
+import '../niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
 /// 弹幕开关按钮。
@@ -37,6 +38,7 @@ class DanmakuButton extends StatelessWidget {
         ),
       );
     }
+    final theme = NiumaPlayerTheme.of(context);
     return AnimatedBuilder(
       animation: ctl,
       builder: (ctx, _) {
@@ -46,7 +48,7 @@ class DanmakuButton extends StatelessWidget {
               ctl.settings.copyWith(visible: !on)),
           icon: NiumaSdkIcon(
             asset: NiumaSdkAssets.danmakuToggleIcon(isOn: on),
-            color: Colors.white,
+            color: theme.iconColor,
           ),
           tooltip: on ? '关闭弹幕' : '开启弹幕',
         );

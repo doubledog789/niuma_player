@@ -8,7 +8,8 @@ void main() {
       const theme = NiumaPlayerTheme();
 
       expect(theme.accentColor, isNull);
-      expect(theme.iconColor, Colors.white);
+      // 牛马橙作为默认 iconColor（以前是 Colors.white）。
+      expect(theme.iconColor, const Color(0xFFEF9F27));
       expect(theme.iconSize, 24);
       expect(theme.bigIconSize, 36);
       expect(
@@ -139,9 +140,14 @@ void main() {
   });
 
   group('M16 fields', () {
-    test('primaryAccent 默认 Color(0xFFFB7299) (B 站粉)', () {
+    test('primaryAccent 默认牛马橙 #EF9F27', () {
       const theme = NiumaPlayerTheme();
-      expect(theme.primaryAccent, const Color(0xFFFB7299));
+      expect(theme.primaryAccent, const Color(0xFFEF9F27));
+    });
+
+    test('actionIconColor 默认牛马橙 #EF9F27', () {
+      const theme = NiumaPlayerTheme();
+      expect(theme.actionIconColor, const Color(0xFFEF9F27));
     });
 
     test('actionIconSize 默认 20', () {
