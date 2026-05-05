@@ -237,10 +237,13 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
           icon: _lockedKind == GestureKind.brightness
               ? Icons.brightness_6
               : Icons.volume_up,
-          // 资源包没提供亮度 SVG，亮度走 Material；音量走 niuma SVG。
-          iconAsset: _lockedKind == GestureKind.volume
-              ? NiumaSdkAssets.icVolume
-              : null,
+          // 资源包约定：ic_settings 是亮度图标；ic_volume / ic_volume_mute
+          // 是音量图标（音量为 0 走 mute 版本）。
+          iconAsset: _lockedKind == GestureKind.brightness
+              ? NiumaSdkAssets.icSettings
+              : (newValue == 0
+                  ? NiumaSdkAssets.icVolumeMute
+                  : NiumaSdkAssets.icVolume),
         ));
       case GestureKind.doubleTap:
       case GestureKind.longPressSpeed:

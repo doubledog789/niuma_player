@@ -24,6 +24,7 @@ import 'niuma_danmaku_overlay.dart';
 import 'niuma_danmaku_scope.dart';
 import 'niuma_fullscreen_page.dart' show NiumaFullscreenScope;
 import '../niuma_sdk_assets.dart';
+import 'controls/lock_button.dart';
 import 'controls/niuma_sdk_icon.dart';
 import 'niuma_gesture_layer.dart';
 import 'niuma_loading_indicator.dart';
@@ -223,6 +224,11 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 当前还在扫描的协议数。降到 0 时停止 scanning 状态。
   int _castScanPendingSubs = 0;
 
+  /// 全屏锁屏状态——锁定时 [BiliStyleControlBar] 不渲染、
+  /// [NiumaGestureLayer.enabled] 关掉，只剩左中浮动 [LockButton]
+  /// 给用户解锁。inline 不参与本状态。
+  final ValueNotifier<bool> _locked = ValueNotifier<bool>(false);
+
   @override
   void initState() {
     super.initState();
@@ -276,6 +282,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     _cancelCastScan();
     widget.controller.removeListener(_onValueChanged);
     _teardownOrchestrator();
+    _locked.dispose();
     super.dispose();
   }
 
@@ -676,9 +683,6 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 onCast: _openCastPicker,
                 onPip: _enterPip,
                 onMore: () => _showMoreMenu(innerContext),
-                // 默认设置 = 复用 more 弹出菜单——业务想分开走自己的
-                // 设置面板时通过 buttonOverrides[settings] 注入。
-                onSettings: () => _showMoreMenu(innerContext),
                 onDanmakuInputTap: widget.onDanmakuInputTap,
               )
             : NiumaControlBar(
@@ -703,14 +707,19 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
             // 手势层：放在视频之上、控件之下。
             // M9 既有"单击切控件显隐"行为通过 onTap: _onTapVideo 透传保留。
             // enabled：全屏 scope 内永远 true；inline 场景看 gesturesEnabledInline。
+            // 锁屏（_locked）时 enabled 强制 false——禁双击 / 长按 / 拖动手势。
             Positioned.fill(
-              child: NiumaGestureLayer(
-                controller: widget.controller,
-                enabled: isFullscreen || widget.gesturesEnabledInline,
-                disabledGestures: widget.disabledGestures,
-                hudBuilder: widget.gestureHudBuilder,
-                onTap: _onTapVideo,
-                child: const SizedBox.expand(),
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _locked,
+                builder: (ctx, locked, _) => NiumaGestureLayer(
+                  controller: widget.controller,
+                  enabled: !locked &&
+                      (isFullscreen || widget.gesturesEnabledInline),
+                  disabledGestures: widget.disabledGestures,
+                  hudBuilder: widget.gestureHudBuilder,
+                  onTap: _onTapVideo,
+                  child: const SizedBox.expand(),
+                ),
               ),
             ),
             // M16: 监听 controller.danmakuVisibility（DanmakuToggle 控制的
@@ -735,15 +744,23 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
             // 全屏：BiliStyleControlBar 用 Stack/Positioned 自己排 top/bottom/
             // center/rail，必须铺满整个浮层 Stack——把它放在独立的
             // Positioned.fill 槽里。inline：保留 M9 老行为，Align bottom。
+            // 锁屏（_locked）时整个 control bar 不渲染——只剩左中 LockButton
+            // 给用户解锁。
             if (isFullscreen)
               Positioned.fill(
-                child: AnimatedOpacity(
-                  opacity: _controlsVisible ? 1.0 : 0.0,
-                  duration: fadeDuration,
-                  child: IgnorePointer(
-                    ignoring: !_controlsVisible,
-                    child: controlBarLayer,
-                  ),
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _locked,
+                  builder: (ctx, locked, _) {
+                    if (locked) return const SizedBox.shrink();
+                    return AnimatedOpacity(
+                      opacity: _controlsVisible ? 1.0 : 0.0,
+                      duration: fadeDuration,
+                      child: IgnorePointer(
+                        ignoring: !_controlsVisible,
+                        child: controlBarLayer,
+                      ),
+                    );
+                  },
                 ),
               )
             else
@@ -772,6 +789,26 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                     child: SafeArea(
                       child: BackAction(
                         onBack: () => Navigator.of(innerContext).maybePop(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            // 全屏锁屏按钮——左中悬浮，跟 _controlsVisible 一起淡入淡出。
+            // 锁定后只剩这一个按钮可点，其它 control bar / 手势全 freeze。
+            if (isFullscreen)
+              Positioned(
+                left: 14,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: _controlsVisible ? 1.0 : 0.0,
+                    duration: fadeDuration,
+                    child: IgnorePointer(
+                      ignoring: !_controlsVisible,
+                      child: SafeArea(
+                        child: LockButton(locked: _locked),
                       ),
                     ),
                   ),

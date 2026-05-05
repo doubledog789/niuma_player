@@ -137,11 +137,7 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
                   NiumaControlButton.back,
                   NiumaControlButton.title,
                 ],
-                topActions: [
-                  NiumaControlButton.lock,
-                  NiumaControlButton.settings,
-                  NiumaControlButton.more,
-                ],
+                topActions: [NiumaControlButton.more],
                 bottomLeft: [
                   NiumaControlButton.playPause,
                   NiumaControlButton.volume,

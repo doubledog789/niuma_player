@@ -33,7 +33,6 @@ class BiliStyleControlBar extends StatelessWidget {
     this.onCast,
     this.onPip,
     this.onMore,
-    this.onSettings,
     this.onDanmakuInputTap,
   });
 
@@ -52,7 +51,6 @@ class BiliStyleControlBar extends StatelessWidget {
   final VoidCallback? onCast;
   final VoidCallback? onPip;
   final VoidCallback? onMore;
-  final VoidCallback? onSettings;
   final VoidCallback? onDanmakuInputTap;
 
   Widget? _resolve(
@@ -110,7 +108,6 @@ class BiliStyleControlBar extends StatelessWidget {
       onCast: onCast,
       onPip: onPip,
       onMore: onMore,
-      onSettings: onSettings,
       onDanmakuInputTap: onDanmakuInputTap,
     );
     return Stack(
