@@ -59,9 +59,11 @@ class _LockButtonState extends State<LockButton> {
       builder: (ctx, locked, _) => IconButton(
         onPressed: _toggle,
         tooltip: locked ? '解锁' : '锁屏',
+        // 锁屏 / 解锁两态都用同一个颜色（actionIconColor，默认白），
+        // 不做 active 高亮——状态靠 lock ↔ unlock 图标本身区分。
         icon: NiumaSdkIcon(
           asset: locked ? NiumaSdkAssets.icLock : NiumaSdkAssets.icUnlock,
-          color: locked ? theme.primaryAccent : theme.actionIconColor,
+          color: theme.actionIconColor,
         ),
       ),
     );
