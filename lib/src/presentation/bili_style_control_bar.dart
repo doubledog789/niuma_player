@@ -50,7 +50,9 @@ class BiliStyleControlBar extends StatelessWidget {
   final VoidCallback? onBack;
   final VoidCallback? onCast;
   final VoidCallback? onPip;
-  final VoidCallback? onMore;
+  /// 接 BuildContext——`MoreAction` 自身 context，上层用 `findRenderObject()`
+  /// 锚定 popup 到 ⋮ 按钮真实坐标。
+  final ValueChanged<BuildContext>? onMore;
   final VoidCallback? onDanmakuInputTap;
 
   Widget? _resolve(

@@ -42,7 +42,9 @@ class NiumaControlButtonResolver {
   final VoidCallback? onBack;
   final VoidCallback? onCast;
   final VoidCallback? onPip;
-  final VoidCallback? onMore;
+  /// 接 BuildContext——`MoreAction` 的自身 context，给上层 `findRenderObject()`
+  /// 锚定 popup 用。
+  final ValueChanged<BuildContext>? onMore;
   final VoidCallback? onDanmakuInputTap;
 
   /// 返回 enum 对应的默认 widget。返回 null 表示该 enum 在当前上下文不渲染（如
@@ -62,7 +64,7 @@ class NiumaControlButtonResolver {
       case NiumaControlButton.lineSwitch:
         return LineSwitchPill(controller: controller);
       case NiumaControlButton.more:
-        return MoreAction(onTap: onMore ?? () {});
+        return MoreAction(onTap: onMore ?? (_) {});
       case NiumaControlButton.playPause:
         return PlayPauseButton(controller: controller);
       case NiumaControlButton.speed:

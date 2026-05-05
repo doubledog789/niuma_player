@@ -518,16 +518,25 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 两项，之后追加业务侧 [moreMenuBuilder] 返回的条目（用分隔线隔开）。
   void _showMoreMenu(BuildContext ctx) {
     final extra = widget.moreMenuBuilder?.call(ctx) ?? <PopupMenuEntry<dynamic>>[];
-    // ctx 是 NiumaPlayer 整体 BuildContext，而不是 ⋮ 按钮——之前用
-    // ctx.findRenderObject() 算 popup 位置会锚到 player 左上角，导致
-    // 用户看到"菜单弹到左边"。改用屏幕宽度算右上锚位，让 popup 从
-    // 顶栏下方右侧弹出，视觉上跟随 ⋮ 按钮位置。
-    final size = MediaQuery.of(ctx).size;
-    final position = RelativeRect.fromLTRB(
-      size.width - 200, // popup 右上角离屏左 (size.width - 200)
-      60, // 顶栏高度 ~50，60 让 popup 在顶栏下方
-      8, // popup 离屏幕右 8px
-      0,
+    // ctx 是 [MoreAction] 自身 build 出来的 context（onTap 回传）。
+    // 用它的 RenderBox 计算 ⋮ 按钮的真实屏幕坐标，让 popup 锚定在按钮
+    // 正下方——之前 MediaQuery.size 硬算右上角的方式碰到横屏 / notch /
+    // SafeArea inset 就跟按钮位置错位。
+    final btnBox = ctx.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.of(ctx).context.findRenderObject() as RenderBox?;
+    if (btnBox == null || overlayBox == null) return;
+
+    final btnRect = Rect.fromPoints(
+      btnBox.localToGlobal(Offset.zero, ancestor: overlayBox),
+      btnBox.localToGlobal(
+        btnBox.size.bottomRight(Offset.zero),
+        ancestor: overlayBox,
+      ),
+    );
+    final position = RelativeRect.fromRect(
+      btnRect,
+      Offset.zero & overlayBox.size,
     );
     showMenu<dynamic>(
       context: ctx,
@@ -682,7 +691,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 onBack: () => _exitFullscreen(innerContext),
                 onCast: _openCastPicker,
                 onPip: _enterPip,
-                onMore: () => _showMoreMenu(innerContext),
+                onMore: (btnCtx) => _showMoreMenu(btnCtx),
                 onDanmakuInputTap: widget.onDanmakuInputTap,
               )
             : NiumaControlBar(
