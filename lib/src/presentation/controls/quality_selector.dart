@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../niuma_sdk_assets.dart';
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
-import 'niuma_sdk_icon.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 
 /// 画质 / 线路选择按钮——读 [NiumaPlayerController.source]'s `lines`，
 /// 展开 popup 列出全部线路；选中时调 [NiumaPlayerController.switchLine]。

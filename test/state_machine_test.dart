@@ -10,7 +10,7 @@ import 'package:niuma_player/niuma_player.dart';
 // `fetchThumbnailVtt` is `@visibleForTesting` and intentionally NOT exported
 // from the public surface (R2-S2 / R2-S5). Tests reach for it via the source
 // path so the public package surface stays minimal.
-import 'package:niuma_player/src/presentation/niuma_player_controller.dart'
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart'
     show fetchThumbnailVtt;
 
 import 'helpers/fake_device_memory_channel.dart';

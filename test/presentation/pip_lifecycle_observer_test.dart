@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/pip_lifecycle_observer.dart';
+import 'package:niuma_player/src/presentation/core/pip_lifecycle_observer.dart';
 
 void main() {
   test('inactive + shouldEnter()=true → enter() 调一次', () {

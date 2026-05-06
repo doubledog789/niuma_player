@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../domain/player_state.dart';
-import '../observability/analytics_emitter.dart';
-import '../observability/analytics_event.dart';
-import 'ad_schedule.dart';
-import 'ad_scheduler.dart';
-import 'niuma_player_controller.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/observability/analytics_emitter.dart';
+import 'package:niuma_player/src/observability/analytics_event.dart';
+import 'package:niuma_player/src/presentation/ad/ad_schedule.dart';
+import 'package:niuma_player/src/presentation/ad/ad_scheduler.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 
 /// 广告 overlay：把 [AdSchedulerOrchestrator.activeCue] 翻译成
 /// 屏幕上的真正 widget。

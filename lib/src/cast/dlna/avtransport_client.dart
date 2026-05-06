@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'soap_avtransport.dart';
+import 'package:niuma_player/src/cast/dlna/soap_avtransport.dart';
 
 /// 抽象 HTTP POST 接口，让 AVTransportClient 在测试时注入 Mock，
 /// 生产用 [_RealSoapHttp]。

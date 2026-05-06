@@ -1,4 +1,4 @@
-import 'player_state.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
 
 /// 当前驱动 [NiumaPlayerController] 的 Dart 侧 backend 是哪个。
 ///

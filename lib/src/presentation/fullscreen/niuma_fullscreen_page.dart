@@ -1,20 +1,20 @@
+import 'package:niuma_player/niuma_player.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
-import '../domain/gesture_kind.dart';
-import '../observability/analytics_emitter.dart';
-import 'ad_schedule.dart';
-import 'button_override.dart';
-import 'niuma_control_bar_config.dart';
-import 'niuma_control_button.dart';
-import 'niuma_danmaku_controller.dart';
-import 'niuma_gesture_layer.dart' show GestureHudBuilder;
-import 'niuma_player.dart';
-import 'niuma_player_controller.dart';
-import 'niuma_player_theme.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
+import 'package:niuma_player/src/observability/analytics_emitter.dart';
+import 'package:niuma_player/src/presentation/ad/ad_schedule.dart';
+import 'package:niuma_player/src/presentation/control_bar/button_override.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/gesture/niuma_gesture_layer.dart' show GestureHudBuilder;
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// 通过 [NiumaFullscreenPage.route] push 的全屏播放页。
 ///
@@ -211,7 +211,7 @@ class NiumaFullscreenPage extends StatefulWidget {
 /// **不导出**：本类是 niuma_player 内部使用的 marker，不属于公开 API
 /// （`lib/niuma_player.dart` 没 export）。用户不需要直接构造它；单测如
 /// 需模拟"在 / 不在全屏页内"两种分支，可通过
-/// `package:niuma_player/src/presentation/niuma_fullscreen_page.dart`
+/// `package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart`
 /// 的内部路径 import。
 class NiumaFullscreenScope extends InheritedWidget {
   /// 构造一个 marker scope。
@@ -295,7 +295,7 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
             disabledGestures: widget.disabledGestures,
             gestureHudBuilder: widget.gestureHudBuilder,
             // M16 参数：全屏页内 NiumaPlayer 检测到 NiumaFullscreenScope 后
-            // 渲染 BiliStyleControlBar，这些参数才真正生效。
+            // 渲染 NiumaFullscreenControlBar，这些参数才真正生效。
             title: widget.title,
             subtitle: widget.subtitle,
             controlBarConfig: widget.controlBarConfig,

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 // NiumaFullscreenScope 是内部 InheritedWidget marker——不在公开 API 中
 // 暴露，但单测需要直接构造它来模拟"当前是否在全屏页内"的两种分支。
-import 'package:niuma_player/src/presentation/niuma_fullscreen_page.dart'
+import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart'
     show NiumaFullscreenScope;
 
 import '../../_helpers/svg_finder.dart';

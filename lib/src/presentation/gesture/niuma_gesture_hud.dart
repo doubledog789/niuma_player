@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../domain/gesture_feedback_state.dart';
-import '../domain/gesture_kind.dart';
-import 'controls/niuma_sdk_icon.dart';
-import 'glass_card.dart';
+import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
+import 'package:niuma_player/src/presentation/shared/glass_card.dart';
 
 // 牛马品牌色（design-tokens.json brand.primary / primary_light）
 const _brandOrange = Color(0xFFEF9F27);

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/niuma_control_bar_config.dart';
-import 'package:niuma_player/src/presentation/niuma_control_button.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
 
 void main() {
   test('minimal 预设：顶左 [back, title]，底左 [playPause]，底右 [fullscreen]', () {

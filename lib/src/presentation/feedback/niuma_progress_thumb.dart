@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../niuma_sdk_assets.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
 
 /// 进度条上的牛马表情头像（Debug 风格 thumb）。
 ///

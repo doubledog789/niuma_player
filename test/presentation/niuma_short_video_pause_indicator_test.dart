@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
 import 'package:niuma_player/src/niuma_sdk_assets.dart';
 import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
-import 'package:niuma_player/src/presentation/niuma_short_video_pause_indicator.dart';
+import 'package:niuma_player/src/presentation/short_video/niuma_short_video_pause_indicator.dart';
 
 import '../_helpers/svg_finder.dart';
 

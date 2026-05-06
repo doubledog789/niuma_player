@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'airplay/airplay_cast_service.dart';
-import 'cast_service.dart';
-import 'dlna/dlna_cast_service.dart';
+import 'package:niuma_player/src/cast/airplay/airplay_cast_service.dart';
+import 'package:niuma_player/src/cast/cast_service.dart';
+import 'package:niuma_player/src/cast/dlna/dlna_cast_service.dart';
 
 /// 投屏协议实现注册表。
 ///

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../niuma_sdk_assets.dart';
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
-import 'niuma_sdk_icon.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 
 /// mockup 屏幕中央的大圆 PlayPause 按钮。
 ///

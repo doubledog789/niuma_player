@@ -1,6 +1,6 @@
-import '../presentation/niuma_player_controller.dart';
-import 'cast_device.dart';
-import 'cast_session.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/cast/cast_device.dart';
+import 'package:niuma_player/src/cast/cast_session.dart';
 
 /// 投屏协议实现接口。子包 extends 它（DlnaCastService / AirPlayCastService）。
 abstract class CastService {

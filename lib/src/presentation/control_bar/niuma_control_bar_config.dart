@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import 'niuma_control_button.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
 
 /// 声明式控件区域配置：每个 enum list 决定渲染顺序和显隐。
 ///

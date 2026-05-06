@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 
-import 'controls/back_action.dart';
-import 'controls/cast_action.dart';
-import 'controls/danmaku_input_pill.dart';
-import 'controls/danmaku_toggle.dart';
-import 'controls/fullscreen_button.dart';
-import 'controls/line_switch_pill.dart';
-import 'controls/more_action.dart';
-import 'controls/pip_action.dart';
-import 'controls/play_pause_button.dart';
-import 'controls/scrub_bar.dart';
-import 'controls/speed_selector.dart';
-import 'controls/subtitle_button.dart';
-import 'controls/time_display.dart';
-import 'controls/title_bar.dart';
-import 'controls/volume_button.dart';
-import 'niuma_control_button.dart';
-import 'niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/controls/back_action.dart';
+import 'package:niuma_player/src/presentation/controls/cast_action.dart';
+import 'package:niuma_player/src/presentation/controls/danmaku_input_pill.dart';
+import 'package:niuma_player/src/presentation/controls/danmaku_toggle.dart';
+import 'package:niuma_player/src/presentation/controls/fullscreen_button.dart';
+import 'package:niuma_player/src/presentation/controls/line_switch_pill.dart';
+import 'package:niuma_player/src/presentation/controls/more_action.dart';
+import 'package:niuma_player/src/presentation/controls/pip_action.dart';
+import 'package:niuma_player/src/presentation/controls/play_pause_button.dart';
+import 'package:niuma_player/src/presentation/controls/scrub_bar.dart';
+import 'package:niuma_player/src/presentation/controls/speed_selector.dart';
+import 'package:niuma_player/src/presentation/controls/subtitle_button.dart';
+import 'package:niuma_player/src/presentation/controls/time_display.dart';
+import 'package:niuma_player/src/presentation/controls/title_bar.dart';
+import 'package:niuma_player/src/presentation/controls/volume_button.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 
-/// 上下文：NiumaControlBar (inline) 和 BiliStyleControlBar (fullscreen)
+/// 上下文：NiumaControlBar (inline) 和 NiumaFullscreenControlBar (fullscreen)
 /// 共享的「按 enum 渲染默认 widget」逻辑。
 ///
 /// 两个位置共用，避免 enum case 在多处分别维护。

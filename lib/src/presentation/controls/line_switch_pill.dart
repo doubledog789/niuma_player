@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// mockup 顶栏的「线路切换」pill——多 line 时显示当前 line label。
 ///

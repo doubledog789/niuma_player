@@ -1,5 +1,5 @@
-import 'data_source.dart';
-import 'player_backend.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
+import 'package:niuma_player/src/domain/player_backend.dart';
 
 /// 对具体 backend 构造的间接层，使测试可以注入 fake，无需 stub
 /// `dart:io` Platform / native channels。生产实现在

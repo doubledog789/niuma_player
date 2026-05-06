@@ -9,16 +9,16 @@
 // 所以独立成文件 + 显式 import + 再 export。
 library;
 
-import 'presentation/controls/danmaku_button.dart';
-import 'presentation/controls/fullscreen_button.dart';
-import 'presentation/controls/pip_button.dart';
-import 'presentation/controls/play_pause_button.dart';
-import 'presentation/controls/quality_selector.dart';
-import 'presentation/controls/scrub_bar.dart';
-import 'presentation/controls/speed_selector.dart';
-import 'presentation/controls/subtitle_button.dart';
-import 'presentation/controls/time_display.dart';
-import 'presentation/controls/volume_button.dart';
+import 'package:niuma_player/src/presentation/controls/danmaku_button.dart';
+import 'package:niuma_player/src/presentation/controls/fullscreen_button.dart';
+import 'package:niuma_player/src/presentation/controls/pip_button.dart';
+import 'package:niuma_player/src/presentation/controls/play_pause_button.dart';
+import 'package:niuma_player/src/presentation/controls/quality_selector.dart';
+import 'package:niuma_player/src/presentation/controls/scrub_bar.dart';
+import 'package:niuma_player/src/presentation/controls/speed_selector.dart';
+import 'package:niuma_player/src/presentation/controls/subtitle_button.dart';
+import 'package:niuma_player/src/presentation/controls/time_display.dart';
+import 'package:niuma_player/src/presentation/controls/volume_button.dart';
 
 typedef NiumaPlayPauseButton = PlayPauseButton;
 typedef NiumaScrubBar = ScrubBar;

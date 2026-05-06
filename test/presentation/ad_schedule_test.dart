@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/ad_schedule.dart';
+import 'package:niuma_player/src/presentation/ad/ad_schedule.dart';
 
 void main() {
   test('AdCue defaults', () {

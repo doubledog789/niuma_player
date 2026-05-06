@@ -1,4 +1,4 @@
-import '../orchestration/resume_position.dart';
+import 'package:niuma_player/src/orchestration/resume_position.dart';
 
 /// 用于 widget 和单元测试的内存版 [ResumeStorage] 测试替身。
 ///

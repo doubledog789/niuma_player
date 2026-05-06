@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
-import '../domain/data_source.dart';
-import '../domain/player_backend.dart';
-import '../domain/player_state.dart';
-import '_pip_event_bus.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
+import 'package:niuma_player/src/domain/player_backend.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/data/_pip_event_bus.dart';
 
 /// 包装 `package:video_player` 的 [PlayerBackend] 实现。
 class VideoPlayerBackend implements PlayerBackend {

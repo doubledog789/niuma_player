@@ -1,10 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 
-import '../data/video_player_backend.dart';
-import '../domain/player_backend.dart';
-import '../domain/player_state.dart';
-import 'niuma_player_controller.dart';
+import 'package:niuma_player/src/data/video_player_backend.dart';
+import 'package:niuma_player/src/domain/player_backend.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 
 /// 渲染 [NiumaPlayerController] 当前激活的 backend。
 ///

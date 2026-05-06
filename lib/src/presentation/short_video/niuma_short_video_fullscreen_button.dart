@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../niuma_sdk_assets.dart';
-import 'controls/niuma_sdk_icon.dart';
-import 'glass_card.dart';
-import 'niuma_danmaku_controller.dart';
-import 'niuma_fullscreen_page.dart';
-import 'niuma_player_controller.dart';
-import 'niuma_player_theme.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
+import 'package:niuma_player/src/presentation/shared/glass_card.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// 抖音风短视频"切全屏"按钮。
 ///

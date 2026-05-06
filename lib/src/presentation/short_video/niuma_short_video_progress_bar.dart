@@ -1,10 +1,10 @@
-// lib/src/presentation/niuma_short_video_progress_bar.dart
+// lib/src/presentation/short_video/niuma_short_video_progress_bar.dart
 import 'package:flutter/material.dart';
 
-import '../domain/niuma_short_video_theme.dart';
-import '../domain/player_state.dart';
-import 'niuma_player_controller.dart';
-import 'niuma_progress_thumb.dart';
+import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/feedback/niuma_progress_thumb.dart';
 
 /// 抖音式底部细线进度条。
 ///

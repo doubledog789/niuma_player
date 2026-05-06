@@ -1,9 +1,9 @@
+import 'package:niuma_player/niuma_player.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:niuma_player/niuma_player.dart';
 
-import 'avtransport_client.dart';
+import 'package:niuma_player/src/cast/dlna/avtransport_client.dart';
 
 /// 一次 DLNA 投屏会话——把 [AVTransportClient] 包成 SDK 通用 [CastSession]。
 ///

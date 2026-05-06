@@ -4,7 +4,7 @@
 import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter/widgets.dart' show IconData;
 
-import 'gesture_kind.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
 
 /// 手势 HUD 数据快照。
 @immutable

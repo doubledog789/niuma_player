@@ -1,9 +1,9 @@
-// lib/src/presentation/niuma_short_video_scrub_label.dart
+// lib/src/presentation/short_video/niuma_short_video_scrub_label.dart
 import 'package:flutter/material.dart';
 
-import '../domain/niuma_short_video_theme.dart';
-import 'glass_card.dart';
-import 'video_time_format.dart';
+import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
+import 'package:niuma_player/src/presentation/shared/glass_card.dart';
+import 'package:niuma_player/src/presentation/shared/video_time_format.dart';
 
 /// 拖动进度条时显示在视频中央的大字时间卡。
 ///

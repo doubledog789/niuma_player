@@ -1,18 +1,18 @@
-// lib/src/presentation/niuma_short_video_player.dart
+// lib/src/presentation/short_video/niuma_short_video_player.dart
 import 'package:flutter/material.dart';
 
-import '../domain/gesture_kind.dart';
-import '../domain/niuma_short_video_theme.dart';
-import '../domain/player_state.dart';
-import 'niuma_danmaku_controller.dart';
-import 'niuma_danmaku_overlay.dart';
-import 'niuma_danmaku_scope.dart';
-import 'niuma_gesture_layer.dart';
-import 'niuma_player_controller.dart';
-import 'niuma_player_view.dart';
-import 'niuma_short_video_pause_indicator.dart';
-import 'niuma_short_video_progress_bar.dart';
-import 'niuma_short_video_scrub_label.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
+import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_overlay.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_scope.dart';
+import 'package:niuma_player/src/presentation/gesture/niuma_gesture_layer.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_view.dart';
+import 'package:niuma_player/src/presentation/short_video/niuma_short_video_pause_indicator.dart';
+import 'package:niuma_player/src/presentation/short_video/niuma_short_video_progress_bar.dart';
+import 'package:niuma_player/src/presentation/short_video/niuma_short_video_scrub_label.dart';
 
 /// 短视频外壳组件。与 [NiumaPlayer] 并列，专为竖屏短视频流（PageView 翻页）
 /// 场景设计。

@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../domain/gesture_feedback_state.dart';
-import '../domain/gesture_kind.dart';
-import '../domain/player_state.dart';
-import '../niuma_sdk_assets.dart';
-import 'niuma_gesture_hud.dart';
-import 'niuma_player_controller.dart';
-import 'video_time_format.dart';
+import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/gesture/niuma_gesture_hud.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/shared/video_time_format.dart';
 
 /// HUD 自定义 builder 类型。
 typedef GestureHudBuilder = Widget Function(

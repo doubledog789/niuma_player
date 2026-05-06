@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'niuma_player_controller.dart';
-import 'niuma_player_theme.dart';
-import 'niuma_thumbnail_view.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/thumbnail/niuma_thumbnail_view.dart';
 
 /// 进度条悬浮缩略图预览。
 ///

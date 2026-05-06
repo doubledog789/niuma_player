@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 
-import 'button_override.dart';
-import 'control_button_resolver.dart';
-import 'controls/center_play_pause.dart';
-import 'controls/icon_label_action.dart';
-import 'controls/scrub_bar.dart';
-import 'controls/time_display.dart';
-import 'niuma_control_bar_config.dart';
-import 'niuma_control_button.dart';
-import 'niuma_player_controller.dart';
-import 'niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/control_bar/button_override.dart';
+import 'package:niuma_player/src/presentation/control_bar/control_button_resolver.dart';
+import 'package:niuma_player/src/presentation/controls/center_play_pause.dart';
+import 'package:niuma_player/src/presentation/controls/icon_label_action.dart';
+import 'package:niuma_player/src/presentation/controls/scrub_bar.dart';
+import 'package:niuma_player/src/presentation/controls/time_display.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// mockup B 站风格全屏控件层。
 ///
 /// 按 [NiumaControlBarConfig] 的 enum list 决定渲染哪些按钮 / 顺序。
 /// inline 状态请用现有 NiumaControlBar；本 widget 只服务全屏。
-class BiliStyleControlBar extends StatelessWidget {
-  const BiliStyleControlBar({
+class NiumaFullscreenControlBar extends StatelessWidget {
+  const NiumaFullscreenControlBar({
     super.key,
     required this.controller,
     required this.config,

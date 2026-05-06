@@ -3,9 +3,9 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
-import '../orchestration/danmaku_models.dart';
-import '../orchestration/danmaku_track_allocator.dart';
-import 'niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/orchestration/danmaku_models.dart';
+import 'package:niuma_player/src/orchestration/danmaku_track_allocator.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
 
 /// 弹幕渲染器。每帧根据当前 video position 计算可见 items 并 draw。
 ///

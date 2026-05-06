@@ -1,9 +1,9 @@
-// lib/src/presentation/niuma_short_video_pause_indicator.dart
+// lib/src/presentation/short_video/niuma_short_video_pause_indicator.dart
 import 'package:flutter/material.dart';
 
-import '../domain/niuma_short_video_theme.dart';
-import '../niuma_sdk_assets.dart';
-import 'controls/niuma_sdk_icon.dart';
+import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 
 /// 短视频暂停态中央粘性图标。
 ///

@@ -1,13 +1,13 @@
+import 'package:niuma_player/niuma_player.dart';
 import 'dart:async';
 
-import 'package:niuma_player/niuma_player.dart';
 
-import 'avtransport_client.dart';
-import 'device_description.dart';
-import 'dlna_session.dart';
-import 'multicast_lock.dart';
-import 'persistent_history.dart';
-import 'ssdp_discovery.dart';
+import 'package:niuma_player/src/cast/dlna/avtransport_client.dart';
+import 'package:niuma_player/src/cast/dlna/device_description.dart';
+import 'package:niuma_player/src/cast/dlna/dlna_session.dart';
+import 'package:niuma_player/src/cast/dlna/multicast_lock.dart';
+import 'package:niuma_player/src/cast/dlna/persistent_history.dart';
+import 'package:niuma_player/src/cast/dlna/ssdp_discovery.dart';
 
 /// DLNA 投屏服务——SSDP 发现 + SOAP/AVTransport 远程控制。
 ///

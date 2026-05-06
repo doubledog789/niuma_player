@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
-import 'package:niuma_player/src/presentation/glass_card.dart';
-import 'package:niuma_player/src/presentation/niuma_short_video_scrub_label.dart';
+import 'package:niuma_player/src/presentation/shared/glass_card.dart';
+import 'package:niuma_player/src/presentation/short_video/niuma_short_video_scrub_label.dart';
 
 void main() {
   testWidgets('渲染 mm:ss / mm:ss 格式', (tester) async {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../niuma_sdk_assets.dart';
-import '../niuma_danmaku_controller.dart';
-import '../niuma_danmaku_scope.dart';
-import '../niuma_player_theme.dart';
-import 'niuma_sdk_icon.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_scope.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 
 /// 弹幕开关按钮。
 ///

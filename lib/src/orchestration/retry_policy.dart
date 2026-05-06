@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
-import '../domain/player_state.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
 
 /// 控制播放器初始化失败时是否重试以及何时重试。
 ///

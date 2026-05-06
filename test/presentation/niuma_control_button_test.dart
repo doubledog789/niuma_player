@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/niuma_control_button.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
 
 void main() {
   test('NiumaControlButton 枚举包含 15 个原子按钮', () {

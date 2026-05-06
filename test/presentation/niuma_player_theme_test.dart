@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 void main() {
   group('NiumaPlayerTheme defaults', () {

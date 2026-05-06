@@ -2,8 +2,8 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-import '../domain/platform_bridge.dart';
-import 'native_backend.dart';
+import 'package:niuma_player/src/domain/platform_bridge.dart';
+import 'package:niuma_player/src/data/native_backend.dart';
 
 /// 生产环境 [PlatformBridge]。
 ///

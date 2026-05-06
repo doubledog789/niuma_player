@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../cast/cast_session.dart';
-import '../../niuma_sdk_assets.dart';
-import '../controls/niuma_sdk_icon.dart';
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
+import 'package:niuma_player/src/cast/cast_session.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// 投屏按钮。inline / 投屏中两态自动切。
 ///

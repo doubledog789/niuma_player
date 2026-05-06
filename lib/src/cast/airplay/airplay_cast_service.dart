@@ -1,7 +1,7 @@
+import 'package:niuma_player/niuma_player.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:niuma_player/niuma_player.dart';
 
 /// AirPlay 投屏服务——iOS only。其他平台 discover 返空，connect 抛 UnsupportedError。
 ///

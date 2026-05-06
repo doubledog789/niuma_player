@@ -1,6 +1,6 @@
-import '../orchestration/thumbnail_track.dart';
-import 'thumbnail_cache.dart';
-import 'thumbnail_frame.dart';
+import 'package:niuma_player/src/orchestration/thumbnail_track.dart';
+import 'package:niuma_player/src/presentation/thumbnail/thumbnail_cache.dart';
+import 'package:niuma_player/src/presentation/thumbnail/thumbnail_frame.dart';
 
 /// 把 [Duration] 映射成 [ThumbnailFrame]：在 cues 里找包含 position 的那条，
 /// 用 baseUrl 解析相对 sprite URL，从 cache 拿对应 ImageProvider。

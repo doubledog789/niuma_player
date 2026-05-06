@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// 顶栏视频标题 + 副标题区域。
 ///

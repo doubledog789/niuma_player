@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
 
 /// 弹幕设置面板：3 个 slider（fontScale / opacity / displayAreaPercent）+ Switch。
 ///

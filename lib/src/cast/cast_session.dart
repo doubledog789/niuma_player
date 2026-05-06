@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'cast_device.dart';
-import 'cast_state.dart';
+import 'package:niuma_player/src/cast/cast_device.dart';
+import 'package:niuma_player/src/cast/cast_state.dart';
 
 /// 一次投屏会话——connect 成功后由 CastService 返回。
 abstract class CastSession {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/button_override.dart';
+import 'package:niuma_player/src/presentation/control_bar/button_override.dart';
 
 void main() {
   test('ButtonOverride.builder 是 BuilderOverride', () {

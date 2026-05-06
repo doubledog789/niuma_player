@@ -1,12 +1,12 @@
+import 'package:niuma_player/niuma_player.dart';
 import 'package:flutter/material.dart';
 
-import '../../niuma_sdk_assets.dart';
-import '../niuma_control_bar_config.dart';
-import '../niuma_fullscreen_page.dart';
-import '../niuma_player.dart';
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
-import 'niuma_sdk_icon.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 
 /// 全屏切换按钮。
 ///
@@ -66,7 +66,7 @@ class FullscreenButton extends StatelessWidget {
           disabledGestures: cfg?.disabledGestures ?? const {},
           gestureHudBuilder: cfg?.gestureHudBuilder,
           // M16 参数：从 NiumaPlayerConfigScope 读取后透传给全屏页，
-          // 确保全屏 BiliStyleControlBar 能正确渲染 mockup 配置。
+          // 确保全屏 NiumaFullscreenControlBar 能正确渲染 mockup 配置。
           title: cfg?.title,
           subtitle: cfg?.subtitle,
           controlBarConfig: cfg?.controlBarConfig,

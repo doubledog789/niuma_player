@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
-import 'controls/danmaku_button.dart';
-import 'controls/fullscreen_button.dart';
-import 'controls/play_pause_button.dart';
-import 'controls/quality_selector.dart';
-import 'controls/scrub_bar.dart';
-import 'controls/speed_selector.dart';
-import 'controls/subtitle_button.dart';
-import 'controls/time_display.dart';
-import 'controls/volume_button.dart';
-import 'control_button_resolver.dart';
-import 'niuma_control_bar_config.dart';
-import 'niuma_player_controller.dart';
-import 'niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/controls/danmaku_button.dart';
+import 'package:niuma_player/src/presentation/controls/fullscreen_button.dart';
+import 'package:niuma_player/src/presentation/controls/play_pause_button.dart';
+import 'package:niuma_player/src/presentation/controls/quality_selector.dart';
+import 'package:niuma_player/src/presentation/controls/scrub_bar.dart';
+import 'package:niuma_player/src/presentation/controls/speed_selector.dart';
+import 'package:niuma_player/src/presentation/controls/subtitle_button.dart';
+import 'package:niuma_player/src/presentation/controls/time_display.dart';
+import 'package:niuma_player/src/presentation/controls/volume_button.dart';
+import 'package:niuma_player/src/presentation/control_bar/control_button_resolver.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// B 站风格的密集底部控件条。
 ///

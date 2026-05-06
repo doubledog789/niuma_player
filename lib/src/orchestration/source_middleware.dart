@@ -1,4 +1,4 @@
-import '../domain/data_source.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
 
 /// 在 [NiumaDataSource] 进入播放后端之前对其进行变换。
 ///

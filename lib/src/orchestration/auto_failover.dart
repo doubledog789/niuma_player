@@ -1,5 +1,5 @@
-import '../domain/player_state.dart';
-import 'multi_source.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/orchestration/multi_source.dart';
 
 /// 在初始化失败后决定下一条尝试的 [MediaLine]。
 ///

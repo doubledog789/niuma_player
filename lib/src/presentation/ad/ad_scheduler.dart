@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../domain/player_state.dart';
-import '../observability/analytics_emitter.dart';
-import '../observability/analytics_event.dart';
-import 'ad_schedule.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/observability/analytics_emitter.dart';
+import 'package:niuma_player/src/observability/analytics_event.dart';
+import 'package:niuma_player/src/presentation/ad/ad_schedule.dart';
 
 /// 基于 [ValueListenable<NiumaPlayerValue>] 的状态变化编排广告 cue 的触发。
 ///

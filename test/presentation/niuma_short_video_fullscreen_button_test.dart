@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/presentation/niuma_fullscreen_page.dart'
+import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart'
     show NiumaFullscreenPage, NiumaFullscreenScope;
 
 import '../_helpers/svg_finder.dart';

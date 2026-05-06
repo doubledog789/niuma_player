@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
 import 'package:niuma_player/src/domain/gesture_kind.dart';
-import 'package:niuma_player/src/presentation/niuma_gesture_hud.dart';
+import 'package:niuma_player/src/presentation/gesture/niuma_gesture_hud.dart';
 
 void main() {
   testWidgets('volume HUD 显示 icon + label + 进度条', (tester) async {

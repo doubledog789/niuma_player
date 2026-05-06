@@ -1,6 +1,6 @@
+import 'package:niuma_player/niuma_player.dart';
 import 'dart:convert';
 
-import 'package:niuma_player/niuma_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 历史设备记录。

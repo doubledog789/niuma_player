@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../domain/data_source.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
 
 /// 单视频续播位置的可插拔持久化契约。
 ///

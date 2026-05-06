@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../domain/data_source.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
 
 /// 描述媒体流画质的技术性元数据。
 ///

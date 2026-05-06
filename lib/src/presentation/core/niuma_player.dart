@@ -3,36 +3,36 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../cast/cast_device.dart';
-import '../cast/cast_registry.dart';
-import '../domain/gesture_kind.dart';
-import '../domain/player_state.dart';
-import '../observability/analytics_emitter.dart';
-import 'ad_schedule.dart';
-import 'ad_scheduler.dart';
-import 'bili_style_control_bar.dart';
-import 'button_override.dart';
-import 'cast/niuma_cast_overlay.dart';
-import 'cast/niuma_cast_picker_panel.dart';
-import 'controls/back_action.dart';
-import 'niuma_ad_overlay.dart';
-import 'niuma_control_bar.dart';
-import 'niuma_control_bar_config.dart';
-import 'niuma_control_button.dart';
-import 'niuma_danmaku_controller.dart';
-import 'niuma_danmaku_overlay.dart';
-import 'niuma_danmaku_scope.dart';
-import 'niuma_fullscreen_page.dart' show NiumaFullscreenScope;
-import '../niuma_sdk_assets.dart';
-import 'controls/lock_button.dart';
-import 'controls/niuma_sdk_icon.dart';
-import 'niuma_gesture_layer.dart';
-import 'niuma_loading_indicator.dart';
-import 'niuma_player_controller.dart';
-import 'niuma_player_theme.dart';
-import 'niuma_player_view.dart';
+import 'package:niuma_player/src/cast/cast_device.dart';
+import 'package:niuma_player/src/cast/cast_registry.dart';
+import 'package:niuma_player/src/domain/gesture_kind.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/observability/analytics_emitter.dart';
+import 'package:niuma_player/src/presentation/ad/ad_schedule.dart';
+import 'package:niuma_player/src/presentation/ad/ad_scheduler.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_fullscreen_control_bar.dart';
+import 'package:niuma_player/src/presentation/control_bar/button_override.dart';
+import 'package:niuma_player/src/presentation/cast/niuma_cast_overlay.dart';
+import 'package:niuma_player/src/presentation/cast/niuma_cast_picker_panel.dart';
+import 'package:niuma_player/src/presentation/controls/back_action.dart';
+import 'package:niuma_player/src/presentation/ad/niuma_ad_overlay.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
+import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_overlay.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_scope.dart';
+import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart' show NiumaFullscreenScope;
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/controls/lock_button.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
+import 'package:niuma_player/src/presentation/gesture/niuma_gesture_layer.dart';
+import 'package:niuma_player/src/presentation/feedback/niuma_loading_indicator.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_view.dart';
 
-part 'niuma_player_popup_menu.dart';
+part 'package:niuma_player/src/presentation/core/niuma_player_popup_menu.dart';
 
 /// niuma_player 一体化默认播放组件。
 ///
@@ -134,11 +134,11 @@ class NiumaPlayer extends StatefulWidget {
   /// - 非 null：把 enum list 透传给 [NiumaControlBar] 走配置驱动渲染。
   final NiumaControlBarConfig? controlBarConfig;
 
-  /// 全屏控件条配置（[BiliStyleControlBar]）。默认 [NiumaControlBarConfig.bili]。
+  /// 全屏控件条配置（[NiumaFullscreenControlBar]）。默认 [NiumaControlBarConfig.bili]。
   final NiumaControlBarConfig fullscreenControlBarConfig;
 
   /// 按钮级覆盖：把指定 enum 的默认 widget 替换为业务自定义内容。
-  /// 仅在全屏 [BiliStyleControlBar] 上生效（inline 暂不支持）。
+  /// 仅在全屏 [NiumaFullscreenControlBar] 上生效（inline 暂不支持）。
   final Map<NiumaControlButton, ButtonOverride>? buttonOverrides;
 
   /// 底栏左侧按钮区**之后**的额外 slot——业务想塞 next/prev 等"接 playPause"
@@ -161,7 +161,7 @@ class NiumaPlayer extends StatefulWidget {
   /// [PopupMenuEntry] 列表，由播放器内部全屏菜单 route 渲染。
   final List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder;
 
-  /// 视频章节起点位置（透到 [ScrubBar.chapters]，全屏 BiliStyleControlBar
+  /// 视频章节起点位置（透到 [ScrubBar.chapters]，全屏 NiumaFullscreenControlBar
   /// 进度条会画刻度）。
   final List<Duration>? chapters;
 
@@ -169,7 +169,7 @@ class NiumaPlayer extends StatefulWidget {
   final VoidCallback? onDanmakuInputTap;
 
   /// 全屏顶栏 topActions enum 之后追加的业务自定义 slot
-  /// （业务互动按钮如点赞 / 分享等）。仅全屏 [BiliStyleControlBar] 生效。
+  /// （业务互动按钮如点赞 / 分享等）。仅全屏 [NiumaFullscreenControlBar] 生效。
   final WidgetBuilder? actionsBuilder;
 
   @override
@@ -226,7 +226,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 当前还在扫描的协议数。降到 0 时停止 scanning 状态。
   int _castScanPendingSubs = 0;
 
-  /// 全屏锁屏状态——锁定时 [BiliStyleControlBar] 不渲染、
+  /// 全屏锁屏状态——锁定时 [NiumaFullscreenControlBar] 不渲染、
   /// [NiumaGestureLayer.enabled] 关掉，只剩左中浮动 [LockButton]
   /// 给用户解锁。inline 不参与本状态。
   final ValueNotifier<bool> _locked = ValueNotifier<bool>(false);
@@ -525,7 +525,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     }
   }
 
-  /// 全屏 [BiliStyleControlBar] 的 onMore 回调——内置「投屏」「画中画」
+  /// 全屏 [NiumaFullscreenControlBar] 的 onMore 回调——内置「投屏」「画中画」
   /// 两项，之后追加业务侧 [moreMenuBuilder] 返回的条目（用分隔线隔开）。
   void _showMoreMenu(BuildContext ctx) {
     final extra =
@@ -706,17 +706,17 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         // controller.value 变化以外的交互（仅本地 widget state 变化的拖动）
         // 才需要这一层兜底；不做的话 ScrubBar drag 期间 _onValueChanged
         // 不 fire，timer 一直跑到底。
-        // M16：全屏（NiumaFullscreenScope 注入）走 BiliStyleControlBar，
+        // M16：全屏（NiumaFullscreenScope 注入）走 NiumaFullscreenControlBar，
         // inline 走原 NiumaControlBar——同一棵树，按当前 BuildContext
         // 是否在 fullscreen scope 里 swap。
         final isFullscreen = NiumaFullscreenScope.maybeOf(innerContext) != null;
 
-        // 全屏底栏：BiliStyleControlBar 自带 top + bottom + center + rail，
+        // 全屏底栏：NiumaFullscreenControlBar 自带 top + bottom + center + rail，
         // 替代 inline 模式下的 [NiumaCastButton + PipButton] 右上 actions
         // 区（这两个按钮在全屏的 topActions enum 里有重渲染入口）。
         // inline：保留 M9 行为——NiumaControlBar 在底部 + 右上 Cast/PiP 浮层。
         final controlBarLayer = isFullscreen
-            ? BiliStyleControlBar(
+            ? NiumaFullscreenControlBar(
                 controller: widget.controller,
                 config: widget.fullscreenControlBarConfig,
                 title: widget.title,
@@ -790,7 +790,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   },
                 ),
               ),
-            // 全屏：BiliStyleControlBar 用 Stack/Positioned 自己排 top/bottom/
+            // 全屏：NiumaFullscreenControlBar 用 Stack/Positioned 自己排 top/bottom/
             // center/rail，必须铺满整个浮层 Stack——把它放在独立的
             // Positioned.fill 槽里。inline：保留 M9 老行为，Align bottom。
             // 锁屏（_locked）时整个 control bar 不渲染——只剩左中 LockButton
@@ -826,7 +826,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
               ),
             // M16: inline 左上 BackAction 浮层——controlsVisible 时显示，
             // 点击退出当前 demo route。Cast/PiP 不再 inline 显示（M16 设计：
-            // 只全屏才需要，全屏 BiliStyleControlBar 顶栏 [more] 菜单内置）。
+            // 只全屏才需要，全屏 NiumaFullscreenControlBar 顶栏 [more] 菜单内置）。
             if (!isFullscreen)
               AnimatedOpacity(
                 opacity: _controlsVisible ? 1.0 : 0.0,
@@ -944,7 +944,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     // 在 push 全屏 route 时能读到外层 NiumaPlayer 的全部配置——避免
     // 全屏页内部的 NiumaPlayer 丢失 adSchedule / theme / autoHide 等
     // 关键 props。M16 新增 9 个参数同样透传，让全屏页里的 NiumaPlayer
-    // 能正确渲染 BiliStyleControlBar 配置。
+    // 能正确渲染 NiumaFullscreenControlBar 配置。
     content = NiumaPlayerConfigScope(
       adSchedule: widget.adSchedule,
       adAnalyticsEmitter: widget.adAnalyticsEmitter,
@@ -1004,7 +1004,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
 ///
 /// **不导出**：本类仅在内部使用（[NiumaPlayer.build] 注入，
 /// [FullscreenButton._onPressed] 读取），不属于公开 API。单测如需直接
-/// 操作通过 `package:niuma_player/src/presentation/niuma_player.dart`
+/// 操作通过 `package:niuma_player/src/presentation/core/niuma_player.dart`
 /// 的内部路径 import。
 class NiumaPlayerConfigScope extends InheritedWidget {
   /// 构造一个 [NiumaPlayerConfigScope]。
@@ -1149,13 +1149,13 @@ SchedulerPhase? debugSchedulerPhaseOverride;
 typedef NiumaPlayerStateForTesting = _NiumaPlayerState;
 
 /// 测试用别名——指向 [NiumaFullscreenScope]，让单测能在不引内部路径的情况下
-/// 包一层 fullscreen marker，触发 NiumaPlayer 的 BiliStyleControlBar swap。
+/// 包一层 fullscreen marker，触发 NiumaPlayer 的 NiumaFullscreenControlBar swap。
 @visibleForTesting
 typedef NiumaFullscreenScopeForTesting = NiumaFullscreenScope;
 
-/// 测试用别名——指向 [BiliStyleControlBar] 类型，单测 `find.byType` 用。
+/// 测试用别名——指向 [NiumaFullscreenControlBar] 类型，单测 `find.byType` 用。
 @visibleForTesting
-typedef BiliStyleControlBarTypeForTesting = BiliStyleControlBar;
+typedef BiliStyleControlBarTypeForTesting = NiumaFullscreenControlBar;
 
 /// 测试用别名——指向 [NiumaCastPickerPanel] 类型，单测 `find.byType` 用。
 @visibleForTesting

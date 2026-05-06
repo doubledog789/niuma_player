@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../cast/cast_device.dart';
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
+import 'package:niuma_player/src/cast/cast_device.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// mockup「分屏 panel」设备选择器：左 42% 视频暗化 + 右 58% 设备列表。
 ///

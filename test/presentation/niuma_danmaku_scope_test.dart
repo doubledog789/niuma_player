@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/niuma_danmaku_controller.dart';
-import 'package:niuma_player/src/presentation/niuma_danmaku_scope.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_scope.dart';
 
 var _notifyCount = 0;
 

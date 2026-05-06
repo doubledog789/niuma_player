@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/orchestration/danmaku_models.dart';
-import 'package:niuma_player/src/presentation/niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
 
 void main() {
   group('NiumaDanmakuController', () {

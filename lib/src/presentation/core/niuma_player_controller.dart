@@ -7,27 +7,27 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart' show experimental;
 
-import '../data/default_backend_factory.dart';
-import '../data/default_platform_bridge.dart';
-import '../data/device_memory.dart' show DeviceMemory;
-import '../data/native_backend.dart';
-import '../domain/backend_factory.dart';
-import '../domain/gesture_feedback_state.dart';
-import '../domain/data_source.dart';
-import '../domain/platform_bridge.dart';
-import '../domain/player_backend.dart';
-import '../domain/player_state.dart';
-import '../orchestration/multi_source.dart';
-import '../orchestration/retry_policy.dart';
-import '../orchestration/source_middleware.dart';
-import '../orchestration/thumbnail_track.dart';
-import '../orchestration/webvtt_parser.dart';
-import '../cast/cast_session.dart';
-import '../cast/cast_state.dart';
-import 'pip_lifecycle_observer.dart';
-import 'thumbnail_cache.dart';
-import 'thumbnail_frame.dart';
-import 'thumbnail_resolver.dart';
+import 'package:niuma_player/src/data/default_backend_factory.dart';
+import 'package:niuma_player/src/data/default_platform_bridge.dart';
+import 'package:niuma_player/src/data/device_memory.dart' show DeviceMemory;
+import 'package:niuma_player/src/data/native_backend.dart';
+import 'package:niuma_player/src/domain/backend_factory.dart';
+import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
+import 'package:niuma_player/src/domain/platform_bridge.dart';
+import 'package:niuma_player/src/domain/player_backend.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/orchestration/multi_source.dart';
+import 'package:niuma_player/src/orchestration/retry_policy.dart';
+import 'package:niuma_player/src/orchestration/source_middleware.dart';
+import 'package:niuma_player/src/orchestration/thumbnail_track.dart';
+import 'package:niuma_player/src/orchestration/webvtt_parser.dart';
+import 'package:niuma_player/src/cast/cast_session.dart';
+import 'package:niuma_player/src/cast/cast_state.dart';
+import 'package:niuma_player/src/presentation/core/pip_lifecycle_observer.dart';
+import 'package:niuma_player/src/presentation/thumbnail/thumbnail_cache.dart';
+import 'package:niuma_player/src/presentation/thumbnail/thumbnail_frame.dart';
+import 'package:niuma_player/src/presentation/thumbnail/thumbnail_resolver.dart';
 
 /// 拉取 WebVTT body 的函数签名。
 ///

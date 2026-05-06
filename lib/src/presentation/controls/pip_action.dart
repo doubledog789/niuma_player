@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../niuma_sdk_assets.dart';
-import '../niuma_player_controller.dart';
-import 'icon_label_action.dart';
-import 'niuma_sdk_icon.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/controls/icon_label_action.dart';
+import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 
 /// mockup 风格的画中画按钮——icon + 「画中画」中文 label 垂直布局。
 ///

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'danmaku_models.dart';
+import 'package:niuma_player/src/orchestration/danmaku_models.dart';
 
 /// 60s 桶 lazy loader：dedup 并发请求，缓存已加载桶，错误不污染 cache。
 class DanmakuBucketLoader {

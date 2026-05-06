@@ -35,7 +35,7 @@ void main() {
         body: SizedBox(
           width: 800,
           height: 400,
-          child: BiliStyleControlBar(
+          child: NiumaFullscreenControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
             title: '视频标题',
@@ -66,7 +66,7 @@ void main() {
         body: SizedBox(
           width: 800,
           height: 400,
-          child: BiliStyleControlBar(
+          child: NiumaFullscreenControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.minimal,
             title: '视频',
@@ -88,7 +88,7 @@ void main() {
         body: SizedBox(
           width: 800,
           height: 400,
-          child: BiliStyleControlBar(
+          child: NiumaFullscreenControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
             title: '视频',
@@ -111,7 +111,7 @@ void main() {
         body: SizedBox(
           width: 800,
           height: 400,
-          child: BiliStyleControlBar(
+          child: NiumaFullscreenControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
             title: '视频',
@@ -134,7 +134,7 @@ void main() {
         body: SizedBox(
           width: 800,
           height: 400,
-          child: BiliStyleControlBar(
+          child: NiumaFullscreenControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
             title: '一个比较长的标题，验证右侧 more 不会被标题布局拖离右边',
@@ -159,7 +159,7 @@ void main() {
         body: SizedBox(
           width: 800,
           height: 400,
-          child: BiliStyleControlBar(
+          child: NiumaFullscreenControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
             title: '视频',
@@ -199,7 +199,7 @@ void main() {
         body: SizedBox(
           width: 800,
           height: 400,
-          child: BiliStyleControlBar(
+          child: NiumaFullscreenControlBar(
             controller: ctl,
             config: NiumaControlBarConfig.bili,
             title: '视频',

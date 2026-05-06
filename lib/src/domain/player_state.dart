@@ -2,9 +2,9 @@ import 'dart:ui' show Size;
 
 import 'package:flutter/foundation.dart';
 
-import '../cast/cast_device.dart';
-import '../cast/cast_state.dart';
-import 'player_backend.dart';
+import 'package:niuma_player/src/cast/cast_device.dart';
+import 'package:niuma_player/src/cast/cast_state.dart';
+import 'package:niuma_player/src/domain/player_backend.dart';
 
 /// [PlayerError] 的粗粒度分类。app 级代码用它判断是否重试、是否给用户
 /// 提示、是否切到 fallback 线路。取代以前用正则匹配错误字符串的做法。

@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-import '../domain/data_source.dart';
-import '../domain/player_backend.dart';
-import '../domain/player_state.dart';
-import '_pip_event_bus.dart';
+import 'package:niuma_player/src/domain/data_source.dart';
+import 'package:niuma_player/src/domain/player_backend.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/data/_pip_event_bus.dart';
 
 /// 用于 texture 创建和设备指纹查询的全局 channel。
 const MethodChannel _globalChannel = MethodChannel('cn.niuma/player');

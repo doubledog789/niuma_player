@@ -5,5 +5,5 @@
 /// 基础设施即可编写 widget 测试。
 library;
 
-export 'src/testing/fake_resume_storage.dart';
-export 'src/testing/fake_analytics_emitter.dart';
+export 'package:niuma_player/src/testing/fake_resume_storage.dart';
+export 'package:niuma_player/src/testing/fake_analytics_emitter.dart';

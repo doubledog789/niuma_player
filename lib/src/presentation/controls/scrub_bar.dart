@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/player_state.dart';
-import '../niuma_fullscreen_page.dart';
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
-import '../niuma_progress_thumb.dart';
-import '../niuma_scrub_preview.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/feedback/niuma_progress_thumb.dart';
+import 'package:niuma_player/src/presentation/thumbnail/niuma_scrub_preview.dart';
 
 /// B 站风格密集进度条。
 ///

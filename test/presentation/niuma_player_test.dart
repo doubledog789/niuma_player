@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/controls/back_action.dart';
 import 'package:niuma_player/src/presentation/controls/more_action.dart';
-import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
+import 'package:niuma_player/src/presentation/core/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
 import 'controls/fake_controller.dart';
@@ -832,7 +832,7 @@ void main() {
       expect(bar.config, isNull, reason: 'controlBarConfig 默认 null 保 M9 老行为');
     });
 
-    testWidgets('全屏 scope 内：BiliStyleControlBar 替换 NiumaControlBar', (t) async {
+    testWidgets('全屏 scope 内：NiumaFullscreenControlBar 替换 NiumaControlBar', (t) async {
       final ctl = FakeNiumaPlayerController();
       await t.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -849,10 +849,10 @@ void main() {
           ),
         ),
       ));
-      // 全屏态：NiumaControlBar 不渲染，BiliStyleControlBar 出现
+      // 全屏态：NiumaControlBar 不渲染，NiumaFullscreenControlBar 出现
       expect(find.byType(np_internal.BiliStyleControlBarTypeForTesting),
           findsOneWidget,
-          reason: '全屏 scope 内应渲染 BiliStyleControlBar');
+          reason: '全屏 scope 内应渲染 NiumaFullscreenControlBar');
       expect(find.byType(NiumaControlBar), findsNothing,
           reason: '全屏 scope 内不渲染 inline NiumaControlBar');
     });

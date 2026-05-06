@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-import 'niuma_danmaku_controller.dart';
+import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
 
 /// InheritedWidget marker，让子树（如 [DanmakuButton]）通过 context 找到
 /// 上层注入的 [NiumaDanmakuController]。

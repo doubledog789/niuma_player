@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/player_state.dart';
-import '../niuma_player_controller.dart';
-import '../niuma_player_theme.dart';
+import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// 进度时间显示——`mm:ss / mm:ss` 格式（`position / duration`）。
 ///

@@ -1,6 +1,6 @@
 import 'dart:ui' show Rect;
 
-import 'thumbnail_track.dart';
+import 'package:niuma_player/src/orchestration/thumbnail_track.dart';
 
 /// WebVTT 解析器（thumbnail 变种）。
 ///

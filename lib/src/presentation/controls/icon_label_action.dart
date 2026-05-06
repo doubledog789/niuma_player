@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../niuma_player_theme.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
 /// mockup 顶栏「图标 + 中文 label」垂直布局通用 widget。
 ///

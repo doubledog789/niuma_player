@@ -1,4 +1,4 @@
-import '../observability/analytics_event.dart';
+import 'package:niuma_player/src/observability/analytics_event.dart';
 
 /// `AnalyticsEmitter` typedef（`void Function(AnalyticsEvent)`）的捕获型
 /// 测试替身。

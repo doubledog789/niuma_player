@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../cast/cast_session.dart';
-import '../niuma_player_controller.dart';
+import 'package:niuma_player/src/cast/cast_session.dart';
+import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 
 /// 投屏中视频区中央覆盖层。castSession=null 时不渲染。
 ///
