@@ -37,6 +37,19 @@ abstract class PlayerBackend {
     return null;
   }
 
+  /// Web-only：让底层 `<video>` element 进入浏览器原生全屏。
+  ///
+  /// **不同浏览器走不同路径**——iOS Safari 不支持 `Element.requestFullscreen()`，
+  /// 只能 `video.webkitEnterFullscreen()`（私有 API，进入 iOS 原生 video player
+  /// UI——业务 Flutter 控件**不会**跟着进 fullscreen）；桌面 Safari / Chrome /
+  /// Firefox 用标准 `requestFullscreen()`。
+  ///
+  /// io 平台 / 非 web backend 返 false（默认实现）。
+  Future<bool> enterNativeFullscreen() async => false;
+
+  /// Web-only：退出浏览器原生 fullscreen。默认实现返 false。
+  Future<bool> exitNativeFullscreen() async => false;
+
   /// 当前状态快照。与 [valueStream] 同步更新。
   NiumaPlayerValue get value;
 

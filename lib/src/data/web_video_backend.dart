@@ -1,6 +1,8 @@
 import 'dart:async';
 // ignore: deprecated_member_use, avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js_util' as js_util;
 import 'dart:ui' show Size;
 import 'dart:ui_web' as ui_web;
 
@@ -252,6 +254,47 @@ class WebVideoBackend extends PlayerBackend {
   Future<void> setLooping(bool looping) async {
     if (_disposed) return;
     _video.loop = looping;
+  }
+
+  @override
+  Future<bool> enterNativeFullscreen() async {
+    if (_disposed) return false;
+    // iOS Safari 优先：webkitEnterFullscreen 是私有 API（进入原生 video
+    // player UI），dart:html 不直接暴露，js_util.callMethod 反射调。
+    // iOS Safari 上调 standard requestFullscreen 会静默失败。
+    try {
+      if (js_util.hasProperty(_video, 'webkitEnterFullscreen')) {
+        js_util.callMethod(_video, 'webkitEnterFullscreen', []);
+        return true;
+      }
+    } catch (_) {/* fallback 到标准 */}
+    // 标准 Element.requestFullscreen——桌面 Chrome / Firefox / Edge / 桌面
+    // Safari / Android Chrome 都支持 on video element。
+    try {
+      await _video.requestFullscreen();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> exitNativeFullscreen() async {
+    if (_disposed) return false;
+    // iOS Safari：webkitExitFullscreen on video
+    try {
+      if (js_util.hasProperty(_video, 'webkitExitFullscreen')) {
+        js_util.callMethod(_video, 'webkitExitFullscreen', []);
+        return true;
+      }
+    } catch (_) {/* fallback to document */}
+    try {
+      if (html.document.fullscreenElement != null) {
+        html.document.exitFullscreen();
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   @override

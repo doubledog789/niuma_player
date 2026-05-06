@@ -687,6 +687,24 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     await _backend?.seekTo(position);
   }
 
+  /// Web-only：让底层 `<video>` element 进入浏览器原生 fullscreen。
+  ///
+  /// iOS Safari 走 `video.webkitEnterFullscreen()` 私有 API（进入 iOS 系统
+  /// 原生 video player UI——业务 Flutter 控件**不会**跟着进 fullscreen）；
+  /// 桌面 Safari / Chrome / Firefox / Android Chrome 走标准
+  /// `video.requestFullscreen()`。
+  ///
+  /// io 平台返 false——业务方在 io 上仍走 `Navigator.push(NiumaFullscreenPage)`
+  /// 路径。`NiumaFullscreenButton` 内部已自动检测 web 走此 method。
+  Future<bool> enterNativeFullscreen() async {
+    return await _backend?.enterNativeFullscreen() ?? false;
+  }
+
+  /// Web-only：退出浏览器原生 fullscreen。
+  Future<bool> exitNativeFullscreen() async {
+    return await _backend?.exitNativeFullscreen() ?? false;
+  }
+
   Future<void> setPlaybackSpeed(double speed) async {
     value = value.copyWith(playbackSpeed: speed);
     await _backend?.setSpeed(speed);
