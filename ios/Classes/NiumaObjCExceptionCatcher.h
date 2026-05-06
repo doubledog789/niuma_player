@@ -13,8 +13,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 跑 [block]——若 block 抛 NSException，捕获后填 [error] 并返 `NO`；
 /// 正常完成返 `YES`。`error` 可为 `NULL`。
-+ (BOOL)tryBlock:(__attribute__((noescape)) void (^)(void))block
-           error:(NSError * _Nullable * _Nullable)error;
+///
+/// 方法名特意叫 `catchExceptions:` 而不是 `tryBlock:`：Swift 把 ObjC
+/// `+ tryBlock:error:` 自动改造成 `try(_:)`，撞 Swift 关键字。
++ (BOOL)catchExceptions:(__attribute__((noescape)) void (^)(void))block
+                   error:(NSError * _Nullable * _Nullable)error;
 
 @end
 

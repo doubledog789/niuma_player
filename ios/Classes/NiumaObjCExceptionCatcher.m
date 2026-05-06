@@ -2,8 +2,8 @@
 
 @implementation NiumaObjCExceptionCatcher
 
-+ (BOOL)tryBlock:(void (^)(void))block
-           error:(NSError **)error {
++ (BOOL)catchExceptions:(void (^)(void))block
+                   error:(NSError **)error {
     @try {
         block();
         return YES;

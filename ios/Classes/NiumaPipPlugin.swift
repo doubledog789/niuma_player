@@ -217,12 +217,14 @@ import UIKit
                             Self.log("UIApplication 不响应 suspend selector，自动后台失败")
                             return
                         }
-                        var nsError: NSError?
-                        let ok = NiumaObjCExceptionCatcher.tryBlock({
-                            app.perform(suspendSel)
-                        }, error: &nsError)
-                        if !ok {
-                            Self.log("perform(suspend) 抛 NSException——可能 iOS 版本封了私有 API: \(nsError?.userInfo ?? [:])")
+                        // Swift 把 ObjC `+ method:error:` BOOL+NSError** 自动
+                        // 转成 throws——调用方式是 do/try/catch。
+                        do {
+                            try NiumaObjCExceptionCatcher.catchExceptions {
+                                app.perform(suspendSel)
+                            }
+                        } catch let error as NSError {
+                            Self.log("perform(suspend) 抛 NSException——可能 iOS 版本封了私有 API: \(error.userInfo)")
                         }
                     }
                 }
