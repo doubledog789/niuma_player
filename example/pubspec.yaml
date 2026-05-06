@@ -27,10 +27,8 @@ dependencies:
     # The example app is bundled with the plugin so we use a path dependency on
     # the parent directory to use the current plugin's version.
     path: ../
-  niuma_player_dlna:
-    path: ../../niuma_player_dlna
-  niuma_player_airplay:
-    path: ../../niuma_player_airplay
+  # 注：DLNA / AirPlay 投屏协议从 niuma_player 0.x 开始内置，不再需要
+  # niuma_player_dlna / niuma_player_airplay 这两个 companion package。
 
   # demo 直接渲染 niuma 资源包 SVG（Home 列表 / tab 图标）
   flutter_svg: ^2.0.9

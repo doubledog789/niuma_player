@@ -27,6 +27,8 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.view.TextureRegistry
 import java.security.MessageDigest
 
+import cn.niuma.niuma_player.dlna.NiumaDlnaPlugin
+
 /** NiumaPlayerPlugin */
 class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
@@ -44,6 +46,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private val players: MutableMap<Long, PlayerSession> = mutableMapOf()
 
     private var deviceMemory: DeviceMemoryStore? = null
+
+    /// 投屏 DLNA 子 plugin（multicast lock 用）。SDK 自带不需要 host app
+    /// 单独注册——onAttachedToEngine 时一起 attach。
+    private val dlnaPlugin: NiumaDlnaPlugin = NiumaDlnaPlugin()
 
     companion object {
         const val ACTION_PIP_PLAY_PAUSE = "cn.niuma.niuma_player.ACTION_PIP_PLAY_PAUSE"
@@ -90,6 +96,9 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 pipEventSink = null
             }
         })
+
+        // 投屏 DLNA 子 plugin attach——SDK 内置无需 host app 单独注册。
+        dlnaPlugin.onAttachedToEngine(flutterPluginBinding)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -172,6 +181,9 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             pipEventChannel.setStreamHandler(null)
         }
         pipEventSink = null
+
+        // 投屏 DLNA 子 plugin detach——释放 multicast lock 等资源。
+        dlnaPlugin.onDetachedFromEngine(binding)
 
         // Release every active player instance.
         val snapshot = players.values.toList()

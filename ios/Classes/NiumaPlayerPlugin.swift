@@ -11,6 +11,8 @@ public class NiumaPlayerPlugin: NSObject, FlutterPlugin {
     NiumaPipPlugin.register(with: registrar)
     // M13: 注册 NiumaSystemPlugin
     NiumaSystemPlugin.register(with: registrar)
+    // M15: 投屏 AirPlay 子插件（SDK 内置无需 host app 单独注册）
+    NiumaAirPlayPlugin.register(with: registrar)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

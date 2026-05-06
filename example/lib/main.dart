@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player_airplay/niuma_player_airplay.dart';
-import 'package:niuma_player_dlna/niuma_player_dlna.dart';
 
 import 'long_video_demo_page.dart';
 import 'niuma_splash_screen.dart';
@@ -14,9 +11,10 @@ const _niumaDark = Color(0xFF1A1410);
 const _niumaLight = Color(0xFFFAC775);
 
 void main() {
-  // M15: 注册投屏 services
-  NiumaCastRegistry.register(DlnaCastService());
-  NiumaCastRegistry.register(AirPlayCastService());
+  // 投屏 DLNA + AirPlay 已由 SDK 内置自动 register（见
+  // [NiumaCastRegistry.all]），无需 host app 手动调
+  // `NiumaCastRegistry.register(...)`。如果业务自家有 Chromecast 等其它
+  // 协议实现，仍可在此处显式 register 自家 service。
   runApp(const NiumaPlayerExampleApp());
 }
 

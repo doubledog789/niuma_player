@@ -157,3 +157,9 @@ export 'src/cast/cast_session.dart' show CastSession;
 export 'src/cast/cast_registry.dart' show NiumaCastRegistry;
 export 'src/presentation/cast/niuma_cast_button.dart' show NiumaCastButton;
 export 'src/presentation/cast/niuma_cast_overlay.dart' show NiumaCastOverlay;
+// 投屏协议实现：DLNA + AirPlay 内置（合并自原 niuma_player_dlna /
+// niuma_player_airplay companion package）。NiumaCastRegistry 默认自动
+// register 这两个，业务方 0 配置就能用——仍可调
+// `NiumaCastRegistry.register(...)` 加自家协议（如 Chromecast）。
+export 'src/cast/dlna/dlna_cast_service.dart' show DlnaCastService;
+export 'src/cast/airplay/airplay_cast_service.dart' show AirPlayCastService;
