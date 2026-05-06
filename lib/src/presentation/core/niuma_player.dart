@@ -355,6 +355,19 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     _orchestrator = null;
   }
 
+  /// 默认的"播放结束 → 重播"行为：seek 到 0 + play。业务方传
+  /// [NiumaPlayer.onEndedReplay] 可覆盖。
+  Future<void> _defaultReplay() async {
+    await widget.controller.seekTo(Duration.zero);
+    await widget.controller.play();
+  }
+
+  /// 默认的"播放出错 → 重试"行为：重新跑 backend init。业务方传
+  /// [NiumaPlayer.onErrorRetry] 可覆盖（典型场景：先切 line 再重试）。
+  void _defaultErrorRetry() {
+    widget.controller.initialize();
+  }
+
   void _onValueChanged() {
     final v = widget.controller.value;
     final phase = v.phase;
@@ -949,14 +962,20 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                       if (eb != null && err != null) {
                         return eb(ctx, err);
                       }
+                      // 业务不传 onErrorRetry 时给个默认重试（重 init
+                      // backend）——大多数业务期望"点重试就再来一次"。
                       return NiumaErrorView(
                         error: err,
-                        onRetry: widget.onErrorRetry,
+                        onRetry: widget.onErrorRetry ?? _defaultErrorRetry,
                       );
                     case PlayerPhase.ended:
                       final endb = widget.endedBuilder;
                       if (endb != null) return endb(ctx);
-                      return NiumaEndedView(onReplay: widget.onEndedReplay);
+                      // 业务不传 onEndedReplay 时给个默认重播——
+                      // 90% 的业务期望"点重播就 seek 0 + play"。
+                      return NiumaEndedView(
+                        onReplay: widget.onEndedReplay ?? _defaultReplay,
+                      );
                     case PlayerPhase.idle:
                     case PlayerPhase.ready:
                     case PlayerPhase.playing:
