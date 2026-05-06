@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/src/niuma_sdk_assets.dart';
@@ -5,6 +6,7 @@ import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 import 'package:niuma_player/src/presentation/shared/glass_card.dart';
 import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
 import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
+import 'package:niuma_player/src/presentation/fullscreen/web_fullscreen_helper.dart';
 import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
@@ -43,6 +45,16 @@ class NiumaShortVideoFullscreenButton extends StatelessWidget {
     final inFullscreen = NiumaFullscreenScope.maybeOf(context) != null;
     return GestureDetector(
       onTap: () {
+        // Web 路径：浏览器原生 fullscreen——不 push route 避开单 <video>
+        // 多 widget 引用黑屏 bug。
+        if (kIsWeb && isWebFullscreenAvailable()) {
+          if (isInWebFullscreen()) {
+            exitWebFullscreen();
+          } else {
+            enterWebFullscreen();
+          }
+          return;
+        }
         if (inFullscreen) {
           Navigator.of(context).pop();
         } else {

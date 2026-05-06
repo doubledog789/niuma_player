@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
+import 'package:niuma_player/src/presentation/fullscreen/web_fullscreen_helper.dart';
 
 /// 全屏切换按钮。
 ///
@@ -32,6 +34,17 @@ class FullscreenButton extends StatelessWidget {
   }
 
   void _onPressed(BuildContext context) {
+    // Web 路径：浏览器原生 fullscreen API——不 push route，避免单
+    // <video> element 多 widget 引用 黑屏 bug。整个 document 进 fullscreen，
+    // Flutter 上层控件随之全屏。
+    if (kIsWeb && isWebFullscreenAvailable()) {
+      if (isInWebFullscreen()) {
+        exitWebFullscreen();
+      } else {
+        enterWebFullscreen();
+      }
+      return;
+    }
     if (_inFullscreenPage(context)) {
       Navigator.of(context).pop();
     } else {

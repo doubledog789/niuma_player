@@ -37,15 +37,21 @@ class WebVideoBackend extends PlayerBackend {
       ..autoplay = false
       ..controls = false
       ..crossOrigin = headers.isNotEmpty ? 'anonymous' : null
-      // pointer-events: none 让 Flutter 上层 GestureDetector 能拿到 tap
-      // （HTML video element 默认拦截鼠标 / 触摸事件）。
       ..style.pointerEvents = 'none'
       ..style.objectFit = 'contain'
       ..style.width = '100%'
       ..style.height = '100%';
+    // 包 wrapper div：HtmlElementView 的 wrapper 也会拦 pointer events，
+    // 单设 video 元素 pointer-events: none 不够——整树都设让事件穿透到
+    // Flutter 上层 GestureDetector。
+    _wrapper = html.DivElement()
+      ..style.pointerEvents = 'none'
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..append(_video);
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
-      (int viewId) => _video,
+      (int viewId) => _wrapper,
     );
     _attachListeners();
   }
@@ -57,6 +63,7 @@ class WebVideoBackend extends PlayerBackend {
   final NiumaDataSource _dataSource;
   final String _viewType;
   late final html.VideoElement _video;
+  late final html.DivElement _wrapper;
 
   bool _disposed = false;
   bool _initialized = false;
