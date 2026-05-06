@@ -1,5 +1,7 @@
 // lib/src/domain/niuma_short_video_theme.dart
-import 'package:flutter/material.dart';
+import 'dart:ui' show Color;
+
+import 'package:flutter/foundation.dart' show immutable;
 
 /// `NiumaShortVideoPlayer` 主题配置。
 ///
@@ -33,16 +35,18 @@ class NiumaShortVideoTheme {
         progressIdleHeight: 1.5,
         progressActiveHeight: 3.5,
         progressPlayedColor: const Color(0xFFEF9F27),
-        progressTrackColor: Colors.white.withValues(alpha: 0.18),
-        progressBufferedColor: Colors.white.withValues(alpha: 0.3),
+        progressTrackColor: const Color(0xFFFFFFFF).withValues(alpha: 0.18),
+        progressBufferedColor: const Color(0xFFFFFFFF).withValues(alpha: 0.3),
         progressThumbColor: const Color(0xFFEF9F27),
         progressThumbRadius: 6.0,
-        pauseIndicatorBackgroundColor: Colors.black.withValues(alpha: 0.5),
+        pauseIndicatorBackgroundColor:
+            const Color(0xFF000000).withValues(alpha: 0.5),
         pauseIndicatorIconColor: const Color(0xFFEF9F27),
         pauseIndicatorSize: 56,
         pauseIndicatorIconSize: 56,
-        scrubLabelTextColor: Colors.white,
-        scrubLabelBackgroundColor: Colors.black.withValues(alpha: 0.55),
+        scrubLabelTextColor: const Color(0xFFFFFFFF),
+        scrubLabelBackgroundColor:
+            const Color(0xFF000000).withValues(alpha: 0.55),
       );
 
   /// 进度条 idle 状态的高度（默认 1.5）。

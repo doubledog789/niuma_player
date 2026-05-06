@@ -1,11 +1,10 @@
-// test/orchestration/ad_scheduler_test.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/observability/analytics_event.dart';
-import 'package:niuma_player/src/orchestration/ad_schedule.dart';
-import 'package:niuma_player/src/orchestration/ad_scheduler.dart';
+import 'package:niuma_player/src/presentation/ad_schedule.dart';
+import 'package:niuma_player/src/presentation/ad_scheduler.dart';
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
 class _FakePlayer extends ChangeNotifier

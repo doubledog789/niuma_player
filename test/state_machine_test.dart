@@ -152,6 +152,7 @@ class FakePlayerBackend implements PlayerBackend {
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
+    bool unsafeAutoBackground = false,
   }) async => false;
 
   @override

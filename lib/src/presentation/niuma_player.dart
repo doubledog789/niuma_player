@@ -8,8 +8,8 @@ import '../cast/cast_registry.dart';
 import '../domain/gesture_kind.dart';
 import '../domain/player_state.dart';
 import '../observability/analytics_emitter.dart';
-import '../orchestration/ad_schedule.dart';
-import '../orchestration/ad_scheduler.dart';
+import 'ad_schedule.dart';
+import 'ad_scheduler.dart';
 import 'bili_style_control_bar.dart';
 import 'button_override.dart';
 import 'cast/niuma_cast_overlay.dart';
@@ -155,8 +155,8 @@ class NiumaPlayer extends StatefulWidget {
   /// 全屏右侧 rail（垂直堆叠的浮动按钮，B 站风格"点赞 / 投币 / 收藏 / 分享"）。
   final WidgetBuilder? rightRailBuilder;
 
-  /// 全屏 [NiumaControlButton.more] 弹出 PopupMenu 的 builder——返回 entries
-  /// list 由 [showMenu] 渲染。
+  /// 全屏 [NiumaControlButton.more] 弹出菜单的 builder——返回
+  /// [PopupMenuEntry] 列表，由播放器内部全屏菜单 route 渲染。
   final List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder;
 
   /// 视频章节起点位置（透到 [ScrubBar.chapters]，全屏 BiliStyleControlBar
@@ -376,8 +376,8 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
     if (_controlsVisible == visible) return;
     // 测试时可以通过 [debugSchedulerPhaseOverride] 模拟特定 phase 触发；
     // 生产代码读真实 [SchedulerBinding.schedulerPhase]。
-    final phase = debugSchedulerPhaseOverride ??
-        SchedulerBinding.instance.schedulerPhase;
+    final phase =
+        debugSchedulerPhaseOverride ?? SchedulerBinding.instance.schedulerPhase;
     if (phase == SchedulerPhase.persistentCallbacks ||
         phase == SchedulerPhase.midFrameMicrotasks) {
       final hadPending = _pendingVisibleIntent != null;
@@ -448,20 +448,29 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       return;
     }
     for (final svc in services) {
-      _castScanSubs.add(svc.discover().listen(
-            (batch) {
-              if (!mounted) return;
-              setState(() {
-                for (final d in batch) {
-                  if (!_castDevices.any((e) => e.id == d.id)) {
-                    _castDevices.add(d);
-                  }
+      // 双层防御：try-catch 抓 svc.discover() 创建 stream 时的 sync throw；
+      // listen.onError 抓 stream 内的 async error。任意 cast service
+      // 实现的网络层失败（iOS local-network 权限被拒、缺 multicast
+      // entitlement、未连 Wi-Fi 等）都不该污染 console——给 picker 显示
+      // "未找到设备"足够了。
+      try {
+        _castScanSubs.add(svc.discover().listen(
+          (batch) {
+            if (!mounted) return;
+            setState(() {
+              for (final d in batch) {
+                if (!_castDevices.any((e) => e.id == d.id)) {
+                  _castDevices.add(d);
                 }
-              });
-            },
-            onDone: _onCastScanSubDone,
-            onError: (_) => _onCastScanSubDone(),
-          ));
+              }
+            });
+          },
+          onDone: _onCastScanSubDone,
+          onError: (Object _) => _onCastScanSubDone(),
+        ));
+      } catch (_) {
+        _onCastScanSubDone();
+      }
     }
     _castScanTimeout = Timer(const Duration(seconds: 8), () {
       if (!mounted) return;
@@ -517,71 +526,93 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
   /// 全屏 [BiliStyleControlBar] 的 onMore 回调——内置「投屏」「画中画」
   /// 两项，之后追加业务侧 [moreMenuBuilder] 返回的条目（用分隔线隔开）。
   void _showMoreMenu(BuildContext ctx) {
-    final extra = widget.moreMenuBuilder?.call(ctx) ?? <PopupMenuEntry<dynamic>>[];
+    final extra =
+        widget.moreMenuBuilder?.call(ctx) ?? <PopupMenuEntry<dynamic>>[];
     // ctx 是 [MoreAction] 自身 build 出来的 context（onTap 回传）。
     // 用它的 RenderBox 计算 ⋮ 按钮的真实屏幕坐标，让 popup 锚定在按钮
     // 正下方——之前 MediaQuery.size 硬算右上角的方式碰到横屏 / notch /
     // SafeArea inset 就跟按钮位置错位。
     final btnBox = ctx.findRenderObject() as RenderBox?;
+    final navigator = Navigator.of(ctx);
     final overlayBox =
-        Overlay.of(ctx).context.findRenderObject() as RenderBox?;
+        navigator.overlay?.context.findRenderObject() as RenderBox?;
     if (btnBox == null || overlayBox == null) return;
 
-    final btnTopLeft =
-        btnBox.localToGlobal(Offset.zero, ancestor: overlayBox);
-    final btnBottomRight = btnBox.localToGlobal(
-      btnBox.size.bottomRight(Offset.zero),
-      ancestor: overlayBox,
-    );
-    // showMenu 的 _PopupMenuRouteLayout 用 position.top 作菜单 y 起点。
-    // 直接把 RelativeRect 的 top 设到按钮**底部 + 4**，让菜单贴在按钮
-    // 正下方展开，而不是跟按钮上下重叠。iOS / Android 行为一致。
+    // Flutter 3.27 的 showMenu 会在 _PopupMenuRouteLayout 中按
+    // MediaQuery.padding clamp 菜单位置。全屏页刻意不走 SafeArea 时，
+    // iOS 横屏 right padding 会把菜单从三点按钮旁推回屏幕中部。
+    // 这里改用本地 popup route：仍复用 PopupMenuEntry，但布局只按
+    // overlay 边界留 8px 余量，不再套 iOS safe-area padding。
     const popupGap = 4.0;
-    final position = RelativeRect.fromLTRB(
-      btnTopLeft.dx,
-      btnBottomRight.dy + popupGap,
-      overlayBox.size.width - btnBottomRight.dx,
-      0,
+    final popupOffset = Offset(0, btnBox.size.height + popupGap);
+    final anchorRect = Rect.fromPoints(
+      btnBox.localToGlobal(popupOffset, ancestor: overlayBox),
+      btnBox.localToGlobal(
+        btnBox.size.bottomRight(popupOffset),
+        ancestor: overlayBox,
+      ),
     );
-    // 默认 popup BG 走 Theme.colorScheme.surface（demo 是 #252526 暗灰），
-    // 图标用白色才看得清——之前误用 #1A1410（更暗）等于直接看不见。
+    final position = RelativeRect.fromRect(
+      anchorRect,
+      Offset.zero & overlayBox.size,
+    );
+    String? semanticLabel;
+    switch (Theme.of(ctx).platform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        semanticLabel = null;
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        semanticLabel = MaterialLocalizations.of(ctx).popupMenuLabel;
+    }
     const itemIconColor = Colors.white;
-    showMenu<dynamic>(
-      context: ctx,
-      position: position,
-      items: <PopupMenuEntry<dynamic>>[
-        PopupMenuItem<dynamic>(
-          value: '__niuma_cast',
-          child: Row(
-            children: const [
-              NiumaSdkIcon(
-                asset: NiumaSdkAssets.icCast,
-                size: 18,
-                color: itemIconColor,
-              ),
-              SizedBox(width: 8),
-              Text('投屏'),
-            ],
+    navigator
+        .push<dynamic>(
+      _NiumaPopupMenuRoute<dynamic>(
+        position: position,
+        items: <PopupMenuEntry<dynamic>>[
+          PopupMenuItem<dynamic>(
+            value: '__niuma_cast',
+            child: Row(
+              children: const [
+                NiumaSdkIcon(
+                  asset: NiumaSdkAssets.icCast,
+                  size: 18,
+                  color: itemIconColor,
+                ),
+                SizedBox(width: 8),
+                Text('投屏'),
+              ],
+            ),
           ),
-        ),
-        PopupMenuItem<dynamic>(
-          value: '__niuma_pip',
-          child: Row(
-            children: const [
-              NiumaSdkIcon(
-                asset: NiumaSdkAssets.icPip,
-                size: 18,
-                color: itemIconColor,
-              ),
-              SizedBox(width: 8),
-              Text('画中画'),
-            ],
+          PopupMenuItem<dynamic>(
+            value: '__niuma_pip',
+            child: Row(
+              children: const [
+                NiumaSdkIcon(
+                  asset: NiumaSdkAssets.icPip,
+                  size: 18,
+                  color: itemIconColor,
+                ),
+                SizedBox(width: 8),
+                Text('画中画'),
+              ],
+            ),
           ),
+          if (extra.isNotEmpty) const PopupMenuDivider(),
+          ...extra,
+        ],
+        barrierLabel: MaterialLocalizations.of(ctx).menuDismissLabel,
+        semanticLabel: semanticLabel,
+        capturedThemes: InheritedTheme.capture(
+          from: ctx,
+          to: navigator.context,
         ),
-        if (extra.isNotEmpty) const PopupMenuDivider(),
-        ...extra,
-      ],
-    ).then((value) {
+      ),
+    )
+        .then((value) {
       if (value == '__niuma_cast') _openCastPicker();
       if (value == '__niuma_pip') _enterPip();
     });
@@ -676,8 +707,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
         // M16：全屏（NiumaFullscreenScope 注入）走 BiliStyleControlBar，
         // inline 走原 NiumaControlBar——同一棵树，按当前 BuildContext
         // 是否在 fullscreen scope 里 swap。
-        final isFullscreen =
-            NiumaFullscreenScope.maybeOf(innerContext) != null;
+        final isFullscreen = NiumaFullscreenScope.maybeOf(innerContext) != null;
 
         // 全屏底栏：BiliStyleControlBar 自带 top + bottom + center + rail，
         // 替代 inline 模式下的 [NiumaCastButton + PipButton] 右上 actions
@@ -730,8 +760,8 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                 valueListenable: _locked,
                 builder: (ctx, locked, _) => NiumaGestureLayer(
                   controller: widget.controller,
-                  enabled: !locked &&
-                      (isFullscreen || widget.gesturesEnabledInline),
+                  enabled:
+                      !locked && (isFullscreen || widget.gesturesEnabledInline),
                   disabledGestures: widget.disabledGestures,
                   hudBuilder: widget.gestureHudBuilder,
                   onTap: _onTapVideo,
@@ -1071,8 +1101,7 @@ class NiumaPlayerConfigScope extends InheritedWidget {
 
   /// 找最近的 [NiumaPlayerConfigScope]——存在即返回；不存在返回 null。
   static NiumaPlayerConfigScope? maybeOf(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<NiumaPlayerConfigScope>();
+    return context.dependOnInheritedWidgetOfExactType<NiumaPlayerConfigScope>();
   }
 
   @override
@@ -1129,3 +1158,214 @@ typedef BiliStyleControlBarTypeForTesting = BiliStyleControlBar;
 /// 测试用别名——指向 [NiumaCastPickerPanel] 类型，单测 `find.byType` 用。
 @visibleForTesting
 typedef NiumaCastPickerPanelTypeForTesting = NiumaCastPickerPanel;
+
+const double _kNiumaPopupMenuMinWidth = 112.0;
+const double _kNiumaPopupMenuMaxWidth = 280.0;
+const double _kNiumaPopupMenuWidthStep = 56.0;
+const double _kNiumaPopupMenuScreenPadding = 8.0;
+
+class _NiumaPopupMenuRoute<T> extends PopupRoute<T> {
+  _NiumaPopupMenuRoute({
+    required this.position,
+    required this.items,
+    required this.barrierLabel,
+    required this.semanticLabel,
+    required this.capturedThemes,
+  }) : super(traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop);
+
+  final RelativeRect position;
+  final List<PopupMenuEntry<T>> items;
+  final String? semanticLabel;
+  final CapturedThemes capturedThemes;
+
+  @override
+  final String? barrierLabel;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 120);
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    final mediaQuery = MediaQuery.of(context);
+    return MediaQuery.removePadding(
+      context: context,
+      removeTop: true,
+      removeBottom: true,
+      removeLeft: true,
+      removeRight: true,
+      child: FocusTraversalGroup(
+        policy: ReadingOrderTraversalPolicy(),
+        child: FocusScope(
+          autofocus: true,
+          child: CustomSingleChildLayout(
+            delegate: _NiumaPopupMenuRouteLayout(
+              position,
+              DisplayFeatureSubScreen.avoidBounds(mediaQuery).toSet(),
+            ),
+            child: capturedThemes.wrap(
+              _NiumaPopupMenu<T>(
+                items: items,
+                semanticLabel: semanticLabel,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child: child,
+    );
+  }
+}
+
+class _NiumaPopupMenu<T> extends StatelessWidget {
+  const _NiumaPopupMenu({
+    required this.items,
+    required this.semanticLabel,
+  });
+
+  final List<PopupMenuEntry<T>> items;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final popupTheme = PopupMenuTheme.of(context);
+    final defaultElevation = theme.useMaterial3 ? 3.0 : 8.0;
+    final defaultShape = theme.useMaterial3
+        ? const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(4)),
+          )
+        : null;
+    final defaultColor = theme.useMaterial3 ? theme.colorScheme.surface : null;
+    final defaultSurfaceTintColor =
+        theme.useMaterial3 ? Colors.transparent : null;
+
+    return Material(
+      type: MaterialType.card,
+      elevation: popupTheme.elevation ?? defaultElevation,
+      shadowColor: popupTheme.shadowColor,
+      surfaceTintColor: popupTheme.surfaceTintColor ?? defaultSurfaceTintColor,
+      color: popupTheme.color ?? defaultColor,
+      shape: popupTheme.shape ?? defaultShape,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: _kNiumaPopupMenuMinWidth,
+          maxWidth: _kNiumaPopupMenuMaxWidth,
+        ),
+        child: IntrinsicWidth(
+          stepWidth: _kNiumaPopupMenuWidthStep,
+          child: Semantics(
+            scopesRoute: true,
+            namesRoute: true,
+            explicitChildNodes: true,
+            label: semanticLabel,
+            child: SingleChildScrollView(
+              padding: popupTheme.menuPadding ??
+                  const EdgeInsets.symmetric(vertical: 8),
+              child: ListBody(children: items),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NiumaPopupMenuRouteLayout extends SingleChildLayoutDelegate {
+  _NiumaPopupMenuRouteLayout(this.position, this.avoidBounds);
+
+  final RelativeRect position;
+  final Set<Rect> avoidBounds;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    return BoxConstraints.loose(constraints.biggest).deflate(
+      const EdgeInsets.all(_kNiumaPopupMenuScreenPadding),
+    );
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    double x;
+    if (position.left > position.right) {
+      x = size.width - position.right - childSize.width;
+    } else {
+      x = position.left;
+    }
+
+    final wantedPosition = Offset(x, position.top);
+    final originCenter = position.toRect(Offset.zero & size).center;
+    final subScreens = DisplayFeatureSubScreen.subScreensInBounds(
+      Offset.zero & size,
+      avoidBounds,
+    );
+    final subScreen = _closestScreen(subScreens, originCenter);
+    return _fitInsideScreen(subScreen, childSize, wantedPosition);
+  }
+
+  Rect _closestScreen(Iterable<Rect> screens, Offset point) {
+    var closest = screens.first;
+    for (final screen in screens) {
+      if ((screen.center - point).distance <
+          (closest.center - point).distance) {
+        closest = screen;
+      }
+    }
+    return closest;
+  }
+
+  Offset _fitInsideScreen(Rect screen, Size childSize, Offset wantedPosition) {
+    var x = wantedPosition.dx;
+    var y = wantedPosition.dy;
+    final minX = screen.left + _kNiumaPopupMenuScreenPadding;
+    final maxX = screen.right - childSize.width - _kNiumaPopupMenuScreenPadding;
+    if (maxX < minX) {
+      x = minX;
+    } else if (x < minX) {
+      x = minX;
+    } else if (x > maxX) {
+      x = maxX;
+    }
+
+    final minY = screen.top + _kNiumaPopupMenuScreenPadding;
+    final maxY =
+        screen.bottom - childSize.height - _kNiumaPopupMenuScreenPadding;
+    if (maxY < minY) {
+      y = minY;
+    } else if (y < minY) {
+      y = minY;
+    } else if (y > maxY) {
+      y = maxY;
+    }
+
+    return Offset(x, y);
+  }
+
+  @override
+  bool shouldRelayout(_NiumaPopupMenuRouteLayout oldDelegate) {
+    if (position != oldDelegate.position) return true;
+    if (avoidBounds.length != oldDelegate.avoidBounds.length) return true;
+    return avoidBounds.any((bound) => !oldDelegate.avoidBounds.contains(bound));
+  }
+}

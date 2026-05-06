@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/controls/back_action.dart';
+import 'package:niuma_player/src/presentation/controls/more_action.dart';
 import 'package:niuma_player/src/presentation/niuma_player.dart' as np_internal;
 import 'package:niuma_player/src/testing/fake_analytics_emitter.dart';
 
@@ -80,7 +82,8 @@ void main() {
       expect(find.byType(NiumaAdOverlay), findsOneWidget);
     });
 
-    testWidgets('isInPictureInPicture=true 时所有浮层（含 NiumaControlBar）隐藏，'
+    testWidgets(
+        'isInPictureInPicture=true 时所有浮层（含 NiumaControlBar）隐藏，'
         '只剩 NiumaPlayerView', (tester) async {
       final ctl = FakeNiumaPlayerController();
       const schedule = NiumaAdSchedule();
@@ -125,10 +128,12 @@ void main() {
       ));
       // 初始 phase=idle，控件应可见。
       final opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 1.0);
     });
@@ -151,20 +156,24 @@ void main() {
       // 4s 内仍显示。
       await tester.pump(const Duration(seconds: 4));
       var opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 1.0);
 
       // 再过 2s（共 6s > 5s 阈值）后隐藏。
       await tester.pump(const Duration(seconds: 2));
       opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 0.0);
     });
@@ -186,10 +195,12 @@ void main() {
       // 等到 controls 应该被隐藏。
       await tester.pump(const Duration(seconds: 2));
       var opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 0.0);
 
@@ -197,10 +208,12 @@ void main() {
       ctl.value = _pausedValue();
       await tester.pump();
       opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 1.0);
     });
@@ -212,10 +225,12 @@ void main() {
       ));
       // 初始：显示。
       var opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 1.0);
 
@@ -223,10 +238,12 @@ void main() {
       await tester.tapAt(tester.getCenter(find.byType(NiumaPlayer)));
       await tester.pump();
       opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 0.0);
 
@@ -234,16 +251,17 @@ void main() {
       await tester.tapAt(tester.getCenter(find.byType(NiumaPlayer)));
       await tester.pump();
       opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 1.0);
     });
 
-    testWidgets('controlsAutoHideAfter=Duration.zero 时永不自动隐藏',
-        (tester) async {
+    testWidgets('controlsAutoHideAfter=Duration.zero 时永不自动隐藏', (tester) async {
       final ctl = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -258,10 +276,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(seconds: 30));
       final opacity = tester.widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byType(NiumaPlayer),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(NiumaPlayer),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(opacity.opacity, 1.0);
     });
@@ -282,10 +302,12 @@ void main() {
       await tester.pump();
       expect(
         tester
-            .widget<AnimatedOpacity>(find.descendant(
-              of: find.byType(NiumaPlayer),
-              matching: find.byType(AnimatedOpacity),
-            ).first)
+            .widget<AnimatedOpacity>(find
+                .descendant(
+                  of: find.byType(NiumaPlayer),
+                  matching: find.byType(AnimatedOpacity),
+                )
+                .first)
             .opacity,
         1.0,
       );
@@ -300,10 +322,12 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(
         tester
-            .widget<AnimatedOpacity>(find.descendant(
-              of: find.byType(NiumaPlayer),
-              matching: find.byType(AnimatedOpacity),
-            ).first)
+            .widget<AnimatedOpacity>(find
+                .descendant(
+                  of: find.byType(NiumaPlayer),
+                  matching: find.byType(AnimatedOpacity),
+                )
+                .first)
             .opacity,
         1.0,
       );
@@ -313,10 +337,12 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       expect(
         tester
-            .widget<AnimatedOpacity>(find.descendant(
-              of: find.byType(NiumaPlayer),
-              matching: find.byType(AnimatedOpacity),
-            ).first)
+            .widget<AnimatedOpacity>(find
+                .descendant(
+                  of: find.byType(NiumaPlayer),
+                  matching: find.byType(AnimatedOpacity),
+                )
+                .first)
             .opacity,
         0.0,
         reason: '新 controller 的 playing 状态应当驱动 auto-hide',
@@ -346,8 +372,7 @@ void main() {
   });
 
   group('M9 review 修复', () {
-    testWidgets('ad cue 活跃时 tap 视频区不切换 controls 可见状态',
-        (tester) async {
+    testWidgets('ad cue 活跃时 tap 视频区不切换 controls 可见状态', (tester) async {
       final ctl = FakeNiumaPlayerController();
       const schedule = NiumaAdSchedule();
       final emitter = FakeAnalyticsEmitter();
@@ -363,10 +388,12 @@ void main() {
 
       // 初始 opacity=1（控件可见）。
       AnimatedOpacity readOpacity() => tester.widget<AnimatedOpacity>(
-            find.descendant(
-              of: find.byType(NiumaPlayer),
-              matching: find.byType(AnimatedOpacity),
-            ).first,
+            find
+                .descendant(
+                  of: find.byType(NiumaPlayer),
+                  matching: find.byType(AnimatedOpacity),
+                )
+                .first,
           );
       expect(readOpacity().opacity, 1.0);
 
@@ -385,18 +412,15 @@ void main() {
       // cue 活跃时 tap 视频区——应被忽略，控件仍隐藏。
       await tester.tapAt(tester.getCenter(find.byType(NiumaPlayer)));
       await tester.pump();
-      expect(readOpacity().opacity, 0.0,
-          reason: 'cue 活跃时 tap 不应切换控件可见');
+      expect(readOpacity().opacity, 0.0, reason: 'cue 活跃时 tap 不应切换控件可见');
 
       // dismissActive → controls 恢复。
       overlay.orchestrator.dismissActive();
       await tester.pump();
-      expect(readOpacity().opacity, 1.0,
-          reason: 'cue 离开后控件应恢复显示');
+      expect(readOpacity().opacity, 1.0, reason: 'cue 离开后控件应恢复显示');
     });
 
-    testWidgets(
-        'NiumaFullscreenPage.route 透传 adSchedule——全屏页内含 NiumaAdOverlay',
+    testWidgets('NiumaFullscreenPage.route 透传 adSchedule——全屏页内含 NiumaAdOverlay',
         (tester) async {
       final ctl = FakeNiumaPlayerController();
       const schedule = NiumaAdSchedule();
@@ -449,13 +473,11 @@ void main() {
 
       // 全屏页内的子树读到的 theme 应该是 customTheme（不是默认）。
       // 通过在全屏页内找 NiumaPlayerTheme.of 的间接证据：iconSize 应该是 42。
-      final fullscreenIcons =
-          tester.widgetList<IconButton>(find.descendant(
+      final fullscreenIcons = tester.widgetList<IconButton>(find.descendant(
         of: find.byType(NiumaFullscreenPage),
         matching: find.byType(IconButton),
       ));
-      expect(fullscreenIcons, isNotEmpty,
-          reason: '全屏页内应有 IconButton');
+      expect(fullscreenIcons, isNotEmpty, reason: '全屏页内应有 IconButton');
       // 至少有一个 IconButton 用了 customTheme.iconSize=42。
       expect(
         fullscreenIcons.any((b) => b.iconSize == 42),
@@ -465,8 +487,7 @@ void main() {
       );
     });
 
-    testWidgets(
-        '_setControlsVisible 在 build 阶段触发时把 setState 延后到 post-frame',
+    testWidgets('_setControlsVisible 在 build 阶段触发时把 setState 延后到 post-frame',
         (tester) async {
       // R2-Important-4：之前的"cue 活跃时 tap 视频区不切换 controls"测试
       // 触发 _setControlsVisible 都是在 idle phase 走 sync setState 路径，
@@ -518,8 +539,7 @@ void main() {
           reason: 'post-frame 应按最新 pendingIntent 落地——visible=false');
     });
 
-    testWidgets(
-        'didUpdateWidget controlsAutoHideAfter 改变时重置计时器使用新值',
+    testWidgets('didUpdateWidget controlsAutoHideAfter 改变时重置计时器使用新值',
         (tester) async {
       final ctl = FakeNiumaPlayerController();
 
@@ -540,10 +560,12 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       AnimatedOpacity readOpacity() => tester.widget<AnimatedOpacity>(
-            find.descendant(
-              of: find.byType(NiumaPlayer),
-              matching: find.byType(AnimatedOpacity),
-            ).first,
+            find
+                .descendant(
+                  of: find.byType(NiumaPlayer),
+                  matching: find.byType(AnimatedOpacity),
+                )
+                .first,
           );
       expect(readOpacity().opacity, 1.0, reason: '1s 时仍可见');
 
@@ -577,8 +599,7 @@ void main() {
   });
 
   group('NiumaPlayer + danmakuController 集成', () {
-    testWidgets('传 danmakuController 时子树注入 NiumaDanmakuScope',
-        (tester) async {
+    testWidgets('传 danmakuController 时子树注入 NiumaDanmakuScope', (tester) async {
       final video = FakeNiumaPlayerController();
       final danmaku = NiumaDanmakuController()
         ..add(const DanmakuItem(position: Duration(seconds: 1), text: 'hi'));
@@ -605,8 +626,7 @@ void main() {
       danmaku.dispose();
     });
 
-    testWidgets('不传 danmakuController 时 DanmakuButton 是禁用态',
-        (tester) async {
+    testWidgets('不传 danmakuController 时 DanmakuButton 是禁用态', (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: SizedBox(
@@ -624,7 +644,8 @@ void main() {
       expect(ip, findsOneWidget);
     });
 
-    testWidgets('NiumaPlayer 传 danmakuController → ConfigScope.danmakuController 同步',
+    testWidgets(
+        'NiumaPlayer 传 danmakuController → ConfigScope.danmakuController 同步',
         (tester) async {
       final video = FakeNiumaPlayerController();
       final danmaku = NiumaDanmakuController();
@@ -649,8 +670,7 @@ void main() {
   });
 
   group('NiumaPlayer inline 左上 BackAction 浮层（M16 后）', () {
-    testWidgets('inline 状态默认渲染 BackAction 在左半 + 上半，无 Cast/Pip',
-        (tester) async {
+    testWidgets('inline 状态默认渲染 BackAction 在左半 + 上半，无 Cast/Pip', (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: SizedBox(
@@ -690,18 +710,19 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(seconds: 6));
       final backOpacity = tester.widget<AnimatedOpacity>(
-        find.ancestor(
-          of: find.byType(BackAction),
-          matching: find.byType(AnimatedOpacity),
-        ).first,
+        find
+            .ancestor(
+              of: find.byType(BackAction),
+              matching: find.byType(AnimatedOpacity),
+            )
+            .first,
       );
       expect(backOpacity.opacity, 0.0);
     });
   });
 
   group('M13 手势集成', () {
-    testWidgets('默认 inline 模式 NiumaGestureLayer enabled=false',
-        (tester) async {
+    testWidgets('默认 inline 模式 NiumaGestureLayer enabled=false', (tester) async {
       final video = FakeNiumaPlayerController();
       await tester.pumpWidget(MaterialApp(
         home: SizedBox(
@@ -796,8 +817,7 @@ void main() {
           reason: 'NiumaPlayer 应把 controlBarConfig 透传给 inline NiumaControlBar');
     });
 
-    testWidgets('controlBarConfig 不传时默认走 _LegacyM9Bar（M9 行为不变）',
-        (t) async {
+    testWidgets('controlBarConfig 不传时默认走 _LegacyM9Bar（M9 行为不变）', (t) async {
       final ctl = FakeNiumaPlayerController();
       await t.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -809,12 +829,10 @@ void main() {
         ),
       ));
       final bar = t.widget<NiumaControlBar>(find.byType(NiumaControlBar));
-      expect(bar.config, isNull,
-          reason: 'controlBarConfig 默认 null 保 M9 老行为');
+      expect(bar.config, isNull, reason: 'controlBarConfig 默认 null 保 M9 老行为');
     });
 
-    testWidgets('全屏 scope 内：BiliStyleControlBar 替换 NiumaControlBar',
-        (t) async {
+    testWidgets('全屏 scope 内：BiliStyleControlBar 替换 NiumaControlBar', (t) async {
       final ctl = FakeNiumaPlayerController();
       await t.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -837,6 +855,119 @@ void main() {
           reason: '全屏 scope 内应渲染 BiliStyleControlBar');
       expect(find.byType(NiumaControlBar), findsNothing,
           reason: '全屏 scope 内不渲染 inline NiumaControlBar');
+    });
+
+    testWidgets('全屏 more 菜单在 iOS 横屏安全区下仍锚定按钮右边缘', (t) async {
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(852, 393);
+      t.view.padding = const FakeViewPadding(right: 80);
+      addTearDown(() {
+        t.view.resetDevicePixelRatio();
+        t.view.resetPhysicalSize();
+        t.view.resetPadding();
+      });
+
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        home: Scaffold(
+          body: np_internal.NiumaFullscreenScopeForTesting(
+            child: NiumaPlayer(
+              controller: ctl,
+              title: '全屏标题',
+              fullscreenControlBarConfig: NiumaControlBarConfig.bili,
+            ),
+          ),
+        ),
+      ));
+
+      await t.tap(find.byType(MoreAction));
+      await t.pumpAndSettle();
+
+      final moreRight = t.getTopRight(find.byType(MoreAction)).dx;
+      final castItem = find.byWidgetPredicate(
+        (w) => w is PopupMenuItem<dynamic> && w.value == '__niuma_cast',
+      );
+      final menuRight = t.getTopRight(castItem).dx;
+
+      expect((moreRight - menuRight).abs(), lessThanOrEqualTo(8));
+    });
+
+    testWidgets('全屏 more 菜单避开折叠屏 display feature', (t) async {
+      t.view.devicePixelRatio = 1.0;
+      t.view.physicalSize = const Size(820, 393);
+      addTearDown(() {
+        t.view.resetDevicePixelRatio();
+        t.view.resetPhysicalSize();
+      });
+
+      const hinge = ui.DisplayFeature(
+        bounds: Rect.fromLTWH(400, 0, 20, 393),
+        type: ui.DisplayFeatureType.hinge,
+        state: ui.DisplayFeatureState.postureFlat,
+      );
+      final ctl = FakeNiumaPlayerController();
+      await t.pumpWidget(MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              displayFeatures: const [hinge],
+            ),
+            child: child!,
+          );
+        },
+        home: Scaffold(
+          body: np_internal.NiumaFullscreenScopeForTesting(
+            child: NiumaPlayer(
+              controller: ctl,
+              title: '全屏标题',
+              fullscreenControlBarConfig: NiumaControlBarConfig.bili,
+            ),
+          ),
+        ),
+      ));
+
+      await t.tap(find.byType(MoreAction));
+      await t.pumpAndSettle();
+
+      final castItem = find.byWidgetPredicate(
+        (w) => w is PopupMenuItem<dynamic> && w.value == '__niuma_cast',
+      );
+      final menuLeft = t.getTopLeft(castItem).dx;
+
+      expect(menuLeft, greaterThanOrEqualTo(428));
+    });
+
+    testWidgets('全屏 more 菜单点击投屏仍打开 cast picker', (t) async {
+      final ctl = FakeNiumaPlayerController();
+      final key = GlobalKey<np_internal.NiumaPlayerStateForTesting>();
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 400,
+            child: np_internal.NiumaFullscreenScopeForTesting(
+              child: NiumaPlayer(
+                key: key,
+                controller: ctl,
+                title: '全屏标题',
+                fullscreenControlBarConfig: NiumaControlBarConfig.bili,
+              ),
+            ),
+          ),
+        ),
+      ));
+
+      await t.tap(find.byType(MoreAction));
+      await t.pumpAndSettle();
+      await t.tap(find.byWidgetPredicate(
+        (w) => w is PopupMenuItem<dynamic> && w.value == '__niuma_cast',
+      ));
+      await t.pumpAndSettle();
+
+      expect(key.currentState!.debugShowCastPicker, isTrue);
+      expect(find.byType(np_internal.NiumaCastPickerPanelTypeForTesting),
+          findsOneWidget);
     });
 
     testWidgets('cast picker panel 默认不显示，提供 onCast 钩子', (t) async {

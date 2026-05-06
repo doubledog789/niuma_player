@@ -40,6 +40,10 @@ class _ShortVideoDemoPageState extends State<ShortVideoDemoPage> {
     _controllers = _samples
         .map((url) => NiumaPlayerController.dataSource(
               NiumaDataSource.network(url),
+              // 同 long_video demo——启用私有 API 自动退后台。
+              options: const NiumaPlayerOptions(
+                unsafePipAutoBackgroundOnEnter: true,
+              ),
             ))
         .toList();
     _danmakuControllers = List.generate(

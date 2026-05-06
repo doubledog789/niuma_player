@@ -73,6 +73,7 @@ class _PipFakeBackend implements PlayerBackend {
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
+    bool unsafeAutoBackground = false,
   }) async {
     enterPipCalled++;
     lastAspectNum = aspectNum;

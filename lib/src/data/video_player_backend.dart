@@ -8,6 +8,42 @@ import '../domain/data_source.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
 
+// ─────────────────────────────────────────────────────────────────────────
+// PiP EventChannel 进程级单 listener bus
+// ─────────────────────────────────────────────────────────────────────────
+//
+// 直接 `EventChannel('niuma_player/pip/events').receiveBroadcastStream()
+// .listen(...)` + sub.cancel 在 controller 复用 / 重建场景下会撞
+// iOS Flutter engine 的 EventChannel 单 listener 模型——`_currentSink`
+// 在新 listen 时被覆盖、旧 cancel 来时 == nil → 引擎返
+// "No active stream to cancel" PlatformException，从 StreamController
+// 的 onCancel 内部 zone 抛出，**不在 await 链上**——await sub.cancel()
+// 的 try-catch 抓不到，会污染 services library log。
+//
+// 解法：整个 SDK 进程**只 listen 一次** root EventChannel；每个 backend
+// 实例 sub-listen 这条 Dart-side broadcast。backend dispose 时 cancel
+// 的是 Dart 内部 sub，不向 native 发 cancel 消息——iOS engine 的
+// `_currentSink` 始终持有 root sink，永不 nil，永不报错。
+// 进程退出时 OS 清理一切。
+StreamController<dynamic>? _pipEventBusCtrl;
+// ignore: unused_element
+StreamSubscription<dynamic>? _pipEventBusRoot;
+
+Stream<dynamic> _pipEventBus() {
+  final existing = _pipEventBusCtrl;
+  if (existing != null) return existing.stream;
+  final ctrl = StreamController<dynamic>.broadcast();
+  _pipEventBusCtrl = ctrl;
+  _pipEventBusRoot = const EventChannel('niuma_player/pip/events')
+      .receiveBroadcastStream()
+      .listen(
+    ctrl.add,
+    onError: (Object error, StackTrace stack) =>
+        ctrl.addError(error, stack),
+  );
+  return ctrl.stream;
+}
+
 /// 包装 `package:video_player` 的 [PlayerBackend] 实现。
 class VideoPlayerBackend implements PlayerBackend {
   VideoPlayerBackend(this._dataSource);
@@ -27,8 +63,6 @@ class VideoPlayerBackend implements PlayerBackend {
   static const MethodChannel _systemChannel =
       MethodChannel('niuma_player/system');
   static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
-  static const EventChannel _pipEventChannel =
-      EventChannel('niuma_player/pip/events');
 
   StreamSubscription<dynamic>? _pipEventSub;
 
@@ -74,7 +108,12 @@ class VideoPlayerBackend implements PlayerBackend {
   }
 
   void _startPipEventListening() {
-    _pipEventSub = _pipEventChannel.receiveBroadcastStream().listen(
+    // 监听的是 [_pipEventBus]——SDK 进程级 lazy singleton broadcast。
+    // backend dispose 时 cancel 的是这个 Dart-side sub，不会向 native 端
+    // 发 cancel 消息，避开 iOS Flutter engine EventChannel 单 listener
+    // 模型在 controller 复用时 `_currentSink=nil` 报 "No active stream
+    // to cancel" 的 zone 抛错（错路径不在 await 链上、try-catch 抓不到）。
+    _pipEventSub = _pipEventBus().listen(
       (dynamic data) {
         if (data is! Map) return;
         final event = data['event'];
@@ -90,7 +129,7 @@ class VideoPlayerBackend implements PlayerBackend {
         }
       },
       onError: (Object error) {
-        // 静默忽略——PiP 不可用时 EventChannel 也可能 error
+        // 静默忽略——PiP 不可用时 root bus 也可能 error
       },
     );
   }
@@ -159,23 +198,46 @@ class VideoPlayerBackend implements PlayerBackend {
     }
   }
 
-  @override
-  Future<void> play() => _inner.play();
+  // 所有 mutate _inner 的入口都先查 _disposed：dispose 期间 ChangeNotifier
+  // 还可能 flush 最后一次 notify，listener 同步调进来时 _inner 可能正在
+  // dispose。撞 'VideoPlayerController used after disposed' 的根因就在这。
+  // 已 disposed 直接 no-op——SDK 不该让调用方关心 race timing。
 
   @override
-  Future<void> pause() => _inner.pause();
+  Future<void> play() async {
+    if (_disposed) return;
+    return _inner.play();
+  }
 
   @override
-  Future<void> seekTo(Duration position) => _inner.seekTo(position);
+  Future<void> pause() async {
+    if (_disposed) return;
+    return _inner.pause();
+  }
 
   @override
-  Future<void> setSpeed(double speed) => _inner.setPlaybackSpeed(speed);
+  Future<void> seekTo(Duration position) async {
+    if (_disposed) return;
+    return _inner.seekTo(position);
+  }
 
   @override
-  Future<void> setVolume(double volume) => _inner.setVolume(volume);
+  Future<void> setSpeed(double speed) async {
+    if (_disposed) return;
+    return _inner.setPlaybackSpeed(speed);
+  }
 
   @override
-  Future<void> setLooping(bool looping) => _inner.setLooping(looping);
+  Future<void> setVolume(double volume) async {
+    if (_disposed) return;
+    return _inner.setVolume(volume);
+  }
+
+  @override
+  Future<void> setLooping(bool looping) async {
+    if (_disposed) return;
+    return _inner.setLooping(looping);
+  }
 
   /// 读当前窗口亮度（0..1）。失败返 0。
   @override
@@ -245,6 +307,7 @@ class VideoPlayerBackend implements PlayerBackend {
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
+    bool unsafeAutoBackground = false,
   }) async {
     // ignore: invalid_use_of_visible_for_testing_member
     final tid = _inner.playerId;
@@ -257,6 +320,7 @@ class VideoPlayerBackend implements PlayerBackend {
           'textureId': tid,
           'aspectNum': aspectNum,
           'aspectDen': aspectDen,
+          'unsafeAutoBackground': unsafeAutoBackground,
         },
       );
       return result ?? false;
@@ -315,6 +379,9 @@ class VideoPlayerBackend implements PlayerBackend {
     if (_disposed) return;
     _disposed = true;
     _inner.removeListener(_onInnerChanged);
+    // _pipEventSub 是 [_pipEventBus] 的 sub-listener，cancel 它不触发
+    // native 端 EventChannel cancel——所以这里不会再撞 "No active stream
+    // to cancel"。root sub 持续 hold 整个进程，由 OS 在进程退出时清理。
     await _pipEventSub?.cancel();
     _pipEventSub = null;
     await _inner.dispose();

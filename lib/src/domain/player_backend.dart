@@ -72,9 +72,15 @@ abstract class PlayerBackend {
   ///
   /// 默认实现返 false——backend 不支持 PiP（如 IJK、Mock）时**无需**重写
   /// 此方法即为正确行为。VideoPlayerBackend / NativeBackend 应重写。
+  ///
+  /// [unsafeAutoBackground] 仅 iOS 生效：true 时 native 端在 PiP start 后
+  /// 调私有 API `UIApplication.suspend` 模拟 home 键，让 PiP 小窗立刻
+  /// 飘出而不需要 user 主动切后台。**会让 host app 失去上 App Store
+  /// 资格**——see [NiumaPlayerOptions.unsafePipAutoBackgroundOnEnter]。
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
+    bool unsafeAutoBackground = false,
   }) async => false;
 
   /// 退出 PiP。不在 PiP 是 no-op，返回 false。默认实现返 false。

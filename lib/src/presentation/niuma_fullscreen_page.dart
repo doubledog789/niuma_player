@@ -1,11 +1,12 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/gesture_kind.dart';
 import '../observability/analytics_emitter.dart';
-import '../orchestration/ad_schedule.dart';
+import 'ad_schedule.dart';
 import 'button_override.dart';
 import 'niuma_control_bar_config.dart';
 import 'niuma_control_button.dart';
@@ -251,16 +252,20 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
       // 2) 下一帧再传空 list 释放锁定，让用户后续能按设备传感器自由
       //    旋转（不强制竖屏锁定）。
       //
-      // iOS 不需要这套——SystemChrome 在 iOS 上立刻生效，传一次空 list
-      // 就回到 plist UISupportedInterfaceOrientations 默认。但执行
-      // 同样代码无副作用：iOS 第一步等价于"暂时偏好 portrait"，第二
-      // 步等价于"defer to plist"。
-      SystemChrome.setPreferredOrientations(
-        const <DeviceOrientation>[DeviceOrientation.portraitUp],
-      );
-      SchedulerBinding.instance.addPostFrameCallback((_) {
+      // iOS 不走 step 1：host app 的 `Info.plist` 若只声明 landscape
+      // supported（短视频/视频类常见），portrait 请求会撞 UISceneError
+      // "None of the requested orientations are supported"——纯日志噪音
+      // 但用户看着烦。SystemChrome 在 iOS 上传空 list 立刻生效，单步够用。
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        SystemChrome.setPreferredOrientations(
+          const <DeviceOrientation>[DeviceOrientation.portraitUp],
+        );
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]);
+        });
+      } else {
         SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]);
-      });
+      }
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     super.dispose();

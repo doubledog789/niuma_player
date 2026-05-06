@@ -171,50 +171,70 @@ void main() {
     });
   });
 
-  group('loop=true 循环', () {
-    testWidgets('phase=ended → seekTo(0) + play', (tester) async {
+  group('loop 走 native setLooping', () {
+    // 设计：循环由 native 层（iOS AVPlayerLooper / Android PlayerSession.setLooping）
+    // 接管，setLooping(true) 时根本不暴露 phase=ended。Dart 层不再 seek+play
+    // 模拟，避免 ended → seek → reload 的视觉断层 + dispose race seekTo 报错。
+    testWidgets('loop=true → initState 调 setLooping(true)', (tester) async {
       final c = FakeNiumaPlayerController();
-      c.value = c.value.copyWith(
-        duration: const Duration(seconds: 30),
-        position: const Duration(seconds: 30),
-        phase: PlayerPhase.playing,
-      );
-
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: NiumaShortVideoPlayer(controller: c),  // loop=true 默认
         ),
       ));
-
-      // 模拟视频结束
-      c.value = c.value.copyWith(phase: PlayerPhase.ended);
-      await tester.pump();
-
-      expect(c.lastSeek, Duration.zero);
-      expect(c.playCount, greaterThan(0));
+      expect(c.lastLooping, isTrue);
     });
 
-    testWidgets('loop=false → 不自动循环', (tester) async {
+    testWidgets('loop=false → initState 调 setLooping(false)', (tester) async {
       final c = FakeNiumaPlayerController();
-      c.value = c.value.copyWith(
-        duration: const Duration(seconds: 30),
-        position: const Duration(seconds: 30),
-        phase: PlayerPhase.playing,
-      );
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, loop: false),
+        ),
+      ));
+      expect(c.lastLooping, isFalse);
+    });
+
+    testWidgets('didUpdateWidget loop 切换 → 重新 setLooping', (tester) async {
+      final c = FakeNiumaPlayerController();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c, loop: true),
+        ),
+      ));
+      expect(c.lastLooping, isTrue);
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: NiumaShortVideoPlayer(controller: c, loop: false),
         ),
       ));
+      expect(c.lastLooping, isFalse);
+    });
+
+    testWidgets('phase=ended 不再触发 Dart 层 seekTo+play', (tester) async {
+      final c = FakeNiumaPlayerController();
+      c.value = c.value.copyWith(
+        duration: const Duration(seconds: 30),
+        position: const Duration(seconds: 30),
+        phase: PlayerPhase.playing,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: NiumaShortVideoPlayer(controller: c),
+        ),
+      ));
       final playBeforeEnd = c.playCount;
 
+      // 即使 ended（理论上 native looping 时不会出现，但防御性测试）
       c.value = c.value.copyWith(phase: PlayerPhase.ended);
       await tester.pump();
 
-      // 没自动循环：seekTo(0) 不应被调，play() 也不应被再次调
-      expect(c.lastSeek, isNull);
-      expect(c.playCount, playBeforeEnd);
+      expect(c.lastSeek, isNull,
+          reason: 'Dart 层不再做 ended→seekTo 模拟循环，避免 dispose race');
+      expect(c.playCount, playBeforeEnd,
+          reason: '同上——native looping 接管');
     });
   });
 

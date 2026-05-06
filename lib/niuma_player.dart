@@ -84,7 +84,8 @@ export 'src/presentation/controls/pip_button.dart' show PipButton;
 export 'src/orchestration/multi_source.dart'
     show MediaQuality, MediaLine, NiumaMediaSource, MultiSourcePolicy;
 export 'src/orchestration/thumbnail_track.dart'
-    show ThumbnailFrame, WebVttCue, ThumbnailLoadState;
+    show WebVttCue, ThumbnailLoadState;
+export 'src/presentation/thumbnail_frame.dart' show ThumbnailFrame;
 export 'src/orchestration/source_middleware.dart'
     show
         SourceMiddleware,
@@ -101,7 +102,7 @@ export 'src/orchestration/resume_position.dart'
         defaultResumeKey,
         ResumeOrchestrator;
 export 'src/orchestration/retry_policy.dart' show RetryPolicy;
-export 'src/orchestration/ad_schedule.dart'
+export 'src/presentation/ad_schedule.dart'
     show
         AdCue,
         AdController,
@@ -109,7 +110,7 @@ export 'src/orchestration/ad_schedule.dart'
         MidRollAd,
         MidRollSkipPolicy,
         PauseAdShowPolicy;
-export 'src/orchestration/ad_scheduler.dart' show AdSchedulerOrchestrator;
+export 'src/presentation/ad_scheduler.dart' show AdSchedulerOrchestrator;
 export 'src/orchestration/auto_failover.dart' show AutoFailoverOrchestrator;
 
 // M11 弹幕

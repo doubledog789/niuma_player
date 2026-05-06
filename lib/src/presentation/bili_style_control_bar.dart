@@ -183,18 +183,57 @@ class BiliStyleControlBar extends StatelessWidget {
                   ScrubBar(controller: controller, chapters: chapters),
                 ],
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    ..._buildList(context, config.bottomLeft, resolver),
-                    if (bottomActionsBuilder != null)
-                      bottomActionsBuilder!(context),
-                    const Spacer(),
-                    // 业务自定义 trailing 在右侧 enum 之前渲染——demo 用来
-                    // 把"选集"放在 倍速/线路切换 之前，对齐 mockup 截图。
-                    if (bottomTrailingBuilder != null)
-                      bottomTrailingBuilder!(context),
-                    ..._buildList(context, config.bottomRight, resolver),
-                  ],
+                // 用 LayoutBuilder + ConstrainedBox(maxWidth: 50%) + Spacer
+                // 实现"两侧贴边、超出可滚"：
+                //   - children 不超时：每侧 ConstrainedBox 占 own size（≤50%），
+                //     Spacer 占余下空间——视觉等效原 Row + Spacer。
+                //   - children 超时：每侧最多 50%，内部 SingleChildScrollView
+                //     横向滚（右侧 reverse=true 滚动起点贴右），不再撞
+                //     RenderFlex overflow assertion。
+                LayoutBuilder(
+                  builder: (ctx, constraints) {
+                    final halfMax = constraints.maxWidth / 2;
+                    return Row(
+                      children: [
+                        ConstrainedBox(
+                          constraints:
+                              BoxConstraints(maxWidth: halfMax),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ..._buildList(
+                                    context, config.bottomLeft, resolver),
+                                if (bottomActionsBuilder != null)
+                                  bottomActionsBuilder!(context),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        ConstrainedBox(
+                          constraints:
+                              BoxConstraints(maxWidth: halfMax),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            reverse: true,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // 业务 trailing 在右侧 enum 之前——demo
+                                // 用来把"选集"放在 倍速/线路切换 之前。
+                                if (bottomTrailingBuilder != null)
+                                  bottomTrailingBuilder!(context),
+                                ..._buildList(
+                                    context, config.bottomRight, resolver),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

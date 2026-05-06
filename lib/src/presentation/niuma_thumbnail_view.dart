@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
-import '../orchestration/thumbnail_track.dart';
+import 'thumbnail_frame.dart';
 
 /// 把 [ThumbnailFrame] 渲染到屏幕上的助手 widget。
 ///

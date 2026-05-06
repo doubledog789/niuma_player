@@ -1,9 +1,10 @@
 import 'dart:ui' show Rect;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/orchestration/thumbnail_cache.dart';
-import 'package:niuma_player/src/orchestration/thumbnail_resolver.dart';
 import 'package:niuma_player/src/orchestration/thumbnail_track.dart';
+import 'package:niuma_player/src/presentation/thumbnail_cache.dart';
+import 'package:niuma_player/src/presentation/thumbnail_frame.dart';
+import 'package:niuma_player/src/presentation/thumbnail_resolver.dart';
 
 void main() {
   group('ThumbnailResolver.resolve', () {

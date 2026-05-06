@@ -419,7 +419,11 @@ class NativeBackend implements PlayerBackend {
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
+    bool unsafeAutoBackground = false,
   }) async {
+    // unsafeAutoBackground 是 iOS-only hack——Android 原生 PiP 调用
+    // Activity.enterPictureInPictureMode 本来就立即生效（系统切到桌面
+    // + 显示小窗），不需要 home 键模拟。这里忽略该参数。
     try {
       final result = await _pipChannel.invokeMethod<bool>(
         'enterPictureInPicture',

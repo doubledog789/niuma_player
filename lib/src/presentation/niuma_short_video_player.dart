@@ -83,11 +83,29 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
   final ValueNotifier<Duration> _scrubPosition =
       ValueNotifier(Duration.zero);
   bool _autoPlayDone = false;
+  // setLooping 在 controller 还没 initialize 时（_backend=null）会被 SDK
+  // 静默吞——业务通常 fire-and-forget 调 initialize() 不 await，导致
+  // initState 时 setLooping 调用无效。本标志让 _onValueChanged 在
+  // phase 离开 idle/opening 后兜底再调一次。
+  bool _loopingApplied = false;
 
   @override
   void initState() {
     super.initState();
     _theme = widget.theme ?? NiumaShortVideoTheme.defaults();
+    // 用 native looping 实现"循环不闪烁"。iOS 上 video_player 走
+    // AVPlayerLooper、Android 走自家原生 PlayerSession.setLooping，
+    // 二者都在播完时直接重启 surface、不暴露 phase=ended——视觉上
+    // 完全连续。Dart 层不再做 ended → seekTo(0) + play() 的模拟，
+    // 否则全屏放大后能看到末帧→黑帧→reload 的几十毫秒断层（"前几帧
+    // 抽搐"），并在 controller dispose 与 listener fire 的 race 里
+    // 撞 'VideoPlayerController used after disposed'。
+    //
+    // 注意：业务通常 fire-and-forget 调 controller.initialize() 不 await，
+    // 此时 _backend=null、setLooping 被静默吞——_onValueChanged 在
+    // initialized=true 后做 once 兜底。
+    widget.controller.setLooping(widget.loop);
+    _loopingApplied = widget.controller.value.initialized;
     // isActive 决定首屏 play/pause：
     //   - true  → 当前页/默认页应自动播
     //   - false → PageView 上下相邻页应保持暂停，滑入瞬间不抖
@@ -117,6 +135,11 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.theme != widget.theme) {
       _theme = widget.theme ?? NiumaShortVideoTheme.defaults();
+    }
+    if (oldWidget.loop != widget.loop) {
+      widget.controller.setLooping(widget.loop);
+      // 同 initState：可能此时仍未 init，标志重置等兜底
+      _loopingApplied = widget.controller.value.initialized;
     }
     if (oldWidget.isActive != widget.isActive) {
       if (widget.isActive) {
@@ -151,12 +174,17 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
 
   void _onValueChanged() {
     _maybeAutoPlay();
-    if (widget.loop &&
-        widget.controller.value.phase == PlayerPhase.ended &&
-        widget.isActive) {
-      widget.controller.seekTo(Duration.zero);
-      widget.controller.play();
-    }
+    _maybeApplyLooping();
+  }
+
+  /// initState/didUpdateWidget 时 controller 可能还没 initialize 完——
+  /// SDK 此时把 setLooping 静默吞。本方法在第一次拿到 initialized=true
+  /// 后再调一次，使 native looping 真正生效。
+  void _maybeApplyLooping() {
+    if (_loopingApplied) return;
+    if (!widget.controller.value.initialized) return;
+    _loopingApplied = true;
+    widget.controller.setLooping(widget.loop);
   }
 
   void _handleSingleTap() {

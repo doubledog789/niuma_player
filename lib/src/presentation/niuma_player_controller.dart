@@ -19,13 +19,14 @@ import '../domain/player_state.dart';
 import '../orchestration/multi_source.dart';
 import '../orchestration/retry_policy.dart';
 import '../orchestration/source_middleware.dart';
-import '../orchestration/thumbnail_cache.dart';
-import '../orchestration/thumbnail_resolver.dart';
 import '../orchestration/thumbnail_track.dart';
 import '../orchestration/webvtt_parser.dart';
 import '../cast/cast_session.dart';
 import '../cast/cast_state.dart';
 import 'pip_lifecycle_observer.dart';
+import 'thumbnail_cache.dart';
+import 'thumbnail_frame.dart';
+import 'thumbnail_resolver.dart';
 
 /// 拉取 WebVTT body 的函数签名。
 ///
@@ -119,6 +120,7 @@ class NiumaPlayerOptions {
     this.forceIjkOnAndroid = false,
     this.thumbnailFetchTimeout = const Duration(seconds: 30),
     this.thumbnailMaxBodyBytes = 5 * 1024 * 1024,
+    this.unsafePipAutoBackgroundOnEnter = false,
   });
 
   /// 若底层 backend 在该窗口内还没到 "initialized"，视作失败，
@@ -148,6 +150,27 @@ class NiumaPlayerOptions {
   /// 5MB 已意味着上万条 cue；典型 thumbnail VTT 只有几 KB。仅对
   /// 默认 [ThumbnailFetcher] 生效。
   final int thumbnailMaxBodyBytes;
+
+  /// **⚠️ App Store 不兼容**——启用后 host app **无法过 App Store 审核**。
+  /// 仅适合 Ad Hoc / Enterprise / 越狱设备等内部分发场景。
+  ///
+  /// iOS 16+ 上 `startPictureInPicture()` 在 app 前台时**不立即激活** PiP
+  /// 小窗——必须 user 主动手势切到后台（home 键 / 上滑）才"飘出"。这是
+  /// Apple 用户体验政策，不是 bug。
+  ///
+  /// 该 flag = `true` 时：iOS 端在 PiP `startPictureInPicture()` 之后
+  /// 立即调用私有 API `UIApplication.shared.perform(Selector("suspend"))`
+  /// 模拟 home 键，让 PiP 小窗立刻飘出，无需 user 手动操作。
+  ///
+  /// **风险**：
+  /// - `suspend` 是 Apple 私有 selector，App Store 静态分析会扫描出 →
+  ///   100% 拒审。仅 Ad Hoc / Enterprise / TestFlight 内部 / 越狱可用。
+  /// - 未来 iOS 系统升级可能让该 selector 失效或抛异常（私有 API 无 SLA）。
+  ///
+  /// Android / Web 忽略此 flag——Android 原生 PiP 本就立即生效不需要 hack。
+  ///
+  /// 默认 `false`（合规）。
+  final bool unsafePipAutoBackgroundOnEnter;
 }
 
 /// 用户直接交互的公共 controller。
@@ -834,6 +857,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       final ok = await backend.enterPictureInPicture(
         aspectNum: aspect.$1,
         aspectDen: aspect.$2,
+        unsafeAutoBackground: options.unsafePipAutoBackgroundOnEnter,
       );
       if (!ok) {
         value = value.copyWith(isInPictureInPicture: false);

@@ -1,4 +1,8 @@
-import 'package:flutter/widgets.dart';
+// 本文件刻意不 import 'package:flutter/widgets.dart' —— domain 层不持有
+// widget tree 概念。`IconData` 虽然来自 widgets 包，但它本身是个纯数据类
+// （codePoint + fontFamily），是 SDK 对外暴露的 HUD 字段类型，按需 show 即可。
+import 'package:flutter/foundation.dart' show immutable;
+import 'package:flutter/widgets.dart' show IconData;
 
 import 'gesture_kind.dart';
 

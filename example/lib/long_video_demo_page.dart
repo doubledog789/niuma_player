@@ -52,6 +52,12 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
         thumbnailVtt:
             'https://artplayer.org/assets/sample/bbb-thumbnails.vtt',
       ),
+      // ⚠️ demo 启用 PiP "点击即自动退后台"——会让 host app 失去上 App
+      // Store 资格，仅适合 Ad Hoc / Enterprise / 越狱设备。详见
+      // [NiumaPlayerOptions.unsafePipAutoBackgroundOnEnter] 文档。
+      options: const NiumaPlayerOptions(
+        unsafePipAutoBackgroundOnEnter: true,
+      ),
     );
     unawaited(_initialize());
   }

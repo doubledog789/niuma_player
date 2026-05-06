@@ -60,6 +60,7 @@ class _PipEmittingFakeBackend implements PlayerBackend {
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
+    bool unsafeAutoBackground = false,
   }) async =>
       false;
   @override

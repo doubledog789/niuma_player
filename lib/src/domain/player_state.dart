@@ -1,5 +1,6 @@
+import 'dart:ui' show Size;
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart';
 
 import '../cast/cast_device.dart';
 import '../cast/cast_state.dart';
