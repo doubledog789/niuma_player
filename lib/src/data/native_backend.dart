@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../domain/data_source.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
+import '_pip_event_bus.dart';
 
 /// 用于 texture 创建和设备指纹查询的全局 channel。
 const MethodChannel _globalChannel = MethodChannel('cn.niuma/player');
@@ -144,7 +145,10 @@ class NativeBackend implements PlayerBackend {
   }
 
   void _startPipEventListening() {
-    _pipEventSub = _pipEventChannel.receiveBroadcastStream().listen(
+    // 用 [pipEventBus] 共享 root listener——避免 Android Flutter engine
+    // EventChannel 在 controller 复用时跟 iOS 同样的 cancel race。详见
+    // _pip_event_bus.dart 头注释。
+    _pipEventSub = pipEventBus().listen(
       (dynamic data) {
         if (data is! Map) return;
         final event = data['event'];
@@ -405,9 +409,9 @@ class NativeBackend implements PlayerBackend {
   }
 
   static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
-  static const EventChannel _pipEventChannel =
-      EventChannel('niuma_player/pip/events');
 
+  /// PiP 事件 sub——监听共享 [pipEventBus]，dispose 时 cancel Dart 内 sub
+  /// 不触发 native cancel，避开 EventChannel 单 listener race。
   StreamSubscription<dynamic>? _pipEventSub;
 
   /// 进入 PiP（Android）。

@@ -7,42 +7,7 @@ import 'package:video_player/video_player.dart';
 import '../domain/data_source.dart';
 import '../domain/player_backend.dart';
 import '../domain/player_state.dart';
-
-// ─────────────────────────────────────────────────────────────────────────
-// PiP EventChannel 进程级单 listener bus
-// ─────────────────────────────────────────────────────────────────────────
-//
-// 直接 `EventChannel('niuma_player/pip/events').receiveBroadcastStream()
-// .listen(...)` + sub.cancel 在 controller 复用 / 重建场景下会撞
-// iOS Flutter engine 的 EventChannel 单 listener 模型——`_currentSink`
-// 在新 listen 时被覆盖、旧 cancel 来时 == nil → 引擎返
-// "No active stream to cancel" PlatformException，从 StreamController
-// 的 onCancel 内部 zone 抛出，**不在 await 链上**——await sub.cancel()
-// 的 try-catch 抓不到，会污染 services library log。
-//
-// 解法：整个 SDK 进程**只 listen 一次** root EventChannel；每个 backend
-// 实例 sub-listen 这条 Dart-side broadcast。backend dispose 时 cancel
-// 的是 Dart 内部 sub，不向 native 发 cancel 消息——iOS engine 的
-// `_currentSink` 始终持有 root sink，永不 nil，永不报错。
-// 进程退出时 OS 清理一切。
-StreamController<dynamic>? _pipEventBusCtrl;
-// ignore: unused_element
-StreamSubscription<dynamic>? _pipEventBusRoot;
-
-Stream<dynamic> _pipEventBus() {
-  final existing = _pipEventBusCtrl;
-  if (existing != null) return existing.stream;
-  final ctrl = StreamController<dynamic>.broadcast();
-  _pipEventBusCtrl = ctrl;
-  _pipEventBusRoot = const EventChannel('niuma_player/pip/events')
-      .receiveBroadcastStream()
-      .listen(
-    ctrl.add,
-    onError: (Object error, StackTrace stack) =>
-        ctrl.addError(error, stack),
-  );
-  return ctrl.stream;
-}
+import '_pip_event_bus.dart';
 
 /// 包装 `package:video_player` 的 [PlayerBackend] 实现。
 class VideoPlayerBackend implements PlayerBackend {
@@ -108,12 +73,12 @@ class VideoPlayerBackend implements PlayerBackend {
   }
 
   void _startPipEventListening() {
-    // 监听的是 [_pipEventBus]——SDK 进程级 lazy singleton broadcast。
-    // backend dispose 时 cancel 的是这个 Dart-side sub，不会向 native 端
-    // 发 cancel 消息，避开 iOS Flutter engine EventChannel 单 listener
-    // 模型在 controller 复用时 `_currentSink=nil` 报 "No active stream
-    // to cancel" 的 zone 抛错（错路径不在 await 链上、try-catch 抓不到）。
-    _pipEventSub = _pipEventBus().listen(
+    // 监听的是 [pipEventBus]——SDK 进程级 lazy singleton broadcast，跟
+    // NativeBackend 共用同一 root listener。backend dispose 时 cancel
+    // 的是这个 Dart-side sub，不会向 native 端发 cancel 消息，避开
+    // Flutter engine EventChannel 单 listener 模型在 controller 复用时
+    // 的 cancel race。详见 _pip_event_bus.dart 头注释。
+    _pipEventSub = pipEventBus().listen(
       (dynamic data) {
         if (data is! Map) return;
         final event = data['event'];
