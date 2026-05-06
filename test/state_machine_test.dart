@@ -42,7 +42,7 @@ class _CountingMiddleware extends SourceMiddleware {
 
 /// Simple controllable fake. Tests provide [initFuture] to drive the
 /// "Try-Once-Then-Retry" state machine in [NiumaPlayerController].
-class FakePlayerBackend implements PlayerBackend {
+class FakePlayerBackend extends PlayerBackend {
   FakePlayerBackend({
     required this.kind,
     this.initBlock,

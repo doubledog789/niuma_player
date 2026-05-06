@@ -37,7 +37,7 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
             id: 'line1',
             label: '线路一',
             source: NiumaDataSource.network(
-              'https://artplayer.org/assets/sample/bbb-video1.mp4',
+              'https://artplayer.org/assets/sample/bbb-video.mp4',
             ),
           ),
           MediaLine(

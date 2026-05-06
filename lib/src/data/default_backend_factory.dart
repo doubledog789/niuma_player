@@ -1,18 +1,10 @@
-import 'package:niuma_player/src/domain/backend_factory.dart';
-import 'package:niuma_player/src/domain/data_source.dart';
-import 'package:niuma_player/src/domain/player_backend.dart';
-import 'package:niuma_player/src/data/native_backend.dart';
-import 'package:niuma_player/src/data/video_player_backend.dart';
+/// Conditional re-export：web 走 `default_backend_factory_web.dart`
+/// （用 [WebVideoBackend]），iOS / Android 走 `default_backend_factory_io.dart`
+/// （用 [VideoPlayerBackend] / [NativeBackend]）。
+///
+/// 这种模式让 `dart:html` / `dart:ui_web` web-only library 完全隔离在
+/// `*_web.dart` 文件内，不污染 io 平台编译。
+library;
 
-/// 生产实现——构造真实的 video_player / niuma native 后端。
-class DefaultBackendFactory implements BackendFactory {
-  const DefaultBackendFactory();
-
-  @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) =>
-      VideoPlayerBackend(ds);
-
-  @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) =>
-      NativeBackend(ds, forceIjk: forceIjk);
-}
+export 'default_backend_factory_io.dart'
+    if (dart.library.html) 'default_backend_factory_web.dart';

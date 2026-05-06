@@ -7,7 +7,7 @@ import 'package:niuma_player/niuma_player.dart';
 /// 简单的 PlayerBackend mock，专门给 PiP 测试用。
 /// 不复用 state_machine_test 的 FakePlayerBackend——那个是为状态机
 /// 行为设计的，本测试只关心 PiP method dispatch + 闸门逻辑。
-class _PipFakeBackend implements PlayerBackend {
+class _PipFakeBackend extends PlayerBackend {
   _PipFakeBackend({
     this.enterPipResult = false,
     this.exitPipResult = false,

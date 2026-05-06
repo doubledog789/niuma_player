@@ -10,7 +10,7 @@ import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/data/_pip_event_bus.dart';
 
 /// 包装 `package:video_player` 的 [PlayerBackend] 实现。
-class VideoPlayerBackend implements PlayerBackend {
+class VideoPlayerBackend extends PlayerBackend {
   VideoPlayerBackend(this._dataSource);
 
   final NiumaDataSource _dataSource;

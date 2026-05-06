@@ -27,6 +27,16 @@ abstract class PlayerBackend {
   /// video_player 用自己的 widget）则为 null。
   int? get textureId;
 
+  /// Web-only：HtmlElementView 注册的 viewType。io 平台 / 非 web backend
+  /// 返 null（默认实现）。`NiumaPlayerView` 检测到非 null 时用
+  /// `HtmlElementView(viewType)` 渲染——backend 内部用
+  /// `dart:ui_web.platformViewRegistry.registerViewFactory` 注册。
+  ///
+  /// 默认实现 null——只有 [WebVideoBackend] 重写。
+  String? get htmlViewType {
+    return null;
+  }
+
   /// 当前状态快照。与 [valueStream] 同步更新。
   NiumaPlayerValue get value;
 

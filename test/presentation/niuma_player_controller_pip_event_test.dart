@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 
-class _PipEmittingFakeBackend implements PlayerBackend {
+class _PipEmittingFakeBackend extends PlayerBackend {
   final _valueCtrl = StreamController<NiumaPlayerValue>.broadcast(sync: true);
   final _eventCtrl = StreamController<NiumaPlayerEvent>.broadcast(sync: true);
   NiumaPlayerValue _value = NiumaPlayerValue.uninitialized();

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 
@@ -27,7 +28,11 @@ class NiumaPlayerView extends StatelessWidget {
         final backend = controller.backend;
         final ratio = aspectRatio ?? _ratioFromValue(value);
         final Widget child;
-        if (backend is VideoPlayerBackend) {
+        // web 优先：backend 暴露 htmlViewType（WebVideoBackend）→ HtmlElementView
+        final viewType = backend?.htmlViewType;
+        if (kIsWeb && viewType != null) {
+          child = HtmlElementView(viewType: viewType);
+        } else if (backend is VideoPlayerBackend) {
           child = VideoPlayer(backend.innerController);
         } else if (backend != null &&
             backend.kind == PlayerBackendKind.native &&

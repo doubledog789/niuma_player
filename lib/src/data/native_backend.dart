@@ -24,7 +24,7 @@ const MethodChannel _globalChannel = MethodChannel('cn.niuma/player');
 ///   - `cn.niuma/player`                       （全局：create / fingerprint）
 ///   - `cn.niuma/player/<textureId>`           （每个实例：play/pause/...）
 ///   - `cn.niuma/player/events/<textureId>`    （每个实例的状态流）
-class NativeBackend implements PlayerBackend {
+class NativeBackend extends PlayerBackend {
   NativeBackend(this._dataSource, {this.forceIjk = false});
 
   final NiumaDataSource _dataSource;
