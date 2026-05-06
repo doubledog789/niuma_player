@@ -181,18 +181,53 @@ NiumaPlayerThemeData(
 ```dart
 Column(children: [
   Row(children: [
-    PlayPauseButton(controller: controller),
-    TimeDisplay(controller: controller),
+    NiumaPlayPauseButton(controller: controller),
+    NiumaTimeDisplay(controller: controller),
   ]),
   NiumaPlayerView(controller),
-  ScrubBar(controller: controller),
+  NiumaScrubBar(controller: controller),
   Row(children: [
-    SpeedSelector(controller: controller),
-    QualitySelector(controller: controller),
-    VolumeButton(controller: controller),
-    FullscreenButton(controller: controller),
+    NiumaSpeedSelector(controller: controller),
+    NiumaQualitySelector(controller: controller),
+    NiumaVolumeButton(controller: controller),
+    NiumaFullscreenButton(controller: controller),
   ]),
 ]);
+```
+
+> **新代码请用 `Niuma*` 前缀**——`NiumaPlayPauseButton` / `NiumaScrubBar` / 等。原裸名（`PlayPauseButton` / `ScrubBar` / 等）作为 typedef alias 仍 export 向后兼容，但容易和业务方自家通用名 widget 冲突。
+
+### 反馈 UI 自定义（loading / error / ended）
+
+`NiumaPlayer` 在 `phase=opening/buffering`（loading）、`phase=error`、`phase=ended` 三态都有**默认渲染**——分别走 `NiumaLoadingIndicator` / `NiumaErrorView` / `NiumaEndedView`。业务想换观感传对应 builder 即可：
+
+```dart
+NiumaPlayer(
+  controller: controller,
+  // 默认 NiumaErrorView/EndedView 的按钮 callback——不传 SDK 也提供
+  // 默认行为（重试 = controller.initialize()，重播 = seek 0 + play），
+  // 业务想改实现传以下两个：
+  onErrorRetry: () => myCustomRetry(),
+  onEndedReplay: () => myCustomReplay(),
+  // 想要完全自定义 widget？传 builder：
+  loadingBuilder: (ctx) => const CircularProgressIndicator(),
+  errorBuilder: (ctx, err) => MyBrandErrorWidget(error: err),
+  endedBuilder: (ctx) => MyEndedScreen(controller: controller),
+)
+```
+
+`NiumaProgressThumb`（默认进度条 thumb 上的 niuma 5 状态表情）也提供 `iconBuilder` slot 替换默认：
+
+```dart
+NiumaProgressThumb(
+  progress: 0.5,
+  isPlaying: true,
+  iconBuilder: (ctx, state) => Icon(
+    state == NiumaProgressThumbState.paused
+        ? Icons.pause_circle_filled
+        : Icons.play_circle_filled,
+  ),
+)
 ```
 
 完整 demo 见 [`example/lib/m9_default_demo_page.dart`](example/lib/m9_default_demo_page.dart) 和 [`example/lib/m9_custom_demo_page.dart`](example/lib/m9_custom_demo_page.dart)。
@@ -291,6 +326,24 @@ videoCtrl.value.isInPictureInPicture;
 videoCtrl.autoEnterPictureInPictureOnBackground = true;
 // app 切后台时自动进 PiP（仅当 phase=playing）
 ```
+
+### ⚠️ iOS-only：点击 PiP 按钮即自动退到桌面（私有 API，不上 App Store）
+
+iOS 16+ 上 `startPictureInPicture()` 在 app 前台时**不立即激活**——必须 user 主动手势切到后台才"飘出"小窗。这是 Apple UX 政策，不是 bug。
+
+如果业务**接受 App Store 不兼容**（仅 Ad Hoc / Enterprise / 越狱 / 内部分发），可以打开 `unsafePipAutoBackgroundOnEnter` 让 SDK 调私有 API `UIApplication.suspend` 模拟 home 键：
+
+```dart
+final controller = NiumaPlayerController.dataSource(
+  NiumaDataSource.network('https://...'),
+  options: const NiumaPlayerOptions(
+    // ⚠️ 启用后 host app 无法过 App Store 审核
+    unsafePipAutoBackgroundOnEnter: true,
+  ),
+);
+```
+
+字段标注 `@experimental`——SDK 内置 ObjC try/catch 桥（`NiumaObjCExceptionCatcher`）抓未来 iOS 版本可能的 NSException。Android / Web 忽略此 flag。
 
 监听 PiP 事件：
 
@@ -415,55 +468,70 @@ PageView.builder(
 
 **进度条**：常态 1.5px 细线贴底，触摸变粗到 3.5px + 出现 thumb，拖动期间暂停 + 中央显示大字时间，松手 seek + 恢复 play 状态。
 
-## 投屏（Cast）— M15
+## 投屏（Cast）— M15（0.x 起合并主包）
 
-niuma_player 通过 federated plugin 模式支持投屏：主包提供 UI + 抽象，DLNA / AirPlay 协议实现走 companion package。
+DLNA + AirPlay 协议实现已**合并进主包**——业务方一个 `niuma_player` 依赖即可。`NiumaPlayer` 默认 ControlBar 自动叠 cast 按钮、自动 register 默认协议——**业务侧零代码**就能用。
 
-### 安装
-
-```yaml
-dependencies:
-  niuma_player: ^0.9.0
-  niuma_player_dlna: ^0.1.0    # 国内 TV / 盒子（DLNA），~300KB
-  niuma_player_airplay: ^0.1.0 # iOS 苹果生态（AirPlay），~10KB
-```
-
-国外业务可加 Chromecast 子包（暂未提供，留接口待社区补）。
-
-### 业务集成
+### 业务集成（默认，0 配置）
 
 ```dart
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player_dlna/niuma_player_dlna.dart';
-import 'package:niuma_player_airplay/niuma_player_airplay.dart';
 
 void main() {
-  NiumaCastRegistry.register(DlnaCastService());
-  NiumaCastRegistry.register(AirPlayCastService());
+  // NiumaCastRegistry 首次访问时 lazy 自动 register DLNA + AirPlay
+  // 默认实现，业务无需手动 register。
   runApp(const MyApp());
 }
 ```
 
-`NiumaPlayer` 默认 ControlBar 已自动叠 cast 按钮——业务侧无额外集成。
+### 自定义投屏协议（可选）
 
-### Android 注意
+业务想替换 SDK 默认 DLNA、加 Chromecast 等自家协议，在 `main()` 第一句调 `NiumaCastRegistry.register(...)` 即可——重复 protocolId 不覆盖，先注册的赢。
 
-DLNA SSDP 走 UDP 多播。Android 11+ 业务侧 `AndroidManifest.xml` 加：
+```dart
+void main() {
+  // 业务自家 DLNA fork（替代 SDK 默认）
+  NiumaCastRegistry.register(MyCustomDlnaCastService());
+  // SDK 默认 AirPlay 还会被 lazy register（protocolId 不重复）
+  runApp(const MyApp());
+}
+```
+
+### Android 必备 manifest 权限（已 SDK 内置声明）
+
+DLNA SSDP 走 UDP 多播。SDK 主包 `AndroidManifest.xml` 已声明：
 
 ```xml
 <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 ```
 
-子包内部已自动管理 `WifiManager.MulticastLock` 申请释放。
+Host app 不需再额外加。`WifiManager.MulticastLock` 由 SDK 内 `NiumaDlnaPlugin`（嵌套于主 `NiumaPlayerPlugin`）自动申请释放。
+
+### iOS Local Network 权限（业务必须配）
+
+iOS 14+ 上多播需要业务方在 `Info.plist` 加：
+
+```xml
+<key>NSLocalNetworkUsageDescription</key>
+<string>用于发现局域网内的投屏设备</string>
+<key>NSBonjourServices</key>
+<array>
+  <string>_ssdp._udp</string>
+</array>
+```
+
+**注意**：免费 Apple ID 无法签 `com.apple.developer.networking.multicast` entitlement——iOS 真机上 SSDP 必失败。SDK 已经把 `SocketException` 在源头吞掉，只是 picker 显示"未找到设备"。生产用户得用付费 Apple Developer 账号 + 申请 multicast entitlement。
 
 ### 相关 widget / 类
 
 - `NiumaCastButton` — 投屏按钮（默认在 ControlBar）
 - `NiumaCastOverlay` — 投屏中视频区中央覆盖层
-- `NiumaCastRegistry` — 子包注册表（业务侧调 register）
-- `CastService` / `CastSession` / `CastDevice` / `CastConnectionState` / `CastEndReason` — 协议抽象，可自定义协议子包
+- `NiumaCastRegistry` — 协议注册表（lazy auto-register defaults + 业务 opt-in 替代）
+- `DlnaCastService` / `AirPlayCastService` — SDK 内置协议实现
+- `CastService` / `CastSession` / `CastDevice` / `CastConnectionState` / `CastEndReason` — 协议抽象，可自定义协议
 
-完整 demo 见 [`example/lib/m15_cast_demo_page.dart`](example/lib/m15_cast_demo_page.dart)。
+完整 demo 见 [`example/lib/long_video_demo_page.dart`](example/lib/long_video_demo_page.dart) 投屏 demo 段。
 
 ## 监听后端选择
 
