@@ -1,12 +1,7 @@
-import 'package:niuma_player/niuma_player.dart';
 import 'package:flutter/material.dart';
-
-import 'package:niuma_player/src/niuma_sdk_assets.dart';
-import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
-import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
-import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
-import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
+import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
 
 /// 全屏切换按钮。
 ///

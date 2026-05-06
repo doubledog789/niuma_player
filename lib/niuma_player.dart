@@ -169,7 +169,7 @@ export 'package:niuma_player/src/presentation/cast/niuma_cast_overlay.dart' show
 // register 这两个，业务方 0 配置就能用——仍可调
 // `NiumaCastRegistry.register(...)` 加自家协议（如 Chromecast）。
 export 'package:niuma_player/src/cast/dlna/dlna_cast_service.dart' show DlnaCastService;
-export 'package:niuma_player/src/cast/airplay/airplay_cast_service.dart' show AirPlayCastService;
+export 'package:niuma_player/src/cast/airplay_cast_service.dart' show AirPlayCastService;
 
 // 原子控件 `Niuma*` 前缀 alias（推荐用名）——避免业务方裸名冲突。
 // 上方 `// M9 原子控件` 块的 10 个裸名（PlayPauseButton / ScrubBar / 等）

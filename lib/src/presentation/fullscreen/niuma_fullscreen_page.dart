@@ -1,20 +1,9 @@
-import 'package:niuma_player/niuma_player.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-
-import 'package:niuma_player/src/domain/gesture_kind.dart';
-import 'package:niuma_player/src/observability/analytics_emitter.dart';
-import 'package:niuma_player/src/presentation/ad/ad_schedule.dart';
-import 'package:niuma_player/src/presentation/control_bar/button_override.dart';
-import 'package:niuma_player/src/presentation/control_bar/niuma_control_bar_config.dart';
-import 'package:niuma_player/src/presentation/control_bar/niuma_control_button.dart';
-import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
-import 'package:niuma_player/src/presentation/gesture/niuma_gesture_layer.dart' show GestureHudBuilder;
-import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
-import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
+import 'package:niuma_player/niuma_player.dart';
 
 /// 通过 [NiumaFullscreenPage.route] push 的全屏播放页。
 ///

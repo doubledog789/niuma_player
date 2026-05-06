@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:niuma_player/src/cast/airplay/airplay_cast_service.dart';
+import 'package:niuma_player/src/cast/airplay_cast_service.dart';
 import 'package:niuma_player/src/cast/cast_service.dart';
 import 'package:niuma_player/src/cast/dlna/dlna_cast_service.dart';
 
