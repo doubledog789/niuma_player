@@ -27,6 +27,8 @@ import 'package:niuma_player/src/niuma_sdk_assets.dart';
 import 'package:niuma_player/src/presentation/controls/lock_button.dart';
 import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 import 'package:niuma_player/src/presentation/gesture/niuma_gesture_layer.dart';
+import 'package:niuma_player/src/presentation/feedback/niuma_ended_view.dart';
+import 'package:niuma_player/src/presentation/feedback/niuma_error_view.dart';
 import 'package:niuma_player/src/presentation/feedback/niuma_loading_indicator.dart';
 import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
@@ -83,6 +85,12 @@ class NiumaPlayer extends StatefulWidget {
     this.chapters,
     this.onDanmakuInputTap,
     this.actionsBuilder,
+    // 反馈 UI 自定义 builder
+    this.loadingBuilder,
+    this.errorBuilder,
+    this.endedBuilder,
+    this.onErrorRetry,
+    this.onEndedReplay,
   });
 
   /// 实际驱动播放的 controller。所有内部子组件共享同一实例。
@@ -171,6 +179,37 @@ class NiumaPlayer extends StatefulWidget {
   /// 全屏顶栏 topActions enum 之后追加的业务自定义 slot
   /// （业务互动按钮如点赞 / 分享等）。仅全屏 [NiumaFullscreenControlBar] 生效。
   final WidgetBuilder? actionsBuilder;
+
+  // ───────────────── 反馈 UI 自定义 ─────────────────
+
+  /// `phase=opening` / `phase=buffering` 时渲染。null 走默认
+  /// [NiumaLoadingIndicator]——business 想要不同 loading 风格（普通
+  /// CircularProgressIndicator / 自家品牌动画等）传此 builder。
+  final WidgetBuilder? loadingBuilder;
+
+  /// `phase=error` 时渲染。null 走默认 [NiumaErrorView]——传入
+  /// `controller.value.error` 显示错误信息 + 可选重试按钮（[onErrorRetry]
+  /// 非 null 时按钮可点击）。business 想完全自定义错误 UI 传此 builder。
+  ///
+  /// builder 收到 `controller.value.error`（非 null：phase=error 时一定有
+  /// error 字段）。
+  final Widget Function(BuildContext context, PlayerError error)? errorBuilder;
+
+  /// `phase=ended` 时渲染。null 走默认 [NiumaEndedView]——居中重播按钮
+  /// （[onEndedReplay] 非 null 时按钮可点击）。**注意**：当
+  /// `controller.setLooping(true)` 时 native 不会触发 phase=ended，此
+  /// builder 不会显示——这个 slot 主要服务非循环点播 / 短视频场景。
+  final WidgetBuilder? endedBuilder;
+
+  /// 默认 [NiumaErrorView] 的 "重试" 按钮回调——典型实现：
+  /// `() => controller.initialize()` 或切换 line。null 时按钮隐藏。
+  /// 业务自定义 [errorBuilder] 时此 callback 不生效（自定义 UI 自管按钮）。
+  final VoidCallback? onErrorRetry;
+
+  /// 默认 [NiumaEndedView] 的 "重播" 按钮回调——典型实现：
+  /// `() async { await controller.seekTo(Duration.zero); await controller.play(); }`。
+  /// null 时按钮隐藏。业务自定义 [endedBuilder] 时此 callback 不生效。
+  final VoidCallback? onEndedReplay;
 
   @override
   State<NiumaPlayer> createState() => _NiumaPlayerState();
@@ -885,20 +924,45 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
                   onRefresh: _startCastScan,
                 ),
               ),
-            // 缓冲 / 打开阶段中央 loading 浮层（资源包 niuma 头 + 旋转
-            // bug + 脉动点）——所有别的浮层之上，避免被遮。inline + 全屏
-            // 都走这层；只看 phase，不看 controlsVisible（loading 时控件
-            // 也可能 fade 走了）。
+            // 反馈 UI 浮层：loading / error / ended 三态——所有别的浮层
+            // 之上，避免被遮。inline + 全屏都走这层；只看 phase，不看
+            // controlsVisible（这些 phase 下控件可能已 fade）。
+            // 业务可通过 loadingBuilder / errorBuilder / endedBuilder 覆盖。
             Positioned.fill(
               child: ValueListenableBuilder<NiumaPlayerValue>(
                 valueListenable: widget.controller,
                 builder: (ctx, v, _) {
-                  final loading = v.phase == PlayerPhase.opening ||
-                      v.phase == PlayerPhase.buffering;
-                  if (!loading) return const SizedBox.shrink();
-                  return const IgnorePointer(
-                    child: Center(child: NiumaLoadingIndicator()),
-                  );
+                  switch (v.phase) {
+                    case PlayerPhase.opening:
+                    case PlayerPhase.buffering:
+                      final lb = widget.loadingBuilder;
+                      return IgnorePointer(
+                        child: Center(
+                          child: lb != null
+                              ? lb(ctx)
+                              : const NiumaLoadingIndicator(),
+                        ),
+                      );
+                    case PlayerPhase.error:
+                      final eb = widget.errorBuilder;
+                      final err = v.error;
+                      if (eb != null && err != null) {
+                        return eb(ctx, err);
+                      }
+                      return NiumaErrorView(
+                        error: err,
+                        onRetry: widget.onErrorRetry,
+                      );
+                    case PlayerPhase.ended:
+                      final endb = widget.endedBuilder;
+                      if (endb != null) return endb(ctx);
+                      return NiumaEndedView(onReplay: widget.onEndedReplay);
+                    case PlayerPhase.idle:
+                    case PlayerPhase.ready:
+                    case PlayerPhase.playing:
+                    case PlayerPhase.paused:
+                      return const SizedBox.shrink();
+                  }
                 },
               ),
             ),

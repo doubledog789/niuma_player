@@ -26,6 +26,7 @@ class NiumaProgressThumb extends StatefulWidget {
     this.size = 32,
     this.fastSpeedThreshold = 50,
     this.sleepAfterMs = 5000,
+    this.iconBuilder,
   });
 
   /// 当前播放进度 0..1。仅用于 [Semantics]，不影响表情切换。
@@ -51,6 +52,15 @@ class NiumaProgressThumb extends StatefulWidget {
 
   /// 暂停多少 ms 后切到 sleep。
   final int sleepAfterMs;
+
+  /// 自定义 thumb 图标 builder——接收当前 [NiumaProgressThumbState]，业务
+  /// 返回任意 widget 替换默认 niuma 表情 SVG。null 时走默认 niuma 表情。
+  ///
+  /// 典型用法：业务想用 [Icon] / 业务自家 SVG / 不要图标只显示进度数值
+  /// 等。`iconBuilder` 收到的 state 已经是计算好的 5 状态（idle /
+  /// seekForward / seekBackward / seekFast / paused），业务按需 switch。
+  final Widget Function(BuildContext context, NiumaProgressThumbState state)?
+      iconBuilder;
 
   @override
   State<NiumaProgressThumb> createState() => _NiumaProgressThumbState();
@@ -108,16 +118,20 @@ class _NiumaProgressThumbState extends State<NiumaProgressThumb> {
 
   @override
   Widget build(BuildContext context) {
+    final builder = widget.iconBuilder;
+    final child = builder != null
+        ? KeyedSubtree(key: ValueKey(_state), child: builder(context, _state))
+        : SvgPicture.asset(
+            NiumaSdkAssets.thumbForState(_state),
+            key: ValueKey(_state),
+            width: widget.size,
+            height: widget.size,
+          );
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       transitionBuilder: (child, animation) =>
           ScaleTransition(scale: animation, child: child),
-      child: SvgPicture.asset(
-        NiumaSdkAssets.thumbForState(_state),
-        key: ValueKey(_state),
-        width: widget.size,
-        height: widget.size,
-      ),
+      child: child,
     );
   }
 }

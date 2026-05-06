@@ -61,6 +61,11 @@ class NiumaFullscreenPage extends StatefulWidget {
     this.moreMenuBuilder,
     this.chapters,
     this.onDanmakuInputTap,
+    this.loadingBuilder,
+    this.errorBuilder,
+    this.endedBuilder,
+    this.onErrorRetry,
+    this.onEndedReplay,
   });
 
   /// 与外部 page 共享的 [NiumaPlayerController]。
@@ -121,6 +126,21 @@ class NiumaFullscreenPage extends StatefulWidget {
   /// M16: 全屏右侧 rail（透传给内层 [NiumaPlayer.rightRailBuilder]）。
   final WidgetBuilder? rightRailBuilder;
 
+  /// 透传给内层 [NiumaPlayer.loadingBuilder]——自定义 loading UI。
+  final WidgetBuilder? loadingBuilder;
+
+  /// 透传给内层 [NiumaPlayer.errorBuilder]——自定义错误 UI。
+  final Widget Function(BuildContext, PlayerError)? errorBuilder;
+
+  /// 透传给内层 [NiumaPlayer.endedBuilder]——自定义结束 UI。
+  final WidgetBuilder? endedBuilder;
+
+  /// 透传给内层 [NiumaPlayer.onErrorRetry]——默认错误 UI 的重试 callback。
+  final VoidCallback? onErrorRetry;
+
+  /// 透传给内层 [NiumaPlayer.onEndedReplay]——默认结束 UI 的重播 callback。
+  final VoidCallback? onEndedReplay;
+
   /// M16: more menu builder（透传给内层 [NiumaPlayer.moreMenuBuilder]）。
   final List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder;
 
@@ -163,6 +183,11 @@ class NiumaFullscreenPage extends StatefulWidget {
     WidgetBuilder? bottomTrailingBuilder,
     WidgetBuilder? pausedOverlayBuilder,
     WidgetBuilder? rightRailBuilder,
+    WidgetBuilder? loadingBuilder,
+    Widget Function(BuildContext, PlayerError)? errorBuilder,
+    WidgetBuilder? endedBuilder,
+    VoidCallback? onErrorRetry,
+    VoidCallback? onEndedReplay,
     List<PopupMenuEntry<dynamic>> Function(BuildContext)? moreMenuBuilder,
     List<Duration>? chapters,
     VoidCallback? onDanmakuInputTap,
@@ -190,6 +215,11 @@ class NiumaFullscreenPage extends StatefulWidget {
         bottomTrailingBuilder: bottomTrailingBuilder,
         pausedOverlayBuilder: pausedOverlayBuilder,
         rightRailBuilder: rightRailBuilder,
+        loadingBuilder: loadingBuilder,
+        errorBuilder: errorBuilder,
+        endedBuilder: endedBuilder,
+        onErrorRetry: onErrorRetry,
+        onEndedReplay: onEndedReplay,
         moreMenuBuilder: moreMenuBuilder,
         chapters: chapters,
         onDanmakuInputTap: onDanmakuInputTap,
@@ -305,6 +335,11 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
             bottomTrailingBuilder: widget.bottomTrailingBuilder,
             pausedOverlayBuilder: widget.pausedOverlayBuilder,
             rightRailBuilder: widget.rightRailBuilder,
+            loadingBuilder: widget.loadingBuilder,
+            errorBuilder: widget.errorBuilder,
+            endedBuilder: widget.endedBuilder,
+            onErrorRetry: widget.onErrorRetry,
+            onEndedReplay: widget.onEndedReplay,
             moreMenuBuilder: widget.moreMenuBuilder,
             chapters: widget.chapters,
             onDanmakuInputTap: widget.onDanmakuInputTap,

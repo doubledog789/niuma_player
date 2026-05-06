@@ -38,9 +38,12 @@ export 'package:niuma_player/src/presentation/core/niuma_player.dart'
     show NiumaPlayer, NiumaPlayerConfigScope;
 export 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart' show NiumaFullscreenPage;
 
-// 缓冲 / 打开阶段中央 loading 动画（牛马头 + 旋转 bug + 脉动点）
+// 反馈 UI（loading / error / ended 默认实现，业务可通过 NiumaPlayer 的
+// loadingBuilder / errorBuilder / endedBuilder 覆盖）
 export 'src/presentation/feedback/niuma_loading_indicator.dart'
     show NiumaLoadingIndicator;
+export 'src/presentation/feedback/niuma_error_view.dart' show NiumaErrorView;
+export 'src/presentation/feedback/niuma_ended_view.dart' show NiumaEndedView;
 
 // 资源包路径常量 + 进度条牛马表情 thumb（5 状态）
 export 'src/niuma_sdk_assets.dart'
