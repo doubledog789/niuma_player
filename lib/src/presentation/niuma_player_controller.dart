@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart' show experimental;
 
 import '../data/default_backend_factory.dart';
 import '../data/default_platform_bridge.dart';
@@ -170,6 +171,7 @@ class NiumaPlayerOptions {
   /// Android / Web 忽略此 flag——Android 原生 PiP 本就立即生效不需要 hack。
   ///
   /// 默认 `false`（合规）。
+  @experimental
   final bool unsafePipAutoBackgroundOnEnter;
 }
 

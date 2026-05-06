@@ -66,7 +66,9 @@ export 'src/presentation/cast/niuma_cast_picker_panel.dart'
 // M9 广告 overlay
 export 'src/presentation/niuma_ad_overlay.dart' show NiumaAdOverlay;
 
-// M9 原子控件
+// M9 原子控件——为避免和业务方自家通用名 widget 冲突，
+// 推荐使用下方 `Niuma*` 前缀的 typedef alias。原裸名仍保留向后兼容，
+// 1.0 之前不删除——但新代码请用前缀名。
 export 'src/presentation/controls/play_pause_button.dart'
     show PlayPauseButton;
 export 'src/presentation/controls/scrub_bar.dart' show ScrubBar;
@@ -79,6 +81,7 @@ export 'src/presentation/controls/danmaku_button.dart' show DanmakuButton;
 export 'src/presentation/controls/fullscreen_button.dart'
     show FullscreenButton;
 export 'src/presentation/controls/pip_button.dart' show PipButton;
+
 
 // 编排
 export 'src/orchestration/multi_source.dart'
@@ -163,3 +166,19 @@ export 'src/presentation/cast/niuma_cast_overlay.dart' show NiumaCastOverlay;
 // `NiumaCastRegistry.register(...)` 加自家协议（如 Chromecast）。
 export 'src/cast/dlna/dlna_cast_service.dart' show DlnaCastService;
 export 'src/cast/airplay/airplay_cast_service.dart' show AirPlayCastService;
+
+// 原子控件 `Niuma*` 前缀 alias（推荐用名）——避免业务方裸名冲突。
+// 上方 `// M9 原子控件` 块的 10 个裸名（PlayPauseButton / ScrubBar / 等）
+// 仍保留向后兼容，1.0 之前不删除；新代码建议用 `Niuma*` 前缀。
+export 'src/control_aliases.dart'
+    show
+        NiumaPlayPauseButton,
+        NiumaScrubBar,
+        NiumaTimeDisplay,
+        NiumaVolumeButton,
+        NiumaSpeedSelector,
+        NiumaQualitySelector,
+        NiumaSubtitleButton,
+        NiumaDanmakuButton,
+        NiumaFullscreenButton,
+        NiumaPipButton;

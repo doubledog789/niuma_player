@@ -37,6 +37,9 @@ dependencies:
   shared_preferences: ^2.2.0
   video_player: ">=2.8.0 <3.0.0"
   plugin_platform_interface: ^2.0.2
+  # @experimental annotation 用——meta 通过 flutter SDK 已 transitive
+  # 可用，这里显式声明避开 depend_on_referenced_packages lint。
+  meta: ^1.10.0
   # Used by NiumaPlayerController to fetch WebVTT thumbnail tracks (M8).
   # Cross-platform: VM uses dart:io HttpClient, web auto-routes to
   # XMLHttpRequest. CORS for web is the caller's responsibility.

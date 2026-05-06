@@ -205,16 +205,24 @@ import UIKit
                 if unsafeAutoBackground {
                     // ⚠️ 私有 API：调 home 键 selector 让 app 进入后台，PiP
                     // 小窗立刻飘出。host app 无法过 App Store 审核。Apple
-                    // 后续 iOS 升级可能让此 selector 失效或抛异常——所以
-                    // 包 try?，失败时不影响 PiP 本身。
+                    // 后续 iOS 升级可能让此 selector 失效或抛 NSException——
+                    // 用 NiumaObjCExceptionCatcher 桥包 @try/@catch（Swift
+                    // do-catch 不抓 NSException），异常时仅记日志、不影响
+                    // PiP 本身。
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         Self.log("⚠️ 触发 unsafe auto-background（私有 API suspend selector）")
                         let app = UIApplication.shared
                         let suspendSel = NSSelectorFromString("suspend")
-                        if app.responds(to: suspendSel) {
-                            app.perform(suspendSel)
-                        } else {
+                        guard app.responds(to: suspendSel) else {
                             Self.log("UIApplication 不响应 suspend selector，自动后台失败")
+                            return
+                        }
+                        var nsError: NSError?
+                        let ok = NiumaObjCExceptionCatcher.tryBlock({
+                            app.perform(suspendSel)
+                        }, error: &nsError)
+                        if !ok {
+                            Self.log("perform(suspend) 抛 NSException——可能 iOS 版本封了私有 API: \(nsError?.userInfo ?? [:])")
                         }
                     }
                 }
