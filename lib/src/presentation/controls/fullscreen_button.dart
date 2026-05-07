@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
+import 'package:niuma_player/src/presentation/fullscreen/web_fullscreen_overlay.dart';
 
 /// 全屏切换按钮。
 ///
@@ -33,12 +34,49 @@ class FullscreenButton extends StatelessWidget {
   }
 
   void _onPressed(BuildContext context) {
-    // Web 路径：让 backend 的 <video> element 进浏览器原生 fullscreen
-    // ——iOS Safari 走 webkitEnterFullscreen 进 iOS 原生 video player UI；
-    // 桌面 / Android 走标准 requestFullscreen on video。**不**push route，
-    // 避免单 video element 多 widget 引用黑屏。
+    // Web 路径：Flutter Overlay 假全屏——OverlayEntry 推全屏 NiumaPlayer
+    // 复用同 controller，inline 那侧 NiumaPlayerView 检测 fullscreen 状态
+    // 返 SizedBox 让 <video> element 给 overlay 用——单 element 在 widget
+    // tree 中只 mount 一处，不抢。Flutter 控件保留并叠加在 video 上。
     if (kIsWeb) {
-      controller.enterNativeFullscreen();
+      if (isWebFlutterFullscreenActive()) {
+        exitWebFlutterFullscreen(controller: controller);
+      } else {
+        final cfg = NiumaPlayerConfigScope.maybeOf(context);
+        final inheritedTheme = cfg?.theme ?? NiumaPlayerTheme.of(context);
+        enterWebFlutterFullscreen(
+          context: context,
+          controller: controller,
+          fullscreenChildBuilder: (ctx) => SafeArea(
+            child: NiumaPlayer(
+              controller: controller,
+              theme: inheritedTheme,
+              adSchedule: cfg?.adSchedule,
+              adAnalyticsEmitter: cfg?.adAnalyticsEmitter,
+              pauseVideoDuringAd: cfg?.pauseVideoDuringAd ?? true,
+              controlsAutoHideAfter:
+                  cfg?.controlsAutoHideAfter ?? const Duration(seconds: 5),
+              danmakuController: cfg?.danmakuController,
+              disabledGestures: cfg?.disabledGestures ?? const {},
+              gestureHudBuilder: cfg?.gestureHudBuilder,
+              title: cfg?.title,
+              subtitle: cfg?.subtitle,
+              controlBarConfig: cfg?.controlBarConfig,
+              fullscreenControlBarConfig:
+                  cfg?.fullscreenControlBarConfig ??
+                      NiumaControlBarConfig.bili,
+              buttonOverrides: cfg?.buttonOverrides,
+              bottomActionsBuilder: cfg?.bottomActionsBuilder,
+              bottomTrailingBuilder: cfg?.bottomTrailingBuilder,
+              pausedOverlayBuilder: cfg?.pausedOverlayBuilder,
+              rightRailBuilder: cfg?.rightRailBuilder,
+              moreMenuBuilder: cfg?.moreMenuBuilder,
+              chapters: cfg?.chapters,
+              onDanmakuInputTap: cfg?.onDanmakuInputTap,
+            ),
+          ),
+        );
+      }
       return;
     }
     if (_inFullscreenPage(context)) {
@@ -92,7 +130,10 @@ class FullscreenButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
-    final inFullscreen = _inFullscreenPage(context);
+    // web 上"在全屏"语义 = 在 fullscreen overlay 内（marker 存在）
+    final inFullscreen = kIsWeb
+        ? WebFullscreenOverlayMarker.isInside(context)
+        : _inFullscreenPage(context);
     return IconButton(
       padding: EdgeInsets.zero,
       iconSize: theme.iconSize,

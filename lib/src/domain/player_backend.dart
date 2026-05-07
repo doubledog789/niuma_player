@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
+
 import 'package:niuma_player/src/domain/player_state.dart';
 
 /// 当前驱动 [NiumaPlayerController] 的 Dart 侧 backend 是哪个。
@@ -36,6 +38,11 @@ abstract class PlayerBackend {
   String? get htmlViewType {
     return null;
   }
+
+  /// Web-only：fullscreen 状态——SDK 通过它给 NiumaPlayerView 决定是
+  /// inline 还是 overlay 渲染。io 平台 / 非 web backend 返 null（默认）。
+  /// 只有 [WebVideoBackend] 重写。
+  ValueListenable<bool>? get webFullscreenState => null;
 
   /// Web-only：让底层 `<video>` element 进入浏览器原生全屏。
   ///

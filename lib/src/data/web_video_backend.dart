@@ -77,6 +77,16 @@ class WebVideoBackend extends PlayerBackend {
   bool _disposed = false;
   bool _initialized = false;
 
+  /// Web "Flutter Overlay 假全屏" 状态——业务用 [enterNativeFullscreen]
+  /// 进入时翻 true。NiumaPlayerView 监听本字段切换渲染：fullscreen 时
+  /// inline 位置返 SizedBox 把 video element 让给 overlay；overlay 那边
+  /// 通过 InheritedWidget marker 强制渲染 video，HtmlElementView 重新
+  /// attach 同一 wrapper element 到 overlay 容器——单 element 在 widget
+  /// tree 中只 mount 一处，不冲突。
+  final ValueNotifier<bool> _isWebFullscreen = ValueNotifier<bool>(false);
+  @override
+  ValueListenable<bool> get webFullscreenState => _isWebFullscreen;
+
   NiumaPlayerValue _value = NiumaPlayerValue.uninitialized();
   final StreamController<NiumaPlayerValue> _valueController =
       StreamController<NiumaPlayerValue>.broadcast();
@@ -266,42 +276,38 @@ class WebVideoBackend extends PlayerBackend {
   @override
   Future<bool> enterNativeFullscreen() async {
     if (_disposed) return false;
-    // iOS Safari 优先：webkitEnterFullscreen 是私有 API（进入原生 video
-    // player UI），dart:html 不直接暴露，js_util.callMethod 反射调。
-    // iOS Safari 上调 standard requestFullscreen 会静默失败。
+    if (_isWebFullscreen.value) return true;
+    _isWebFullscreen.value = true;
+    return true;
+  }
+
+  @override
+  Future<bool> exitNativeFullscreen() async {
+    if (_disposed) return false;
+    if (!_isWebFullscreen.value) return false;
+    _isWebFullscreen.value = false;
+    return true;
+  }
+
+  /// 业务可选：进浏览器原生 video player fullscreen——iOS Safari 走
+  /// webkitEnterFullscreen（系统 UI，**Flutter 控件不可见**），桌面 / Android
+  /// 走标准 requestFullscreen。**绝大多数业务推荐用 enterNativeFullscreen
+  /// 走 Flutter Overlay 假全屏路径保留控件**——本方法仅给"我就要原生 video
+  /// player UI"的业务用。
+  Future<bool> enterBrowserVideoFullscreen() async {
+    if (_disposed) return false;
     try {
       if (js_util.hasProperty(_video, 'webkitEnterFullscreen')) {
         js_util.callMethod(_video, 'webkitEnterFullscreen', []);
         return true;
       }
-    } catch (_) {/* fallback 到标准 */}
-    // 标准 Element.requestFullscreen——桌面 Chrome / Firefox / Edge / 桌面
-    // Safari / Android Chrome 都支持 on video element。
+    } catch (_) {/* fallback */}
     try {
       await _video.requestFullscreen();
       return true;
     } catch (_) {
       return false;
     }
-  }
-
-  @override
-  Future<bool> exitNativeFullscreen() async {
-    if (_disposed) return false;
-    // iOS Safari：webkitExitFullscreen on video
-    try {
-      if (js_util.hasProperty(_video, 'webkitExitFullscreen')) {
-        js_util.callMethod(_video, 'webkitExitFullscreen', []);
-        return true;
-      }
-    } catch (_) {/* fallback to document */}
-    try {
-      if (html.document.fullscreenElement != null) {
-        html.document.exitFullscreen();
-        return true;
-      }
-    } catch (_) {}
-    return false;
   }
 
   @override
@@ -320,5 +326,6 @@ class WebVideoBackend extends PlayerBackend {
     _video.load();
     await _valueController.close();
     await _eventController.close();
+    _isWebFullscreen.dispose();
   }
 }
