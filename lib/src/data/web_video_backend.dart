@@ -43,6 +43,13 @@ class WebVideoBackend extends PlayerBackend {
       ..style.objectFit = 'contain'
       ..style.width = '100%'
       ..style.height = '100%';
+    // iOS Safari 经典坑：<video> 默认第一次 play 时**自动**进入 fullscreen
+    // player（非 inline）——即使没调 fullscreen API。必须显式 playsinline
+    // 让 video 在 inline 容器内播放。
+    // - `playsinline` 属性是 HTML5 标准，所有现代浏览器支持
+    // - `webkit-playsinline` 兼容 iOS 9 及之前的旧 Safari
+    _video.setAttribute('playsinline', 'true');
+    _video.setAttribute('webkit-playsinline', 'true');
     // 包 wrapper div：HtmlElementView 的 wrapper 也会拦 pointer events，
     // 单设 video 元素 pointer-events: none 不够——整树都设让事件穿透到
     // Flutter 上层 GestureDetector。
