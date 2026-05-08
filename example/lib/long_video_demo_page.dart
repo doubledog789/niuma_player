@@ -44,8 +44,7 @@ class _LongVideoDemoPageState extends State<LongVideoDemoPage> {
             id: 'line2',
             label: '线路二',
             source: NiumaDataSource.network(
-              'https://zhlsaj.zrr4ij4.site/m3c/hc237/m3u8/upload/e81/e81e26417c3a80f722325b0ca82411f4/6417c3a8.m3u8?sign=00128ae0e514bdc6e57c649b9935bc16&time=1778140800&rand=468ffa96970938ae84c3abd63b82795b&uid=435455'
-              // 'https://artplayer.org/assets/sample/bbb-video.mp4',
+              'https://artplayer.org/assets/sample/bbb-video.mp4',
             ),
           ),
         ],

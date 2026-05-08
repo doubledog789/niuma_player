@@ -61,7 +61,19 @@ class NiumaControlBar extends StatelessWidget {
   }
 }
 
-/// M9 9 按钮 layout，原 NiumaControlBar 实现照搬，行为不变。
+/// inline 控件条 layout——按宽度三档响应式裁按钮：
+///
+/// | 宽度 | 行为 |
+/// |---|---|
+/// | < 280dp | 极窄（PiP 迷你窗 / cropped inline）：仅渲染 ScrubBar |
+/// | 280–460dp | 中等（手机 16:9 inline 典型 ~393）：4 按钮 row——play / time / spacer / fullscreen |
+/// | ≥ 460dp | 宽（iPad inline / desktop）：完整 9 按钮 row |
+///
+/// 之前所有 ≥ 420dp 都强渲完整 9 按钮，typical iPhone 16:9 inline 容器
+/// (393pt 宽屏幕扣 padding) 落到这区间会撞 RenderFlex overflow——
+/// 视频右下角出现黄黑斜纹警告条纹。新阈值让常见 inline 容器走中等档
+/// 显示核心控件，避免溢出；业务侧想要完整按钮列表传
+/// `NiumaControlBarConfig.bili` / `full` 通过 [_ConfigDrivenBar] 路径。
 class _LegacyM9Bar extends StatelessWidget {
   const _LegacyM9Bar({required this.controller});
 
@@ -72,11 +84,24 @@ class _LegacyM9Bar extends StatelessWidget {
     final theme = NiumaPlayerTheme.of(context);
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        // <420dp（PiP 迷你窗 / 极窄 inline）：只渲染 ScrubBar，9 按钮 +
-        //   Spacer 塞不下时整 Row 不构造，避免 RenderFlex assertion。
-        // ≥420dp：完整 9 按钮 Row（Cast / PiP 移到视频右上角 actions 区，
-        //   不再挤这条 ControlBar）。
-        final compact = constraints.maxWidth < 420;
+        final w = constraints.maxWidth;
+        // 极窄：只 ScrubBar，整个 Row 不构造避免 overflow。
+        if (w < 280) {
+          return Container(
+            padding: theme.controlBarPadding,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: theme.controlsBackgroundGradient,
+              ),
+            ),
+            child: ScrubBar(controller: controller),
+          );
+        }
+        // ≥ 460dp 才能容下完整 9 按钮（按经验估每按钮 ~40-50px + spacing
+        // + padding ≈ 480px 自然宽度）。
+        final wide = w >= 460;
         return Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -90,23 +115,23 @@ class _LegacyM9Bar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ScrubBar(controller: controller),
-              if (!compact) ...[
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    PlayPauseButton(controller: controller),
-                    const SizedBox(width: 8),
-                    TimeDisplay(controller: controller),
-                    const Spacer(),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  PlayPauseButton(controller: controller),
+                  const SizedBox(width: 8),
+                  TimeDisplay(controller: controller),
+                  const Spacer(),
+                  if (wide) ...[
                     const DanmakuButton(),
                     const SubtitleButton(),
                     SpeedSelector(controller: controller),
                     QualitySelector(controller: controller),
                     VolumeButton(controller: controller),
-                    FullscreenButton(controller: controller),
                   ],
-                ),
-              ],
+                  FullscreenButton(controller: controller),
+                ],
+              ),
             ],
           ),
         );
