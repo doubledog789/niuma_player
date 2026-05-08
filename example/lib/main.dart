@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import 'cast_pip_demo.dart';
 import 'custom_controls_demo.dart';
 import 'custom_feedback_ui_demo.dart';
+import 'danmaku_demo.dart';
+import 'gesture_lock_demo.dart';
 import 'long_video_demo_page.dart';
 import 'niuma_splash_screen.dart';
 import 'rollback_failover_demo.dart';
@@ -103,6 +106,24 @@ class _Home extends StatelessWidget {
         subtitle: 'config / buttonOverrides / bottomActions / moreMenu slot 演示',
         icon: Icons.tune,
         builder: (_) => const CustomControlsDemoPage(),
+      ),
+      _DemoEntry(
+        title: '弹幕集成',
+        subtitle: 'NiumaDanmakuController / onDanmakuInputTap / 设置面板',
+        icon: Icons.chat_bubble_outline,
+        builder: (_) => const DanmakuDemoPage(),
+      ),
+      _DemoEntry(
+        title: '投屏 + 画中画',
+        subtitle: 'Cast / PiP setup + events 监听 + 平台差异',
+        icon: Icons.cast,
+        builder: (_) => const CastPipDemoPage(),
+      ),
+      _DemoEntry(
+        title: '手势 + 锁屏',
+        subtitle: 'disabledGestures / gestureHudBuilder / LockButton',
+        icon: Icons.touch_app_outlined,
+        builder: (_) => const GestureLockDemoPage(),
       ),
     ];
 
