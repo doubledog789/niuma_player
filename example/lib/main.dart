@@ -16,6 +16,18 @@ const _niumaOrange = Color(0xFFEF9F27);
 const _niumaDark = Color(0xFF1A1410);
 const _niumaLight = Color(0xFFFAC775);
 
+/// 命令行启动直入指定 demo——用于截图自动化 / 跳过 splash + catalog
+/// 直接看某个 demo 的快捷入口。
+///
+/// ```bash
+/// flutter run --dart-define=DEMO=long_video
+/// ```
+///
+/// 可选值：`long_video` / `short_video` / `rollback` / `feedback` /
+/// `controls` / `danmaku` / `cast_pip` / `gesture`。空（不传）走普通
+/// catalog 流程（splash → _Home）。
+const _kScreenshotTarget = String.fromEnvironment('DEMO', defaultValue: '');
+
 void main() {
   // 投屏 DLNA + AirPlay 已由 SDK 内置自动 register（见
   // [NiumaCastRegistry.all]），无需 host app 手动调
@@ -53,8 +65,34 @@ class NiumaPlayerExampleApp extends StatelessWidget {
           textColor: Colors.white,
         ),
       ),
-      home: NiumaSplashScreen(next: (_) => const _Home()),
+      home: _kScreenshotTarget.isEmpty
+          ? NiumaSplashScreen(next: (_) => const _Home())
+          : _resolveScreenshotTarget(_kScreenshotTarget),
     );
+  }
+}
+
+/// 截图模式：根据 dart-define DEMO 直入对应 demo page。
+Widget _resolveScreenshotTarget(String name) {
+  switch (name) {
+    case 'long_video':
+      return const LongVideoDemoPage();
+    case 'short_video':
+      return const ShortVideoDemoPage();
+    case 'rollback':
+      return const RollbackFailoverDemoPage();
+    case 'feedback':
+      return const CustomFeedbackUiDemoPage();
+    case 'controls':
+      return const CustomControlsDemoPage();
+    case 'danmaku':
+      return const DanmakuDemoPage();
+    case 'cast_pip':
+      return const CastPipDemoPage();
+    case 'gesture':
+      return const GestureLockDemoPage();
+    default:
+      return const _Home();
   }
 }
 

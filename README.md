@@ -1,40 +1,71 @@
 # niuma_player
 
-[![CI](https://github.com/niuma/niuma_player/actions/workflows/ci.yml/badge.svg)](https://github.com/niuma/niuma_player/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/flutter-%E2%89%A53.10-blue)](https://flutter.dev)
 
-生产级 Flutter 视频播放器，提供跨 iOS / Android / Web 三端统一的 `controller.value` API，并在 Android 上内置 ExoPlayer → IJK 自动回退路径，让那些无法硬解的旧机型 / 华为机型也能正常播放。
+生产级 Flutter 视频播放器 SDK——**iOS / Android / Web 三端**统一 API，开箱即用 UI（长视频 bili 风 + 短视频抖音风），多线路自动 failover / 失败回滚，弹幕、画中画、投屏全套内置。
 
-## 为什么造这个轮子
+---
 
-`package:video_player` 是显而易见的起点，但在 Android 上有两个广为人知的问题会卡到企业级应用：
+## 目录
 
-1. **旧机型 / 华为机型硬解码器缺位** —— 黑屏，无报错，无法播放。
-2. **受限网络下的 HLS** —— ExoPlayer 的 HLS 实现在某些 CDN 上会卡住，唯一切实可行的兜底方案是基于 FFmpeg 的播放器，比如 IJK。
+- [特性](#特性)
+- [平台兼容](#平台兼容)
+- [安装](#安装)
+- [5 行快速上手](#5-行快速上手)
+- [8 个 Demo 速览](#8-个-demo-速览)
+- [核心 API 速查](#核心-api-速查)
+- [平台原生接入](#平台原生接入)
+- [Web 平台已知限制](#web-平台已知限制)
+- [常见问题](#常见问题)
+- [发版与版本控制](#发版与版本控制)
 
-`niuma_player` 透明地解决了这两个问题。Android 上原生插件优先尝试 ExoPlayer；如果在第一帧之前失败，就切换到 IJK，并把设备指纹**记录**到持久化存储（`SharedPreferences`），后续每次启动都直接走 IJK —— 再也没有"昨天还能用今天就坏了"的玄学。
-
-iOS 通过 `package:video_player` 走 AVFoundation。Web 通过 `package:video_player` 走浏览器的 `<video>` 元素。**三端共用同一套 Dart API。**
+---
 
 ## 特性
 
-- **一个 controller，三端通吃** —— `NiumaPlayerController` 在所有平台暴露相同的 `value`、事件和命令接口。
-- **互斥的状态机** —— `playing`、`paused`、`buffering`、`ended`、`error` 互斥，不再需要靠 `isBuffering && !isPlaying && !isCompleted` 拼凑判断导致 UI 闪烁。
-- **结构化错误** —— `PlayerErrorCategory`（`transient` / `codecUnsupported` / `network` / `terminal` / `unknown`），不需要正则匹配错误字符串。
-- **Android 上 Try-Fail-Remember** —— 自动 ExoPlayer → IJK 回退，按设备持久化记忆，公开 `clearDeviceMemory()` 供"重置缓存"类 UI 调用。
-- **循环不闪烁** —— 原生侧在播完时直接重启，不暴露 `phase=ended`，开了 `setLooping(true)` 的视频视觉上完全连续。
-- **开箱即用的 widget** —— `NiumaPlayerView(controller)` 会根据当前后端自动选择正确的渲染原语（`VideoPlayer` / `Texture`）。
-- **完全可测试** —— 依赖注入的 `BackendFactory` + `PlatformBridge` 让状态机可以在纯 Dart 单元测试里跑，不需要 platform channel。
+### 播放引擎
+- **三端统一 controller**：`NiumaPlayerController.value` 在 iOS / Android / Web 暴露相同的 phase / size / position / errors API
+- **互斥状态机**：`opening` → `ready` → `playing` ⇄ `paused` ⇄ `buffering` → `ended` / `error`，UI 不再靠 `isBuffering && !isPlaying` 拼布尔判断
+- **结构化错误**：`PlayerErrorCategory.network / codecUnsupported / terminal` 等，不靠正则匹配错误字符串
+- **Android 自动 fallback**：ExoPlayer → IJK，失败设备指纹持久化到 `SharedPreferences`，下次直接走 IJK——华为 / 旧设备 codec 缺位场景透明兜底
 
-## 平台支持
+### 多线路 + 失败策略（v0.9.1+）
+- **`autoFailoverOnInitialError`**（默认开）：默认线路 init 失败 → 按 `MediaLine.priority` 升序遍历下一条，全失败再 emit error
+- **`rollbackOnSwitchFailure`**（默认开）：用户主动切换线路失败 → 静默回滚到原线路保留 position / wasPlaying
+- **`switchLine(lineId)`**：业务侧主动切换 API，emit `LineSwitching` / `LineSwitched` / `LineSwitchFailed` 事件
 
-| 平台 | 后端 | HLS 支持 |
-|---|---|---|
-| iOS | AVPlayer（通过 `video_player`） | 原生（AVFoundation） |
-| Android | ExoPlayer ↔ IJK（自家原生插件） | 原生（HLS 走 media3-exoplayer-hls；IJK 走 FFmpeg） |
-| Web (Safari) | `<video>`（通过 `video_player`） | 原生 |
-| Web (Chrome / Firefox / Edge) | `<video>`（通过 `video_player`） | **不内置** —— 如有需要请额外引入 `video_player_web_hls` |
+### UI 套装
+- **`NiumaPlayer`**：长视频外壳，bili 风 mockup 全屏 + inline 模式，支持自定义 ControlBarConfig / ButtonOverrides / 三态反馈 builder slot
+- **`NiumaShortVideoPlayer`**：短视频抖音风外壳，PageView 翻页 / 单击 toggle / 长按 2x / 抖音式底部细进度条 / 沉浸式弹幕
+- **`NiumaFullscreenPage`**：route push 全屏页，按视频比例**自动锁方向**（竖直视频 → 竖屏；横屏 → 横屏）；web 上不可锁但浮"旋转屏幕"提示
+- **抖音风 seek HUD**：拖动快进 / 快退浮在屏幕中央，brand 橙方向箭头 + 30pt 大字 target 时间 + dim 总时长 + 细进度条
+- **底栏智能 layout**：按 config 估算总自然宽度——单行 Row + Spacer / 双行 Column 自动切换
+
+### 内置功能
+- **弹幕系统**：`NiumaDanmakuController` + `NiumaDanmakuOverlay` + `DanmakuSettingsPanel`（字号 / 透明度 / 显示区域 %）
+- **画中画**：iOS / Android 程序触发，零原生代码（iOS 反射 AVPlayer，Android 业务侧 1 行接入）
+- **投屏**：DLNA + AirPlay，自动 register（业务零配置），可叠 Chromecast 等自家协议
+- **缩略图**：M8 WebVTT 缩略图轨道——拖动 ScrubBar 时浮预览图
+- **手势层**：5 种手势（horizontalSeek / brightness / volume / longPressSpeed / doubleTap），可白名单 / 自定义 HUD / 锁屏
+
+### 反馈 UI 自定义（v0.8+）
+- **`loadingBuilder` / `errorBuilder` / `endedBuilder`**：phase=opening|buffering / error / ended 时渲染业务自家 UI
+- **`onErrorRetry` / `onEndedReplay`**：默认 UI 的回调（业务自定义 UI 可忽略）
+- **`NiumaProgressThumb.iconBuilder`**：拖动进度条时的 thumb 头像
+
+---
+
+## 平台兼容
+
+| 平台 | 后端 | HLS | PiP | 投屏 | 全屏锁方向 |
+|---|---|:-:|:-:|:-:|:-:|
+| **iOS** | AVPlayer (`video_player`) | ✅ 原生 | ✅ 反射 AVPlayer | ✅ AirPlay | ✅ |
+| **Android** | ExoPlayer ↔ IJK (自家 plugin) | ✅ 原生 | ✅ 业务 1 行接入 | ✅ DLNA | ✅ |
+| **Safari (PWA)** | 自家 `<video>` element | ✅ 原生 | ⚠️ 隐藏（user gesture 限制） | ⚠️ 隐藏 | ⚠️ no-op + 旋转提示 |
+| **Chrome / Firefox / Edge** | 自家 `<video>` element | ⚠️ 需引入 hls.js（不内置） | ⚠️ 隐藏 | ⚠️ 隐藏 | ⚠️ no-op + 旋转提示 |
+
+---
 
 ## 安装
 
@@ -42,595 +73,316 @@ iOS 通过 `package:video_player` 走 AVFoundation。Web 通过 `package:video_p
 dependencies:
   niuma_player:
     git:
-      url: https://github.com/niuma/niuma_player.git
+      url: https://github.com/axin789/niuma_player.git
       ref: main
 ```
 
-> 发布到 pub.dev 后，替换为 `niuma_player: ^0.1.0`。
+---
 
 ## 5 行快速上手
 
 ```dart
-final controller = NiumaPlayerController.dataSource(
-  NiumaDataSource.network('https://example.com/big_buck_bunny.mp4'),
-);
-await controller.initialize();
-controller.play();
-// 在你的 widget 树里：
-NiumaPlayerView(controller);
-```
+import 'package:niuma_player/niuma_player.dart';
 
-happy path 的全部 API 就这些。Try-Fail-Remember 机制、错误分类、后端选择事件都是可选的额外能力，你不需要主动碰它们。
-
-## M7 特性（多线路、中间件、重试）
-
-通过 `NiumaMediaSource.lines(...)` 把多个 CDN 镜像或不同清晰度的源装进一个 controller，再用 `switchLine` 在它们之间切换：
-
-```dart
-final controller = NiumaPlayerController(
-  NiumaMediaSource.lines(
-    lines: [
-      MediaLine(id: 'cdn-a', label: 'CDN A',
-        source: NiumaDataSource.network('https://a/video.m3u8')),
-      MediaLine(id: 'cdn-b', label: 'CDN B',
-        source: NiumaDataSource.network('https://b/video.m3u8'),
-        priority: 1),
-    ],
-    defaultLineId: 'cdn-a',
-  ),
-  middlewares: const [
-    HeaderInjectionMiddleware({'Authorization': 'Bearer ...'}),
-  ],
-  retryPolicy: const RetryPolicy.smart(),
-);
-await controller.initialize();
-// 切换 CDN，位置和播放状态保留：
-await controller.switchLine('cdn-b');
-```
-
-`SourceMiddleware` 在每次 backend 启动前都会跑——首次 initialize、`switchLine`、每次 retry——签名 URL 永远是新的。完整 demo 见 [`example/lib/multi_line_page.dart`](example/lib/multi_line_page.dart)。
-
-## M8 特性（缩略图 VTT）
-
-支持 WebVTT thumbnail track，让你给进度条悬浮预览图层取数。
-
-```dart
-final controller = NiumaPlayerController(
-  NiumaMediaSource.single(
-    NiumaDataSource.network('https://cdn.com/video.mp4'),
-    thumbnailVtt: 'https://cdn.com/thumbnails.vtt',
-  ),
-);
-await controller.initialize();
-
-// 在进度条 hover 时调用
-final frame = controller.thumbnailFor(const Duration(seconds: 30));
-if (frame != null) {
-  // frame.image 是 ImageProvider，frame.region 是 sprite 内裁剪 rect
-  // 用 RawImage / Image + custom paint 渲染即可
-}
-```
-
-支持的 VTT 格式（thumbnail 变种）：
-
-```
-WEBVTT
-
-00:00.000 --> 00:05.000
-sprite.jpg#xywh=0,0,128,72
-```
-
-特性：
-- 自动 fetch + 解析；失败静默降级（视频不受影响）
-- Sprite 图按 URL 去重 + LRU（默认 32 张上限，覆盖长视频典型 sprite 数）
-- VTT URL 同样走 `SourceMiddleware`（HeaderInjection / SignedUrl）
-- `controller.dispose()` 时清空 controller-local 引用并 `evict` 全局
-  `PaintingBinding.imageCache` 中已解码的位图，避免 sprite 像素长期占住 RAM
-- `NiumaThumbnailView(frame: ...)` 助手 widget：一行渲染缩略图（封装
-  `ImageStream` 同步触发防御 + sprite crop）
-- 不提供完整 hover 组件 —— `NiumaThumbnailView` 是渲染原子，进度条联动 hover
-  / overlay 留给 M9
-
-## M9 特性（UI overlay）
-
-完整的 UI overlay 层——`NiumaPlayer` 一体化组件 + 主题 + 9 个原子控件 + 全屏 page + 广告 overlay + 进度条缩略图预览。
-
-5 行起步（90% 用户用这个）：
-
-```dart
 final controller = NiumaPlayerController.dataSource(
   NiumaDataSource.network('https://example.com/video.mp4'),
-  thumbnailVtt: 'https://example.com/thumbnails.vtt',
 );
 await controller.initialize();
 controller.play();
-// 在 widget 树里——一个组件就够了：
+
+// 在 widget 树里：
 NiumaPlayer(controller: controller);
 ```
 
-默认即拿到：
+完整接入指南：[`docs/getting-started.md`](docs/getting-started.md)
+完整 API 参考：[`docs/api-reference.md`](docs/api-reference.md)
 
-- B 站风格底部控件条（9 个控件 + 进度条）
-- 进入播放后 5 秒自动隐藏控件，点击视频区切换显隐，暂停时强制显示
-- 进度条拖动时上方悬浮 sprite 缩略图预览（M8 + M9 联动）
-- 右下 fullscreen 按钮：通过内部 `InheritedWidget` marker 检测当前是
-  否在全屏页内——在全屏页内时点击 pop 回原页面，不在时 push
-  `NiumaFullscreenPage`（200ms 淡入 + landscape 锁定 + immersiveSticky）。
-  **全屏路由透传**外层全部配置（`adSchedule` / `adAnalyticsEmitter` /
-  `pauseVideoDuringAd` / `controlsAutoHideAfter` / `theme`，包括用
-  `NiumaPlayerThemeData` 注入的 inherited 主题），全屏页内的
-  `NiumaPlayer` 行为与原页一致。
-- 可选广告 overlay：传 `adSchedule` 自动激活；广告事件包含 `AdImpression`
-  / `AdClick` / `AdDismissed`，后者的 `reason` 涵盖 `userSkip` /
-  `timeout` / `error`（cue.builder 异常时使用 `error` 而非冒充 timeout）
+---
 
-主题自定义（13 字段，全部可选）：
+## 8 个 Demo 速览
+
+`example/` 是一个完整的 catalog app，从主页 `_Home` 选择各 demo 入口。运行：
+```bash
+cd example && flutter run
+```
+
+> 想直接进某个 demo（不用从主页点）：`flutter run --dart-define=DEMO=long_video`，可选 `long_video` / `short_video` / `rollback` / `feedback` / `controls` / `danmaku` / `cast_pip` / `gesture`。
+
+### Catalog 主页
+
+<img src="docs/screenshots/01_catalog.png" width="280" alt="catalog">
+
+8 个 demo 入口列表——brand 橙圆角 icon container + 中文标题 + 简要说明。
+
+### 1 · 长视频
+
+<img src="docs/screenshots/02_long_video.png" width="280" alt="long video demo">
+
+bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩略图（拖进度条预览）。
+
+源码：[`example/lib/long_video_demo_page.dart`](example/lib/long_video_demo_page.dart)
+
+### 2 · 短视频
+
+<img src="docs/screenshots/03_short_video.png" width="280" alt="short video demo">
+
+抖音风 PageView 翻页 / 单击 toggle play/pause / 长按 2x 倍速 / 抖音式底部细进度条 / 沉浸式弹幕 / 业务侧 overlayBuilder（点赞 / 评论 / 分享）。
+
+源码：[`example/lib/short_video_demo_page.dart`](example/lib/short_video_demo_page.dart)
+
+### 3 · 失败回滚 + 自动 failover
+
+<img src="docs/screenshots/04_rollback.png" width="280" alt="rollback failover demo">
+
+故意配 3 条线路：line1 / line2 是坏 URL，line3 是好的。截图捕获了 init 时 SDK 自动 fail 过两条最后落到好线路的事件日志。**业务方只需 0 行代码就拿到这个能力**——`NiumaPlayerOptions.autoFailoverOnInitialError` 默认 `true`。
+
+源码：[`example/lib/rollback_failover_demo.dart`](example/lib/rollback_failover_demo.dart)
+
+### 4 · 自定义反馈 UI
+
+<img src="docs/screenshots/05_feedback.png" width="280" alt="custom feedback ui demo">
+
+`loadingBuilder` / `errorBuilder` / `endedBuilder` 三态 slot——业务自家 widget 替换 SDK 默认渲染。点"切到坏的源"按钮触发 errorBuilder。
+
+源码：[`example/lib/custom_feedback_ui_demo.dart`](example/lib/custom_feedback_ui_demo.dart)
+
+### 5 · 自定义控件层
+
+<img src="docs/screenshots/06_controls.png" width="280" alt="custom controls demo">
+
+声明式 `NiumaControlBarConfig` 选 button / 排顺序；`buttonOverrides` 把单个 button 换成自家 widget；`bottomActionsBuilder` / `bottomTrailingBuilder` / `moreMenuBuilder` 业务侧追加。
+
+源码：[`example/lib/custom_controls_demo.dart`](example/lib/custom_controls_demo.dart)
+
+### 6 · 弹幕集成
+
+<img src="docs/screenshots/07_danmaku.png" width="280" alt="danmaku demo">
+
+`NiumaDanmakuController` 创建 + `addAll(items)` + `add(single)`；`NiumaPlayer.danmakuController` 透传；`onDanmakuInputTap` 接业务自家弹幕输入 dialog；`DanmakuSettingsPanel` bottomSheet 弹出。
+
+源码：[`example/lib/danmaku_demo.dart`](example/lib/danmaku_demo.dart)
+
+### 7 · 投屏 + 画中画
+
+<img src="docs/screenshots/08_cast_pip.png" width="280" alt="cast pip demo">
+
+iOS / Android / Web 三端 setup 差异说明；`controller.enterPictureInPicture()` 程序触发；监听 `events` stream → `CastStarted` / `CastEnded` / `PipModeChanged` 实时打日志；状态 chip 显示 PiP 是否支持 + 当前是否在 PiP。
+
+源码：[`example/lib/cast_pip_demo.dart`](example/lib/cast_pip_demo.dart)
+
+### 8 · 手势 + 锁屏
+
+<img src="docs/screenshots/09_gesture.png" width="280" alt="gesture lock demo">
+
+5 种 `GestureKind` filter chip 实时切换 `disabledGestures`；`gestureHudBuilder` 切换默认 vs 自定义 brand 色胶囊 HUD；说明 SDK 内置 `LockButton`（全屏页左中浮，点击 freeze 整个控件层 + 手势层）零配置自带。
+
+源码：[`example/lib/gesture_lock_demo.dart`](example/lib/gesture_lock_demo.dart)
+
+---
+
+每个 demo 内部带 `_DocBlock` 区域用 brand 橙 monospace 标题展示对应 API 名 + 简要说明，业务方对照接入。
+
+---
+
+## 核心 API 速查
+
+### NiumaPlayerOptions（行为 policy）
 
 ```dart
-NiumaPlayerThemeData(
-  data: const NiumaPlayerTheme(
-    accentColor: Colors.deepPurpleAccent,
-    scrubBarThumbRadiusActive: 12,
-  ),
-  child: NiumaPlayer(controller: controller),
+const NiumaPlayerOptions(
+  initTimeout: Duration(seconds: 30),         // 单次 initialize wall-clock 上限
+  forceIjkOnAndroid: false,                   // Android 跳过 ExoPlayer 直接走 IJK
+  rollbackOnSwitchFailure: true,              // 用户切线路失败 → 静默回滚（推荐 true）
+  autoFailoverOnInitialError: true,           // 默认线路 init 失败 → 自动尝试下一条（推荐 true）
+  unsafePipAutoBackgroundOnEnter: false,      // ⚠️ App Store 不兼容：iOS PiP 后自动切后台
+  thumbnailFetchTimeout: Duration(seconds: 30),
+  thumbnailMaxBodyBytes: 5 * 1024 * 1024,
+)
+```
+
+### NiumaMediaSource（数据源）
+
+```dart
+// 单线路：
+NiumaMediaSource.single(NiumaDataSource.network('...'));
+
+// 多线路：
+NiumaMediaSource.lines(
+  lines: [
+    MediaLine(id: 'cdn1', label: '线路 1', priority: 0, source: ...),
+    MediaLine(id: 'cdn2', label: '线路 2', priority: 1, source: ...),
+  ],
+  defaultLineId: 'cdn1',
+  thumbnailVtt: 'https://.../thumbnails.vtt',  // 可选 M8 缩略图
 );
 ```
 
-需要更深度自定义时（控件位置 / 多视频面板 / 自定义动画），9 个原子控件全部公开 export，可自由拼装：
-
-```dart
-Column(children: [
-  Row(children: [
-    NiumaPlayPauseButton(controller: controller),
-    NiumaTimeDisplay(controller: controller),
-  ]),
-  NiumaPlayerView(controller),
-  NiumaScrubBar(controller: controller),
-  Row(children: [
-    NiumaSpeedSelector(controller: controller),
-    NiumaQualitySelector(controller: controller),
-    NiumaVolumeButton(controller: controller),
-    NiumaFullscreenButton(controller: controller),
-  ]),
-]);
-```
-
-> **新代码请用 `Niuma*` 前缀**——`NiumaPlayPauseButton` / `NiumaScrubBar` / 等。原裸名（`PlayPauseButton` / `ScrubBar` / 等）作为 typedef alias 仍 export 向后兼容，但容易和业务方自家通用名 widget 冲突。
-
-### 反馈 UI 自定义（loading / error / ended）
-
-`NiumaPlayer` 在 `phase=opening/buffering`（loading）、`phase=error`、`phase=ended` 三态都有**默认渲染**——分别走 `NiumaLoadingIndicator` / `NiumaErrorView` / `NiumaEndedView`。业务想换观感传对应 builder 即可：
+### NiumaPlayer（长视频 widget）
 
 ```dart
 NiumaPlayer(
   controller: controller,
-  // 默认 NiumaErrorView/EndedView 的按钮 callback——不传 SDK 也提供
-  // 默认行为（重试 = controller.initialize()，重播 = seek 0 + play），
-  // 业务想改实现传以下两个：
-  onErrorRetry: () => myCustomRetry(),
-  onEndedReplay: () => myCustomReplay(),
-  // 想要完全自定义 widget？传 builder：
-  loadingBuilder: (ctx) => const CircularProgressIndicator(),
-  errorBuilder: (ctx, err) => MyBrandErrorWidget(error: err),
-  endedBuilder: (ctx) => MyEndedScreen(controller: controller),
+  // 主题
+  theme: NiumaPlayerTheme.defaults(),
+  // 全屏控件配置
+  fullscreenControlBarConfig: NiumaControlBarConfig.bili,  // minimal / bili / full
+  // 按钮级 override
+  buttonOverrides: { NiumaControlButton.speed: ButtonOverride.builder((ctx) => ...) },
+  // 业务侧底栏 slot
+  bottomActionsBuilder: (ctx) => TextButton(...),  // 右组首位
+  bottomTrailingBuilder: (ctx) => TextButton(...), // 右组次位
+  rightRailBuilder: (ctx) => Column(...),          // 右侧互动栏
+  moreMenuBuilder: (ctx) => [PopupMenuItem(...)],  // ⋮ 菜单业务条目
+  // 反馈 UI
+  loadingBuilder: (ctx) => MyLoadingWidget(),
+  errorBuilder: (ctx, err) => MyErrorWidget(err),
+  endedBuilder: (ctx) => MyEndedWidget(),
+  onErrorRetry: () => controller.initialize(),
+  onEndedReplay: () => controller.seekTo(Duration.zero).then((_) => controller.play()),
+  // 弹幕
+  danmakuController: danmaku,
+  onDanmakuInputTap: () => showMyDanmakuInputDialog(),
+  // 手势
+  disabledGestures: { GestureKind.brightness },
+  gestureHudBuilder: (ctx, state) => MyCustomHud(state),
+  // M16 元数据
+  title: '剧名',
+  subtitle: '第 12 集',
+  chapters: [Duration(seconds: 30), Duration(minutes: 2)],
 )
 ```
 
-`NiumaProgressThumb`（默认进度条 thumb 上的 niuma 5 状态表情）也提供 `iconBuilder` slot 替换默认：
+### NiumaShortVideoPlayer（短视频 widget）
 
 ```dart
-NiumaProgressThumb(
-  progress: 0.5,
-  isPlaying: true,
-  iconBuilder: (ctx, state) => Icon(
-    state == NiumaProgressThumbState.paused
-        ? Icons.pause_circle_filled
-        : Icons.play_circle_filled,
-  ),
+NiumaShortVideoPlayer(
+  controller: controller,
+  isActive: pageIndex == currentIndex,         // PageView 协调
+  loop: true,
+  fit: BoxFit.cover,                            // 默认 cover 抖音风
+  overlayBuilder: (ctx, value) => MyOverlay(),  // 爱心 / 评论 / 分享
+  leftCenterBuilder: (ctx, ctl) =>             // 典型：全屏按钮
+      NiumaShortVideoFullscreenButton(controller: ctl),
 )
 ```
 
-完整 demo 见 [`example/lib/m9_default_demo_page.dart`](example/lib/m9_default_demo_page.dart) 和 [`example/lib/m9_custom_demo_page.dart`](example/lib/m9_custom_demo_page.dart)。
-
-## M11 特性（弹幕 / barrage）
-
-纯 Dart 渲染的弹幕层，三模式（scroll / topFixed / bottomFixed）+ 60s 桶 lazy load + 可选设置面板。零原生改动，三端一致。
-
-接入只需 3 步：构造 `NiumaDanmakuController`，把它和 `NiumaPlayerController` 一起塞进 `NiumaPlayer`：
+### NiumaPlayerEvent（事件流）
 
 ```dart
-final danmaku = NiumaDanmakuController(
-  loader: (start, end) async {
-    // 60s 桶 lazy load，业务自己实现（你的 /api/danmaku/list 等）
-    final raw = await api.fetchDanmaku(videoId, start, end);
-    return raw.map((e) => DanmakuItem(
-      position: Duration(seconds: e.pos),
-      text: e.content,
-      fontSize: e.size.toDouble(),
-      color: Color(0xFF000000 | e.color),
-      mode: DanmakuMode.scroll,
-      pool: e.pool,        // 透传字段
-      metadata: e.id,      // 业务任意字段
-    )).toList();
-  },
-);
-
-NiumaPlayer(
-  controller: videoCtrl,
-  danmakuController: danmaku,   // 传入即自动叠加 NiumaDanmakuOverlay
-);
-
-// 用户自己 send 后回包 echo 一条本地（SDK 不碰网络）
-final pos = videoCtrl.value.position;
-await api.sendDanmaku(pos, '我发的');
-danmaku.add(DanmakuItem(position: pos, text: '我发的'));
-```
-
-**三种集成形态：**
-
-1. **`NiumaPlayer` 自动接管**（默认）——传 `danmakuController` 即激活
-2. **`NiumaDanmakuOverlay` 积木件**——自定义布局自己 Stack
-3. **`NiumaDanmakuScope` + `DanmakuButton`**——独立布局也能让按钮可点
-
-**设置面板**（可选）独立暴露：
-
-```dart
-showModalBottomSheet(
-  context: context,
-  builder: (_) => DanmakuSettingsPanel(danmaku: danmaku),
-);
-// 4 项：visible / fontScale / opacity / displayAreaPercent
-```
-
-**渲染策略：**
-
-- CustomPainter 单 paint pass + TextPainter LRU cache（256 上限）
-- 三模式 first-fit 轨道分配，满轨直接丢弃自然降密度（防 seek 后 backlog）
-- 暂停 = 弹幕画面冻结（零代码，video.position 停推 painter 不 repaint）
-- seek > 1s = 自动清空飞行 + 触发对应桶 lazy load
-- 60fps@200 同屏弹幕（中端 Android 目标）
-
-**SDK 不做的事：** 网络 / 输入框 / 屏蔽词 / 持久化设置——全留给业务层。
-
-完整 demo 见 [`example/lib/m11_danmaku_demo_page.dart`](example/lib/m11_danmaku_demo_page.dart)。
-
-## M12 特性（PiP 画中画 / Picture-in-Picture）
-
-iOS 15+ / Android 8.0+ 真机原生 PiP。按钮触发 + 可选自动后台触发，状态完全集成进 `NiumaPlayerController`。
-
-5 行接入（默认行为已经够好）：
-
-```dart
-NiumaPlayer(controller: videoCtrl);  // 右上角自动有 PipButton
-```
-
-业务编程式触发：
-
-```dart
-// 设备支持判断
-if (videoCtrl.value.isPictureInPictureSupported) {
-  await videoCtrl.enterPictureInPicture();
-}
-
-// 退出
-await videoCtrl.exitPictureInPicture();
-
-// 当前状态读
-videoCtrl.value.isInPictureInPicture;
-```
-
-业务想要后台自动 PiP（默认关）：
-
-```dart
-// 用户设置开关里调一行
-videoCtrl.autoEnterPictureInPictureOnBackground = true;
-// app 切后台时自动进 PiP（仅当 phase=playing）
-```
-
-### ⚠️ iOS-only：点击 PiP 按钮即自动退到桌面（私有 API，不上 App Store）
-
-iOS 16+ 上 `startPictureInPicture()` 在 app 前台时**不立即激活**——必须 user 主动手势切到后台才"飘出"小窗。这是 Apple UX 政策，不是 bug。
-
-如果业务**接受 App Store 不兼容**（仅 Ad Hoc / Enterprise / 越狱 / 内部分发），可以打开 `unsafePipAutoBackgroundOnEnter` 让 SDK 调私有 API `UIApplication.suspend` 模拟 home 键：
-
-```dart
-final controller = NiumaPlayerController.dataSource(
-  NiumaDataSource.network('https://...'),
-  options: const NiumaPlayerOptions(
-    // ⚠️ 启用后 host app 无法过 App Store 审核
-    unsafePipAutoBackgroundOnEnter: true,
-  ),
-);
-```
-
-字段标注 `@experimental`——SDK 内置 ObjC try/catch 桥（`NiumaObjCExceptionCatcher`）抓未来 iOS 版本可能的 NSException。Android / Web 忽略此 flag。
-
-监听 PiP 事件：
-
-```dart
-videoCtrl.events.listen((e) {
-  if (e is PipModeChanged) {
-    debugPrint(e.isInPip ? '进入 PiP' : '退出 PiP');
-  }
-  if (e is PipRemoteAction) {
-    // Android PiP 窗内 play/pause 按钮触发——SDK 已自动调 play/pause，
-    // 业务一般不需要拦截，除非要做埋点 / 自定义行为
-    debugPrint('PiP 远程操作: ${e.action}');
-  }
+controller.events.listen((e) {
+  if (e is BackendSelected) { /* iOS / Android / Web */ }
+  if (e is FallbackTriggered) { /* Android ExoPlayer → IJK */ }
+  if (e is LineSwitching) { /* 切换开始 */ }
+  if (e is LineSwitched) { /* 切换成功 */ }
+  if (e is LineSwitchFailed) { /* 切换失败（已 rollback 还会 emit 用于业务上报） */ }
+  if (e is PipModeChanged) { /* 进入 / 退出 PiP */ }
+  if (e is PipRemoteAction) { /* PiP 小窗按钮事件 */ }
+  if (e is CastStarted) { /* 投屏开始 */ }
+  if (e is CastEnded) { /* 投屏结束 */ }
 });
 ```
 
-**用户必须配置两处**（SDK 不能自动改 host app）：
+---
 
-**Android** — `android/app/src/main/AndroidManifest.xml`，Launcher Activity：
+## 平台原生接入
 
+### iOS
+
+`Info.plist` 加：
+```xml
+<key>NSAppTransportSecurity</key>
+<dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+```
+
+PiP 想 work：
+```xml
+<key>UIBackgroundModes</key>
+<array><string>audio</string></array>
+```
+
+### Android
+
+`AndroidManifest.xml` 的 `<activity>`：
 ```xml
 <activity
-    android:name=".MainActivity"
     android:supportsPictureInPicture="true"
-    android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
-    ...>
+    android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
 ```
 
 `MainActivity.kt`：
-
 ```kotlin
-import android.content.res.Configuration
-import cn.niuma.niuma_player.NiumaPlayerPlugin
-import io.flutter.embedding.android.FlutterActivity
-
 class MainActivity : FlutterActivity() {
     override fun onPictureInPictureModeChanged(
         isInPictureInPictureMode: Boolean,
         newConfig: Configuration?,
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        NiumaPlayerPlugin.reportPipModeChanged(isInPictureInPictureMode)
+        cn.niuma.niuma_player.NiumaPlayerPlugin
+            .reportPipModeChanged(isInPictureInPictureMode)
     }
 }
 ```
 
-**iOS** — `ios/Runner/Info.plist`：
+`<uses-permission android:name="android.permission.INTERNET"/>` + ATS 不限制（Android 一般默认允许）。
 
-```xml
-<key>UIBackgroundModes</key>
-<array>
-  <string>audio</string>
-</array>
+### Web (PWA)
+
+PWA 想要全屏自动隐 host 页面背景，在 `web/index.html` 里：
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
 ```
 
-**特性：**
+如果 Chrome / Firefox 需要 HLS：在 `pubspec.yaml` 加 `video_player_web_hls`（SDK 不内置，可选）。
 
-- iOS 用 AVPictureInPictureController + AVPlayerLayer（反射桥接 video_player 的 AVPlayer）
-- Android 用 Activity.enterPictureInPictureMode + RemoteAction
-- 跟 `controlsAutoHideAfter` 联动——5 秒不操作 PipButton 跟控件条一起淡出
-- 全屏页内 PipButton 自然继承（同 controller 共享 value）
-- 不支持设备：PipButton 灰禁，方法返 false 不抛
+---
 
-完整 demo 见 [`example/lib/m12_pip_demo_page.dart`](example/lib/m12_pip_demo_page.dart)。
+## Web 平台已知限制
 
-## M13 特性（手势交互）
+按设计取舍记录（v0.9.1）：
 
-视频区 5 项核心手势——B 站 / YouTube 标配。零新增 pubspec 依赖（自家原生）。
+- **PiP / Cast / DLNA / AirPlay**：浏览器无可靠程序化 API，控件层在 web 上**自动隐藏**这些按钮避免误导。⋮ 菜单同样跳过。
+- **`SystemChrome.setPreferredOrientations`**：web 平台 no-op（无法程序化锁方向）。SDK 在竖屏 viewport 全屏时浮 5s "旋转屏幕"提示——**仅当视频是横屏比例**时显示，竖直视频不提示（已是最佳画布）。
+- **iOS Safari `<video>.volume` setter 只读**：SDK 同步设 `_video.muted` 解决"按钮静音不生效"问题。
+- **iOS Safari `videoWidth/Height` 滞后**：onLoadedMetadata 时尺寸可能仍是 0，SDK 在 `onPlaying` / `onTimeUpdate` retry 同步——竖直视频"按比例选 fit"逻辑不会失败。
+- **垂直视频 in 横屏 viewport**：SDK 自动用 `BoxFit.cover` 让视频填满（少量边缘裁剪）而不是 letterbox，避免视频"反而比 inline 还小"的体感。
+- **短视频 web tap 视频区域暂停**：已通过把 `NiumaGestureLayer` 从 wrap video 改成 sibling 层修好（`GestureDetector` 移到 platform-view 之上的 Flutter overlay canvas，事件正常 fire）。
+- **PWA 全屏白边**：fullscreen route 期间 SDK 把 `<body>` / `<html>` 背景刷黑，dispose 还原。
 
-```dart
-NiumaPlayer(
-  controller: videoCtrl,
-  // 手势默认仅在全屏页生效；inline 启用：
-  gesturesEnabledInline: true,
-  // 黑名单：禁用部分手势
-  disabledGestures: const {GestureKind.brightness},
-  // 自定义 HUD（可选）
-  gestureHudBuilder: (ctx, state) => MyHudWidget(state: state),
-);
+---
 
-// 业务想监听手势状态做埋点 / 自定义反馈
-videoCtrl.gestureFeedback.addListener(() {
-  print('当前手势: ${videoCtrl.gestureFeedback.value}');
-});
-```
+## 常见问题
 
-**支持的手势：**
+**Q：iOS 真机上 PiP 启动失败？**
+A：检查 `Info.plist` 是否有 `UIBackgroundModes` → `audio`。AVPictureInPictureController 依赖 audio session 后台模式。
 
-- 双击 → 切换播放/暂停
-- 水平滑 → seek 进度（半屏宽 = 视频时长一半）
-- 左半屏上下滑 → 亮度（窗口级，退出页面自动恢复）
-- 右半屏上下滑 → 系统媒体音量
-- 长按 → 临时 2x 倍速，松手回原速
+**Q：Android 模拟器 PiP 退出后控件不见？**
+A：v0.9.1 已加兜底——app resume 时强制重置 stale `isInPictureInPicture` state。如果仍有问题，确认 `MainActivity.onPictureInPictureModeChanged` 重写正确。
 
-**默认 HUD 风格：** B 站风暗色卡片 + 图标 + 文字 + 进度条；主题色跟随 `Theme.colorScheme.primary`。
+**Q：业务想关掉自动 failover 改自家逻辑？**
+A：`NiumaPlayerOptions(autoFailoverOnInitialError: false, rollbackOnSwitchFailure: false)`。然后监听 `controller.events` 自家处理 `LineSwitchFailed`。
 
-完整 demo：[`example/lib/m13_gesture_demo_page.dart`](example/lib/m13_gesture_demo_page.dart)。
+**Q：长视频 demo 里 "下一集" 在窄屏全屏出现在 right group 而不是 left？**
+A：v0.9.1 起 `bottomActionsBuilder` 默认放右组首位（语义更接近 settings/navigation）。想放左组就用自定义 `fullscreenControlBarConfig` 把对应 enum 加到 `bottomLeft`。
 
-### 短视频模式（M14）
+**Q：seek HUD / loading / error UI 看着不对眼？**
+A：`gestureHudBuilder` / `loadingBuilder` / `errorBuilder` / `endedBuilder` 全 slot 化，业务可任意替换。参考 [`custom_feedback_ui_demo.dart`](example/lib/custom_feedback_ui_demo.dart)。
 
-针对竖屏短视频流（抖音/快手/视频号）场景的独立组件 `NiumaShortVideoPlayer`：
+**Q：Chrome 上 HLS 不能播？**
+A：Chrome 没原生 HLS。`pubspec.yaml` 加 `video_player_web_hls` 引入 hls.js 兜底。SDK 不内置因为体积考虑（hls.js ~250KB）。
 
-```dart
-PageView.builder(
-  scrollDirection: Axis.vertical,
-  itemCount: videos.length,
-  onPageChanged: (idx) => setState(() => _currentPage = idx),
-  itemBuilder: (ctx, idx) => NiumaShortVideoPlayer(
-    controller: controllers[idx],
-    isActive: idx == _currentPage,         // PageView 协调
-    overlayBuilder: (ctx, value) => Align(  // 叠爱心/评论/分享
-      alignment: Alignment.bottomRight,
-      child: ActionsColumn(),
-    ),
-  ),
-),
-```
+---
 
-**默认行为**：`loop=true / muted=false / fit=cover`（贴抖音风），可通过 props 覆盖。
+## 发版与版本控制
 
-**手势**：单击 toggle play/pause + 长按 2x（其他手势全 disable，不与 PageView 翻页冲突）。
+- **Conventional Commits**：`feat:` / `fix(android):` / `docs:` / `refactor:` / `test:` 等
+- **Semantic Versioning**：major bump = 公开 API breaking 变更；minor = 新增导出；patch = bug fix / 内部重构
+- **CHANGELOG.md**：每次发版前更新 `## [Unreleased]` → 新版本号 + 日期
+- **CI 预检**：每次 commit 前 `flutter analyze && flutter test` 双绿（537+ 测试）
+- **三端编译验证**：`cd example && flutter build ios --no-codesign && flutter build apk --debug && flutter build web` 都过
 
-**进度条**：常态 1.5px 细线贴底，触摸变粗到 3.5px + 出现 thumb，拖动期间暂停 + 中央显示大字时间，松手 seek + 恢复 play 状态。
-
-## 投屏（Cast）— M15（0.x 起合并主包）
-
-DLNA + AirPlay 协议实现已**合并进主包**——业务方一个 `niuma_player` 依赖即可。`NiumaPlayer` 默认 ControlBar 自动叠 cast 按钮、自动 register 默认协议——**业务侧零代码**就能用。
-
-### 业务集成（默认，0 配置）
-
-```dart
-import 'package:niuma_player/niuma_player.dart';
-
-void main() {
-  // NiumaCastRegistry 首次访问时 lazy 自动 register DLNA + AirPlay
-  // 默认实现，业务无需手动 register。
-  runApp(const MyApp());
-}
-```
-
-### 自定义投屏协议（可选）
-
-业务想替换 SDK 默认 DLNA、加 Chromecast 等自家协议，在 `main()` 第一句调 `NiumaCastRegistry.register(...)` 即可——重复 protocolId 不覆盖，先注册的赢。
-
-```dart
-void main() {
-  // 业务自家 DLNA fork（替代 SDK 默认）
-  NiumaCastRegistry.register(MyCustomDlnaCastService());
-  // SDK 默认 AirPlay 还会被 lazy register（protocolId 不重复）
-  runApp(const MyApp());
-}
-```
-
-### Android 必备 manifest 权限（已 SDK 内置声明）
-
-DLNA SSDP 走 UDP 多播。SDK 主包 `AndroidManifest.xml` 已声明：
-
-```xml
-<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-```
-
-Host app 不需再额外加。`WifiManager.MulticastLock` 由 SDK 内 `NiumaDlnaPlugin`（嵌套于主 `NiumaPlayerPlugin`）自动申请释放。
-
-### iOS Local Network 权限（业务必须配）
-
-iOS 14+ 上多播需要业务方在 `Info.plist` 加：
-
-```xml
-<key>NSLocalNetworkUsageDescription</key>
-<string>用于发现局域网内的投屏设备</string>
-<key>NSBonjourServices</key>
-<array>
-  <string>_ssdp._udp</string>
-</array>
-```
-
-**注意**：免费 Apple ID 无法签 `com.apple.developer.networking.multicast` entitlement——iOS 真机上 SSDP 必失败。SDK 已经把 `SocketException` 在源头吞掉，只是 picker 显示"未找到设备"。生产用户得用付费 Apple Developer 账号 + 申请 multicast entitlement。
-
-### 相关 widget / 类
-
-- `NiumaCastButton` — 投屏按钮（默认在 ControlBar）
-- `NiumaCastOverlay` — 投屏中视频区中央覆盖层
-- `NiumaCastRegistry` — 协议注册表（lazy auto-register defaults + 业务 opt-in 替代）
-- `DlnaCastService` / `AirPlayCastService` — SDK 内置协议实现
-- `CastService` / `CastSession` / `CastDevice` / `CastConnectionState` / `CastEndReason` — 协议抽象，可自定义协议
-
-完整 demo 见 [`example/lib/long_video_demo_page.dart`](example/lib/long_video_demo_page.dart) 投屏 demo 段。
-
-## 监听后端选择
-
-```dart
-controller.events.listen((event) {
-  switch (event) {
-    case BackendSelected(:final kind, :final fromMemory):
-      print('Active backend: $kind (fromMemory=$fromMemory)');
-    case FallbackTriggered(:final reason, :final errorCategory):
-      print('Fell back to IJK: $reason / $errorCategory');
-  }
-});
-```
-
-## 用 value 驱动 UI
-
-```dart
-ValueListenableBuilder<NiumaPlayerValue>(
-  valueListenable: controller,
-  builder: (_, value, __) {
-    if (value.hasError) return ErrorView(value.error!);
-    if (!value.initialized) return const CircularProgressIndicator();
-    return NiumaPlayerView(controller);
-  },
-);
-```
-
-播放 / 暂停图标用 `value.effectivelyPlaying` —— 它在 `buffering` 期间仍为 `true`，所以图标不会在播放中途闪烁。
-
-## 读取 / 清除设备记忆
-
-```dart
-// 清除"该设备需要走 IJK"的记忆。在"重置缓存"流程里调用。
-await NiumaPlayerController.clearDeviceMemory();
-```
-
-## 架构
-
-```
-NiumaPlayerController  (Dart, single public façade)
-    │
-    ├── iOS / Web → VideoPlayerBackend → package:video_player
-    │
-    └── Android   → NativeBackend → niuma_player Kotlin plugin
-                                     │
-                                     ├── ExoPlayerSession  (default fast path)
-                                     └── IjkSession        (rescue path)
-                                       ↑
-                          Native owns DeviceMemoryStore — Dart side just
-                          retries with `forceIjk: true` on first failure.
-```
-
-完整设计参见 [`doc/plans/2026-04-24-niuma-player-design.md`](doc/plans/2026-04-24-niuma-player-design.md)。
-
-## 示例 app
-
-`example/` 目录提供了端到端的演示，覆盖七种场景 —— happy path、强制 IJK、循环、错误路径等。运行方式：
-
-```bash
-cd example
-flutter run -d <device>
-```
-
-## 测试
-
-```bash
-flutter test
-```
-
-Dart 侧状态机在 `test/state_machine_test.dart` 中达到 100% 分支覆盖（iOS / Web / Android happy path / Android retry-success / Android retry-fails / wall-clock 超时）。Kotlin 侧通过示例 app 的诊断页验证。
-
-## FAQ
-
-**Q: iOS 上能免费拿到 IJK 回退吗？**
-不行 —— iOS 完全使用 AVPlayer。AVPlayer 能处理 iOS 能解的所有编码，没必要在那里塞一份 FFmpeg。回退方案仅限 Android。
-
-**Q: 为什么 HLS 在 Chrome / Firefox 里播不了？**
-这些浏览器原生不支持 HLS，只有 Safari 支持。如果你需要广泛覆盖浏览器的 HLS，请引入 [`video_player_web_hls`](https://pub.dev/packages/video_player_web_hls) —— 它会自动注册并通过 hls.js 处理 m3u8。我们没有默认打包它，因为 hls.js 会让 web bundle 增大约 250KB。
-
-**Q: 测试时能不能在指定设备上强制走 IJK？**
-可以 —— 给 controller 传 `NiumaPlayerOptions(forceIjkOnAndroid: true)` 即可。
-
-**Q: 设备记忆能跨 app 重装保留吗？**
-不能，它存在 `SharedPreferences`，卸载会被清掉。这是有意为之 —— 全新安装应该重新探测。
-
-## 路线图
-
-- **M4** —— 可选磁盘缓存层（重放命中缓存；Android 走 `SimpleCache`，iOS 走 AVAssetResourceLoader）
-- **M5** —— 短视频 reels 用的预加载池（N 个并行预热的 controller + LRU）
-- **M7** ✅ —— 编排层（multi-line + `switchLine`、source middleware、续播位置、retry policy、广告调度、analytics）
-- **M8** ✅ —— 缩略图 VTT scrub preview（sprite 解析 + ImageProvider 暴露）
-- **M9** ✅ —— UI overlay：`NiumaPlayer` 一体化组件 + `NiumaPlayerTheme` + 9 个原子控件 + `NiumaFullscreenPage` + `NiumaAdOverlay` + `NiumaScrubPreview`
-- **Backlog** —— 字幕 track 选择（WebVTT 多语言字幕 + sidecar / HLS 内嵌都支持）
-- 内置 `video_player_web_hls` opt-in 开关
-
-## 贡献
-
-参见 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎 PR —— 提交前请先跑 `flutter analyze && flutter test`。
+---
 
 ## 许可证
 
-Apache-2.0。参见 [LICENSE](LICENSE)。
+Apache 2.0 — 见 [LICENSE](LICENSE)。
