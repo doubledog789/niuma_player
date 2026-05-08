@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -149,12 +150,18 @@ class NiumaPlayer extends StatefulWidget {
   /// 仅在全屏 [NiumaFullscreenControlBar] 上生效（inline 暂不支持）。
   final Map<NiumaControlButton, ButtonOverride>? buttonOverrides;
 
-  /// 底栏左侧按钮区**之后**的额外 slot——业务想塞 next/prev 等"接 playPause"
-  /// 的播放列表按钮就放这里。仅全屏生效。
+  /// 底栏右侧 trailing 区的额外 slot——渲染顺序在 [bottomTrailingBuilder]
+  /// **之前**、`config.bottomRight` enum 列表之前。业务用来塞"下一集 / 章节
+  /// 切换"等导航类 action。仅全屏生效。
+  ///
+  /// **位置说明（M16 之后）**：本 slot 跟 [bottomTrailingBuilder] / 右侧
+  /// enum 一起被分到**右组**，由 layout（窄屏 wrap 时）一起右对齐到屏幕
+  /// 右侧。早期版本曾归到左组，会让窄屏多溢出一行——故重定位到右组。
   final WidgetBuilder? bottomActionsBuilder;
 
   /// 底栏右侧 enum **之前**的额外 slot——业务想把"选集 / 集数"等放在
   /// 倍速 / 线路切换 之前就放这里。仅全屏生效。
+  /// 渲染顺序：[bottomActionsBuilder] → 本 slot → `config.bottomRight` enum。
   final WidgetBuilder? bottomTrailingBuilder;
 
   /// 视频暂停时中央显示的 overlay——常用于"短视频 ▶ 圆按钮"风格 indicator。
@@ -579,9 +586,18 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
 
   /// 全屏 [NiumaFullscreenControlBar] 的 onMore 回调——内置「投屏」「画中画」
   /// 两项，之后追加业务侧 [moreMenuBuilder] 返回的条目（用分隔线隔开）。
+  ///
+  /// **Web 上隐藏 cast / PiP 两项**：浏览器没有可靠的程序化 cast API
+  /// （DLNA / AirPlay 不可控、Chromecast 需 cast SDK 用户手势）；PiP 也
+  /// 必须由 user gesture 直接 trigger 不能跨 frame——SDK 这两个按钮在 web
+  /// 上 100% 无效。隐掉避免误导用户点了"无反应"。
+  /// 隐掉后如果业务侧 [moreMenuBuilder] 也没东西，整个菜单就空了——直接
+  /// early return 不弹出空菜单。
   void _showMoreMenu(BuildContext ctx) {
     final extra =
         widget.moreMenuBuilder?.call(ctx) ?? <PopupMenuEntry<dynamic>>[];
+    final hideCastPip = kIsWeb;
+    if (hideCastPip && extra.isEmpty) return;
     // ctx 是 [MoreAction] 自身 build 出来的 context（onTap 回传）。
     // 用它的 RenderBox 计算 ⋮ 按钮的真实屏幕坐标，让 popup 锚定在按钮
     // 正下方——之前 MediaQuery.size 硬算右上角的方式碰到横屏 / notch /
@@ -627,35 +643,37 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
       _NiumaPopupMenuRoute<dynamic>(
         position: position,
         items: <PopupMenuEntry<dynamic>>[
-          PopupMenuItem<dynamic>(
-            value: '__niuma_cast',
-            child: Row(
-              children: const [
-                NiumaSdkIcon(
-                  asset: NiumaSdkAssets.icCast,
-                  size: 18,
-                  color: itemIconColor,
-                ),
-                SizedBox(width: 8),
-                Text('投屏'),
-              ],
+          if (!hideCastPip) ...[
+            PopupMenuItem<dynamic>(
+              value: '__niuma_cast',
+              child: Row(
+                children: const [
+                  NiumaSdkIcon(
+                    asset: NiumaSdkAssets.icCast,
+                    size: 18,
+                    color: itemIconColor,
+                  ),
+                  SizedBox(width: 8),
+                  Text('投屏'),
+                ],
+              ),
             ),
-          ),
-          PopupMenuItem<dynamic>(
-            value: '__niuma_pip',
-            child: Row(
-              children: const [
-                NiumaSdkIcon(
-                  asset: NiumaSdkAssets.icPip,
-                  size: 18,
-                  color: itemIconColor,
-                ),
-                SizedBox(width: 8),
-                Text('画中画'),
-              ],
+            PopupMenuItem<dynamic>(
+              value: '__niuma_pip',
+              child: Row(
+                children: const [
+                  NiumaSdkIcon(
+                    asset: NiumaSdkAssets.icPip,
+                    size: 18,
+                    color: itemIconColor,
+                  ),
+                  SizedBox(width: 8),
+                  Text('画中画'),
+                ],
+              ),
             ),
-          ),
-          if (extra.isNotEmpty) const PopupMenuDivider(),
+            if (extra.isNotEmpty) const PopupMenuDivider(),
+          ],
           ...extra,
         ],
         barrierLabel: MaterialLocalizations.of(ctx).menuDismissLabel,
@@ -1010,7 +1028,50 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              NiumaPlayerView(widget.controller),
+              // 视频画面 fit 智能选择：
+              //
+              // **默认 contain**（letterbox 保 aspect）——多数场景：
+              //   - inline 嵌入，business 给固定 aspect 容器，contain 跟容器
+              //     比例对齐；
+              //   - io 平台全屏：[NiumaFullscreenPage.initState] 已根据视频
+              //     比例锁了 portrait/landscape，viewport 跟视频比例匹配，
+              //     contain == cover；
+              //   - 横屏视频在 web 竖屏全屏：用户被旋转提示引导旋转，旋转
+              //     后 viewport 匹配，contain 填满。
+              //
+              // **例外 cover**（裁剪填满）——web 全屏 + 竖直视频：web 端
+              //   `SystemChrome.setPreferredOrientations` 是 no-op 锁不了
+              //   方向，竖直视频在竖屏 viewport 里 aspect 一般不严格匹配
+              //   （视频 9:16 = 0.56，手机 9:19.5 = 0.46），contain 会留
+              //   上下黑边让视频"缩小"——视觉上反而比 inline 还小。改 cover
+              //   把视频放大到填满高度（少量左右裁剪），匹配抖音类竖屏短
+              //   视频 feed 的 UX。
+              //
+              // 视频元数据未到（size.width/height = 0）退到 Center+AspectRatio
+              // fallback 行为，等 ValueListenableBuilder 在 size 到达后重 build。
+              ValueListenableBuilder<NiumaPlayerValue>(
+                valueListenable: widget.controller,
+                builder: (ctx, v, _) {
+                  final size = v.size;
+                  if (size.width <= 0 || size.height <= 0) {
+                    return Center(child: NiumaPlayerView(widget.controller));
+                  }
+                  final isVertical = size.height > size.width;
+                  final useCover = kIsWeb && isFullscreen && isVertical;
+                  return FittedBox(
+                    fit: useCover ? BoxFit.cover : BoxFit.contain,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: size.width,
+                      height: size.height,
+                      child: NiumaPlayerView(
+                        widget.controller,
+                        aspectRatio: size.width / size.height,
+                      ),
+                    ),
+                  );
+                },
+              ),
               ValueListenableBuilder<NiumaPlayerValue>(
                 valueListenable: widget.controller,
                 child: overlays,

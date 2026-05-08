@@ -122,6 +122,8 @@ class NiumaPlayerOptions {
     this.thumbnailFetchTimeout = const Duration(seconds: 30),
     this.thumbnailMaxBodyBytes = 5 * 1024 * 1024,
     this.unsafePipAutoBackgroundOnEnter = false,
+    this.rollbackOnSwitchFailure = true,
+    this.autoFailoverOnInitialError = true,
   });
 
   /// 若底层 backend 在该窗口内还没到 "initialized"，视作失败，
@@ -173,6 +175,34 @@ class NiumaPlayerOptions {
   /// 默认 `false`（合规）。
   @experimental
   final bool unsafePipAutoBackgroundOnEnter;
+
+  /// 用户主动 [NiumaPlayerController.switchLine] 切线路失败时，是否
+  /// **自动回滚到原线路**（保留切换前的 position / wasPlaying 状态）。
+  ///
+  /// 默认 `true`：业务侧调 `switchLine(brokenId)`，新线路 init 失败 →
+  /// SDK 内部静默尝试 `switchLine(originalId)` 续播，用户体感"什么都没
+  /// 发生"。回滚也失败才 emit [LineSwitchFailed] 并 rethrow。
+  ///
+  /// 关掉时（false）保留旧行为：失败直接 rethrow，老 backend 已 dispose
+  /// 留下"无 backend 可播"状态，业务自行处理。
+  ///
+  /// 注意：与 [autoFailoverOnInitialError] 是**两条独立轴**——前者管
+  /// "用户手动切换"，后者管"首次 initialize"。
+  final bool rollbackOnSwitchFailure;
+
+  /// 默认线路（[NiumaMediaSource.defaultLineId]）首次 [NiumaPlayerController.initialize]
+  /// 失败时，是否**自动按 [MediaLine.priority] 升序遍历下一条线路**继续尝试。
+  ///
+  /// 默认 `true`：业务方一个 `controller.initialize()` 调用顶多看到一次
+  /// 黑屏 / loading，SDK 内部把所有 line 跑遍直到成功或全失败；全失败时
+  /// 抛最后一条线路的错误 → `PlayerPhase.error` → 触发业务侧
+  /// `errorBuilder`（如 [NiumaErrorView]）。
+  ///
+  /// 关掉时（false）回到旧行为：只 init 默认线路，失败立刻向上传播。
+  ///
+  /// 单线路（[NiumaMediaSource.single]）场景本 flag 无效——只有 1 条线路
+  /// 可选。
+  final bool autoFailoverOnInitialError;
 }
 
 /// 用户直接交互的公共 controller。
@@ -219,7 +249,19 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         _thumbnailLoadState = source.thumbnailVtt == null
             ? ThumbnailLoadState.none
             : ThumbnailLoadState.idle,
-        super(NiumaPlayerValue.uninitialized());
+        super(NiumaPlayerValue.uninitialized()) {
+    // PiP lifecycle 兜底——永远 add，构造时一次。autoEnterPip flag 决定
+    // shouldEnter() 真假，但 onResume 兜底重置 stale PiP state 始终生效。
+    _pipObserver = PipLifecycleObserver(
+      shouldEnter: () =>
+          _autoEnterPip &&
+          value.phase == PlayerPhase.playing &&
+          !value.isInPictureInPicture,
+      enter: enterPictureInPicture,
+      onResume: _resetStalePipStateOnResume,
+    );
+    WidgetsBinding.instance.addObserver(_pipObserver!);
+  }
 
   /// 单 source 便捷 factory。把 [ds] 包成 [NiumaMediaSource.single]，
   /// 让无需多线路的调用方继续用更简洁的写法。
@@ -401,25 +443,54 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Future<void> _runInitialize() async {
     // iOS / Web → 永远走 video_player。
     if (_platform.isIOS || _platform.isWeb) {
-      await _withRetry(() async {
-        // 每次重试：dispose 之前（已失败的）backend，重新跑 middleware
-        // 流水线（重算 signed URL / 新鲜 headers），构造新 backend，
-        // 再调用 initialize()。
-        await _disposeCurrentBackend();
-        _resolvedSource = await runSourceMiddlewares(
-          source.currentLine.source,
-          middlewares,
-        );
-        await _attachBackend(
-            _backendFactory.createVideoPlayer(_resolvedSource!));
-        await _backend!.initialize().timeout(options.initTimeout);
-      });
-      _emit(const BackendSelected(
-        PlayerBackendKind.videoPlayer,
-        fromMemory: false,
-      ));
-      unawaited(_loadThumbnailsIfAny());
-      return;
+      // 选择要遍历的线路集：
+      // - 多线路 + autoFailoverOnInitialError=true → 按 priority 升序全遍历
+      // - 单线路 / flag=false → 只试 defaultLine
+      // 失败的线路 emit [LineSwitchFailed]，全失败 rethrow 最后一条错误（让
+      // 上层 phase=error → errorBuilder 兜住）。
+      final candidates = (options.autoFailoverOnInitialError &&
+              source.lines.length > 1)
+          ? ([...source.lines]..sort((a, b) => a.priority.compareTo(b.priority)))
+          : <MediaLine>[source.currentLine];
+
+      Object? lastError;
+      StackTrace? lastStack;
+      for (var i = 0; i < candidates.length; i++) {
+        final line = candidates[i];
+        try {
+          _activeLineId = line.id;
+          await _withRetry(() async {
+            // 每次重试：dispose 之前（已失败的）backend，重新跑 middleware
+            // 流水线（重算 signed URL / 新鲜 headers），构造新 backend，
+            // 再调用 initialize()。
+            await _disposeCurrentBackend();
+            _resolvedSource = await runSourceMiddlewares(
+              line.source,
+              middlewares,
+            );
+            await _attachBackend(
+                _backendFactory.createVideoPlayer(_resolvedSource!));
+            await _backend!.initialize().timeout(options.initTimeout);
+          });
+          // 这条线路成功了
+          _emit(const BackendSelected(
+            PlayerBackendKind.videoPlayer,
+            fromMemory: false,
+          ));
+          unawaited(_loadThumbnailsIfAny());
+          return;
+        } catch (e, st) {
+          lastError = e;
+          lastStack = st;
+          if (candidates.length > 1) {
+            _emit(LineSwitchFailed(toId: line.id, error: e));
+          }
+          // 还有下一条就继续；没有就把错误抛出去
+        }
+      }
+      // 所有线路都失败 → 上抛最后一个错误，由调用方的 try-catch 兜住
+      // 转成 PlayerPhase.error。
+      Error.throwWithStackTrace(lastError!, lastStack ?? StackTrace.current);
     }
 
     // Android：单一 native backend。下面的 Dart 侧重试逻辑就是
@@ -738,49 +809,79 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
     _emit(LineSwitching(fromId: fromId, toId: lineId));
 
+    // 切换前快照——回滚也要用同一份 savedPos / wasPlaying，让用户体感
+    // "切失败 = 什么都没发生"：回到原线路、原位置、原播放状态。
     final savedPos = value.position;
     final wasPlaying = value.isPlaying;
 
     try {
-      await _disposeCurrentBackend();
-      if (_disposed) return;
-      _activeLineId = lineId;
-      final resolved = await runSourceMiddlewares(target.source, middlewares);
-      if (_disposed) return;
-      _resolvedSource = resolved;
-
-      if (_platform.isIOS || _platform.isWeb) {
-        await _attachBackend(_backendFactory.createVideoPlayer(resolved));
-        if (_disposed) {
-          // 刚 attach 的 backend 不能泄漏；返回前先拆掉。
-          await _disposeCurrentBackend();
-          return;
-        }
-        await _withRetry(
-            () => _backend!.initialize().timeout(options.initTimeout));
-      } else {
-        await _initNative(forceIjk: options.forceIjkOnAndroid);
-      }
-      if (_disposed) {
-        // backend 已达到 "initialized"，但 controller 中途被 dispose
-        // 了——清理后退出，不再发 LineSwitched。
-        await _disposeCurrentBackend();
-        return;
-      }
-
-      if (savedPos > Duration.zero) {
-        await _backend!.seekTo(savedPos);
-        if (_disposed) return;
-      }
-      if (wasPlaying) {
-        await _backend!.play();
-        if (_disposed) return;
-      }
+      await _doSwitchTo(lineId, savedPos: savedPos, wasPlaying: wasPlaying);
       _emit(LineSwitched(lineId));
     } catch (e) {
       if (_disposed) return;
+      // [NiumaPlayerOptions.rollbackOnSwitchFailure]：用户手动切换失败时
+      // 静默回滚到原线路。回滚也失败再 emit + rethrow——上抛后调用方
+      // 走 PlayerPhase.error 路径。
+      if (options.rollbackOnSwitchFailure && fromId != lineId) {
+        try {
+          await _doSwitchTo(fromId,
+              savedPos: savedPos, wasPlaying: wasPlaying);
+          // 回滚成功——发一次 LineSwitchFailed 让业务侧能记日志/上报，
+          // **但不 rethrow**（业务方调 await switchLine() 不会抛错，体感
+          // "切失败但播放器自我恢复了"）。
+          _emit(LineSwitchFailed(toId: lineId, error: e));
+          return;
+        } catch (_) {
+          // 回滚也炸了——掉到原始错误处理。
+        }
+      }
       _emit(LineSwitchFailed(toId: lineId, error: e));
       rethrow;
+    }
+  }
+
+  /// [switchLine] 与 rollback 共用的底层实现：dispose 老 backend → 跑
+  /// middleware → attach 新 backend → initialize → seek + 续播。
+  Future<void> _doSwitchTo(
+    String lineId, {
+    required Duration savedPos,
+    required bool wasPlaying,
+  }) async {
+    final target = source.lineById(lineId);
+    if (target == null) {
+      throw ArgumentError.value(lineId, 'lineId', 'unknown line id');
+    }
+    await _disposeCurrentBackend();
+    if (_disposed) return;
+    _activeLineId = lineId;
+    final resolved = await runSourceMiddlewares(target.source, middlewares);
+    if (_disposed) return;
+    _resolvedSource = resolved;
+
+    if (_platform.isIOS || _platform.isWeb) {
+      await _attachBackend(_backendFactory.createVideoPlayer(resolved));
+      if (_disposed) {
+        // 刚 attach 的 backend 不能泄漏；返回前先拆掉。
+        await _disposeCurrentBackend();
+        return;
+      }
+      await _withRetry(
+          () => _backend!.initialize().timeout(options.initTimeout));
+    } else {
+      await _initNative(forceIjk: options.forceIjkOnAndroid);
+    }
+    if (_disposed) {
+      await _disposeCurrentBackend();
+      return;
+    }
+
+    if (savedPos > Duration.zero) {
+      await _backend!.seekTo(savedPos);
+      if (_disposed) return;
+    }
+    if (wasPlaying) {
+      await _backend!.play();
+      if (_disposed) return;
     }
   }
 
@@ -835,23 +936,26 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 不会触发。
   bool get autoEnterPictureInPictureOnBackground => _autoEnterPip;
 
-  /// 设置 [autoEnterPictureInPictureOnBackground]。
-  /// 同值短路；不同值时（Task 6）注册 / 注销 [WidgetsBindingObserver]。
+  /// 设置 [autoEnterPictureInPictureOnBackground]。同值短路。
+  /// 不同值时只翻 [_autoEnterPip] flag——observer 永远在跑，
+  /// `shouldEnter` 闭包读这个 flag 决定是否真触发 enter。
   set autoEnterPictureInPictureOnBackground(bool nextValue) {
     if (_autoEnterPip == nextValue) return;
     _autoEnterPip = nextValue;
-    if (nextValue) {
-      _pipObserver = PipLifecycleObserver(
-        shouldEnter: () =>
-            _autoEnterPip &&
-            value.phase == PlayerPhase.playing &&
-            !value.isInPictureInPicture,
-        enter: enterPictureInPicture,
-      );
-      WidgetsBinding.instance.addObserver(_pipObserver!);
-    } else if (_pipObserver != null) {
-      WidgetsBinding.instance.removeObserver(_pipObserver!);
-      _pipObserver = null;
+  }
+
+  /// app 回前台时兜底——Android 模拟器 / 某些设备从 PiP 回前台时不可靠
+  /// 触发 `onPictureInPictureModeChanged(false)`，导致 [PipModeChanged]
+  /// 事件不发，controller 残留 `value.isInPictureInPicture=true`，
+  /// `NiumaPlayer` 内的 PiP 检查永远把 overlays 藏掉。这里 resume 阶段
+  /// 强制把这条 stale state 翻回。
+  ///
+  /// "在前台 = 不在 PiP" 是定义保证——iOS / Android PiP 都是非前台状态。
+  /// 即使真的在 PiP 中错触发本逻辑，下一次 [PipModeChanged] 事件会再翻回。
+  void _resetStalePipStateOnResume() {
+    if (_disposed) return;
+    if (value.isInPictureInPicture) {
+      value = value.copyWith(isInPictureInPicture: false);
     }
   }
 

@@ -1,14 +1,10 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-import 'package:niuma_player/src/domain/niuma_short_video_theme.dart';
 import 'package:niuma_player/src/niuma_sdk_assets.dart';
 import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
 import 'package:niuma_player/src/presentation/shared/glass_card.dart';
 import 'package:niuma_player/src/presentation/danmaku/niuma_danmaku_controller.dart';
 import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
-import 'package:niuma_player/src/presentation/fullscreen/web_fullscreen_overlay.dart';
-import 'package:niuma_player/src/presentation/short_video/niuma_short_video_player.dart';
 import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 import 'package:niuma_player/src/presentation/core/niuma_player_theme.dart';
 
@@ -44,37 +40,9 @@ class NiumaShortVideoFullscreenButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // web 上 "在全屏" 语义 = web fullscreen overlay marker 存在
-    final inFullscreen = kIsWeb
-        ? WebFullscreenOverlayMarker.isInside(context)
-        : NiumaFullscreenScope.maybeOf(context) != null;
+    final inFullscreen = NiumaFullscreenScope.maybeOf(context) != null;
     return GestureDetector(
       onTap: () {
-        // Web 路径：Flutter Overlay 假全屏——保留 Flutter 控件叠加在 video
-        // 上。单 <video> element 不 push route 抢夺。
-        if (kIsWeb) {
-          if (isWebFlutterFullscreenActive()) {
-            exitWebFlutterFullscreen(controller: controller);
-          } else {
-            enterWebFlutterFullscreen(
-              context: context,
-              controller: controller,
-              fullscreenChildBuilder: (ctx) => SafeArea(
-                child: NiumaShortVideoPlayer(
-                  controller: controller,
-                  danmakuController: danmakuController,
-                  theme: NiumaShortVideoTheme.defaults(),
-                  leftCenterBuilder: (c, ctl) =>
-                      NiumaShortVideoFullscreenButton(
-                    controller: ctl,
-                    danmakuController: danmakuController,
-                  ),
-                ),
-              ),
-            );
-          }
-          return;
-        }
         if (inFullscreen) {
           Navigator.of(context).pop();
         } else {

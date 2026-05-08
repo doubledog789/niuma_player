@@ -204,7 +204,40 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
     final stack = Stack(
       fit: StackFit.expand,
       children: [
-        // [1+2] 视频画面 + 单击/长按手势层（GestureLayer 在 child 上挂事件）
+        // [0] 视频画面（最底层）。
+        //
+        // 用 ValueListenableBuilder 监听 controller.value.size，拿真实视频
+        // 像素尺寸喂给 SizedBox——FittedBox 是矢量缩放、纹理不会糊。
+        // 之前写 SizedBox(16, 9) 是 16x9 逻辑像素的微小 box，纹理被
+        // 压成 16x9 再放大 25 倍 → 视频画面"花掉"。
+        ValueListenableBuilder<NiumaPlayerValue>(
+          valueListenable: widget.controller,
+          builder: (ctx, value, _) {
+            final w = value.size.width > 0 ? value.size.width : 1920.0;
+            final h = value.size.height > 0 ? value.size.height : 1080.0;
+            return FittedBox(
+              fit: widget.fit,
+              child: SizedBox(
+                width: w,
+                height: h,
+                child: NiumaPlayerView(
+                  widget.controller,
+                  aspectRatio: w / h,
+                ),
+              ),
+            );
+          },
+        ),
+        // [1] 单击/长按手势层（视频之上、Flutter overlay canvas 中）。
+        //
+        // **必须是 video 的 sibling 层而不是 parent**：web 上 HtmlElementView
+        // 渲染成原生 `<video>` element 叠在 Flutter canvas 之上——若
+        // GestureDetector 包裹 video（parent），其 RenderObject 在 platform
+        // view 之"下"渲染，浏览器 hit test 把事件丢给 `<flt-platform-view>`
+        // 容器吞掉，Flutter gesture 系统拿不到。改放 sibling 层后
+        // GestureDetector 在 platform view 上方的 Flutter overlay canvas 里，
+        // tap 正常 fire。和 NiumaPlayer 长视频里 NiumaGestureLayer 的用法
+        // 对齐（child=SizedBox.expand）。
         NiumaGestureLayer(
           controller: widget.controller,
           enabled: true,
@@ -215,28 +248,7 @@ class _NiumaShortVideoPlayerState extends State<NiumaShortVideoPlayer> {
             GestureKind.volume,
           },
           onTap: _handleSingleTap,
-          // 用 ValueListenableBuilder 监听 controller.value.size，拿真实视频
-          // 像素尺寸喂给 SizedBox——FittedBox 是矢量缩放、纹理不会糊。
-          // 之前写 SizedBox(16, 9) 是 16x9 逻辑像素的微小 box，纹理被
-          // 压成 16x9 再放大 25 倍 → 视频画面"花掉"。
-          child: ValueListenableBuilder<NiumaPlayerValue>(
-            valueListenable: widget.controller,
-            builder: (ctx, value, _) {
-              final w = value.size.width > 0 ? value.size.width : 1920.0;
-              final h = value.size.height > 0 ? value.size.height : 1080.0;
-              return FittedBox(
-                fit: widget.fit,
-                child: SizedBox(
-                  width: w,
-                  height: h,
-                  child: NiumaPlayerView(
-                    widget.controller,
-                    aspectRatio: w / h,
-                  ),
-                ),
-              );
-            },
-          ),
+          child: const SizedBox.expand(),
         ),
         // [2] 弹幕层（IgnorePointer：让 tap 透传给底下 GestureLayer 的单击 toggle）
         if (widget.danmakuController != null)

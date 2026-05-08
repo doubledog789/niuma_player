@@ -84,6 +84,61 @@ class NiumaFullscreenControlBar extends StatelessWidget {
     }
   }
 
+  /// 经验估算：单按钮 40-130 + 间距 12——决定底栏走单行还是双行布局。
+  /// 估算偏保守（略大于实际），刚好临界场景倾向走双行避免溢出。
+  static double _estimateBottomRowWidth({
+    required NiumaControlBarConfig config,
+    required bool hasBottomActions,
+    required bool hasBottomTrailing,
+    required bool multipleLines,
+  }) {
+    double w = 0;
+    int count = 0;
+    double widthOf(NiumaControlButton btn) {
+      switch (btn) {
+        case NiumaControlButton.danmakuInput:
+          return 130; // pill 自带文本"发个友善的弹幕见证当下"
+        case NiumaControlButton.danmakuToggle:
+          return 70; // icon + switch
+        case NiumaControlButton.title:
+          return 200; // 标题文本占用大
+        case NiumaControlButton.speed:
+        case NiumaControlButton.lineSwitch:
+          return 50; // 文字按钮 "1.0x" / "线路一"
+        case NiumaControlButton.subtitle:
+        case NiumaControlButton.volume:
+          return 50;
+        default:
+          return 40; // 其它简单 icon 按钮
+      }
+    }
+
+    for (final btn in config.bottomLeft) {
+      w += widthOf(btn);
+      count++;
+    }
+    for (final btn in config.bottomRight) {
+      // lineSwitch 单线路时 LineSwitchPill 渲染为 SizedBox.shrink，不占宽度
+      if (btn == NiumaControlButton.lineSwitch && !multipleLines) continue;
+      w += widthOf(btn);
+      count++;
+    }
+    if (hasBottomActions) {
+      w += 80; // 业务自定义 action 按钮（典型"下一集"等文本按钮）
+      count++;
+    }
+    if (hasBottomTrailing) {
+      w += 80; // 同上（典型"选集 P1"）
+      count++;
+    }
+    if (count > 1) {
+      w += (count - 1) * 12; // Wrap spacing 12
+    }
+    // Container 自身 padding 已经在 LayoutBuilder.constraints.maxWidth
+    // 之外被减掉，这里不再加。
+    return w;
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -183,54 +238,88 @@ class NiumaFullscreenControlBar extends StatelessWidget {
                   ScrubBar(controller: controller, chapters: chapters),
                 ],
                 const SizedBox(height: 8),
-                // 用 LayoutBuilder + ConstrainedBox(maxWidth: 50%) + Spacer
-                // 实现"两侧贴边、超出可滚"：
-                //   - children 不超时：每侧 ConstrainedBox 占 own size（≤50%），
-                //     Spacer 占余下空间——视觉等效原 Row + Spacer。
-                //   - children 超时：每侧最多 50%，内部 SingleChildScrollView
-                //     横向滚（右侧 reverse=true 滚动起点贴右），不再撞
-                //     RenderFlex overflow assertion。
+                // 底栏布局——双模式：
+                //
+                // **宽模式**（≥ 600px：iPhone 横屏 / iPad）：
+                //   单行 Row + 两个 Flexible(loose) + Align，左组顶左、
+                //   右组顶右，中间留空。视觉上保持 bili 风的"两组贴边"。
+                //
+                // **窄模式**（< 600px：iPhone 竖屏全屏 / PWA 模式）：
+                //   两行 Column，第一行 leftWrap 左对齐，第二行 rightWrap
+                //   右对齐——继续保持"左/右"的视觉语义，不再让按钮全挤一块。
+                //
+                // Wrap 自身的 `alignment.start/.end` 配合 `crossAxisAlignment.stretch`
+                // 让窄屏每行单独占满宽度后再做内对齐——这样 danmakuInput
+                // pill 整块完整渲染，不被裁也不被 ellipsis。
                 LayoutBuilder(
                   builder: (ctx, constraints) {
-                    final halfMax = constraints.maxWidth / 2;
-                    return Row(
+                    final leftItems = <Widget>[
+                      ..._buildList(context, config.bottomLeft, resolver),
+                    ];
+                    // bottomActionsBuilder（业务自定义 action，例如"下一集"）
+                    // 放右组首位——之前放左组尾会让 narrow 模式下左组多
+                    // 一项溢出到额外一行，layout 变成"左组 5 件占一行 +
+                    // 自定义 action 占一行 + 右组占一行" 共 3 行。改放右组
+                    // 后，narrow 模式下 [下一集] 跟 [选集/倍速/线路] 一起
+                    // 在第二行右对齐，总共 2 行。语义上"自定义底栏 action"
+                    // 也更接近右侧"settings/navigation"分组。
+                    //
+                    // bottomTrailingBuilder 仍在 enum 之前——保留 demo
+                    // "选集"放在倍速/线路前的 ordering 约定。
+                    final rightItems = <Widget>[
+                      if (bottomActionsBuilder != null)
+                        bottomActionsBuilder!(context),
+                      if (bottomTrailingBuilder != null)
+                        bottomTrailingBuilder!(context),
+                      ..._buildList(context, config.bottomRight, resolver),
+                    ];
+                    final leftWrap = Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.start,
+                      children: leftItems,
+                    );
+                    final rightWrap = Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.end,
+                      children: rightItems,
+                    );
+                    // 估算总自然宽度，决定走单行 (Row + Spacer) 还是双行
+                    // (Column)——不用固定阈值，因为同一窗宽下不同 config
+                    // 答案不一样：短视频 (3 + 1 个 item) 在 iPhone 竖屏
+                    // 366 应该单行；长视频 (8 个 item + pill) 在同样
+                    // 366 必须双行。
+                    //
+                    // 估算策略：每枚 item 按经验值算（icon 40 / 文字按钮
+                    // 50 / pill 130 / toggle 70 / builder 80），间距 12，
+                    // lineSwitch 单线路时返 SizedBox.shrink 排除。估算 ≤
+                    // 容器内宽则单行，否则双行。
+                    final estimate = _estimateBottomRowWidth(
+                      config: config,
+                      hasBottomActions: bottomActionsBuilder != null,
+                      hasBottomTrailing: bottomTrailingBuilder != null,
+                      multipleLines: controller.source.lines.length > 1,
+                    );
+                    if (estimate <= constraints.maxWidth) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          leftWrap,
+                          const Spacer(),
+                          rightWrap,
+                        ],
+                      );
+                    }
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        ConstrainedBox(
-                          constraints:
-                              BoxConstraints(maxWidth: halfMax),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ..._buildList(
-                                    context, config.bottomLeft, resolver),
-                                if (bottomActionsBuilder != null)
-                                  bottomActionsBuilder!(context),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        ConstrainedBox(
-                          constraints:
-                              BoxConstraints(maxWidth: halfMax),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            reverse: true,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // 业务 trailing 在右侧 enum 之前——demo
-                                // 用来把"选集"放在 倍速/线路切换 之前。
-                                if (bottomTrailingBuilder != null)
-                                  bottomTrailingBuilder!(context),
-                                ..._buildList(
-                                    context, config.bottomRight, resolver),
-                              ],
-                            ),
-                          ),
-                        ),
+                        leftWrap,
+                        const SizedBox(height: 6),
+                        rightWrap,
                       ],
                     );
                   },

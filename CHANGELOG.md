@@ -5,6 +5,79 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [0.9.1] - 2026-05-09
+
+### 新增
+
+- **`NiumaPlayerOptions.rollbackOnSwitchFailure`**（默认 `true`）：用户主动调
+  `switchLine` 失败时静默回滚到原线路，保留切换前的 `position` / `wasPlaying`。
+- **`NiumaPlayerOptions.autoFailoverOnInitialError`**（默认 `true`）：默认线路
+  `initialize` 失败时按 `MediaLine.priority` 升序遍历下一条；全部失败 → controller
+  `phase=error`，触发业务侧 `errorBuilder`（如 `NiumaErrorView`）。
+- **Web 旋转提示**：竖屏 viewport 全屏 + 横屏视频时浮顶部胶囊提示"旋转屏幕获得
+  更好观看体验"，5s 自动消失 / 旋到横屏立即消失 / 点击 dismiss；竖直视频不显示
+  （已是最佳画布）。
+- **NiumaPlayer 视频 fit 智能选择**：默认 `BoxFit.contain`（letterbox 保 aspect）；
+  web 全屏 + 竖直视频例外用 `BoxFit.cover`（裁剪填满）——解 web 端无法 lock
+  方向时竖直视频在竖屏 viewport 看起来反而"缩小"的体感问题。
+- **NiumaFullscreenPage 按视频比例锁方向**：竖直视频（height > width）→ 锁
+  `portraitUp`；横屏 / 未知 → 锁 landscape（长视频默认）。Web 平台无效（`SystemChrome`
+  在 web 上是 no-op）。
+
+### 修复
+
+- **Web 全屏 popup z-order**：抛弃 `OverlayEntry` 假全屏方案改用 `NiumaFullscreenPage`
+  route push——`OverlayEntry` 在 Navigator overlay 中 z-order **永远高于所有
+  route**，全屏内通过 `showMenu` / `showDialog` push 的 popup/dialog 反而被 fullscreen
+  overlay 盖住不可见。route push 后两者按 z-order 正常 stack。
+- **Web 单 `<video>` element 协调跨 backend swap**：进程级 `webFullscreenRouteCount`
+  counter 替代 backend 自家 `_isWebFullscreen` ValueNotifier——line failover 触发
+  backend swap 时新 backend 默认 `false` 让 inline 误判退出全屏抢回 wrapper 导致
+  fullscreen 黑屏。Counter 跟 route 生命周期挂钩与 backend 实例解耦。
+- **iOS Safari `<video>.volume` 是只读 quirk**：`setVolume()` 同步设
+  `_video.muted = volume == 0.0`——浏览器静音按钮真正生效。
+- **iOS Safari `videoWidth/videoHeight` 滞后**：`onLoadedMetadata` 时尺寸可能仍是
+  0，加 `_maybeUpdateSize()` helper 在 `onPlaying` / `onTimeUpdate` retry 同步到
+  `value.size`，让"按视频比例选 fit"逻辑能拿到真实尺寸。
+- **`StackFit.expand` 让 `AspectRatio` 失效**：`Stack(StackFit.expand)` 给非
+  Positioned 子项 tight 约束，`AspectRatio` 在 tight 约束下退化为
+  `constraints.smallest` aspect 被忽略——9:16 视频被强拉成 16:9 变形。改用
+  `ValueListenableBuilder` + `FittedBox`（fit 智能选）正确按 video aspect layout。
+- **PWA 模式全屏白边**：iOS Safari PWA 全屏 viewport 与视频 aspect 错位时空地
+  露出 host 页面默认白底——fullscreen route 期间把 `<body>` / `<html>` 背景刷黑，
+  dispose 还原。条件 import `_root_bg_io.dart` / `_root_bg_web.dart`。
+- **PWA 模式底部 home indicator 盖控件条**：`NiumaFullscreenPage` 的 SafeArea 在
+  web 平台启用 bottom inset（`bottom: kIsWeb`）——`SystemChrome.setEnabledSystemUIMode`
+  在 web 上是 no-op，home indicator 不会被隐藏。
+- **WebVideoBackend.initialize() 改 Completer**：load 成功
+  （`_maybeMarkInitialized`）`complete()`、load 失败（`onError`）`completeError()`，
+  上层 `await initialize()` 真正拿到 load 结果，不再撞 30s `initTimeout`。
+- **WebVideoBackend.play() 的 `NotSupportedError` 不再静默**：翻 `phase=error` +
+  rethrow，让上层 `switchLine` / `initialize` 走 rollback / auto-failover 路径。
+- **More 菜单 web 上隐藏 `cast` / `pip`**：浏览器无可靠程序化 cast / PiP API
+  （DLNA/AirPlay 不可控、PiP 需 user gesture 直 trigger 不能跨 frame），点了无反应
+  误导用户。Web 上若 `extra` 也空就不弹空菜单。
+- **底栏 layout 估算驱动单/双行**：固定阈值 → 按 config 估算总自然宽度（icon 40 /
+  toggle 70 / pill 130 / builder 80 + spacing 12，单线路 lineSwitch 排除）。估算
+  ≤ container maxWidth → 单行 `Row + Spacer`，否则双行 `Column` 左/右组分别左右
+  对齐。短视频 (3+1 个 item) 在 iPhone 竖屏 366 px 不再被强制双行。
+- **Android 模拟器 PiP 退出 stale state**：模拟器 / 部分设备从 PiP 回前台时不
+  可靠触发 `onPictureInPictureModeChanged(false)` 导致 `value.isInPictureInPicture`
+  残留 `true` 控件层一直被藏。`PipLifecycleObserver` 加 `onResume` 回调——app
+  回前台时强制重置 stale state（"在前台 = 不在 PiP" 是 OS 定义保证）。
+- **短视频 web tap 视频区域不暂停**：`NiumaShortVideoPlayer` 把 `NiumaGestureLayer`
+  从 wrap video 改成 sibling 层（`child=SizedBox.expand`，video 在 Stack 另一个
+  child）——`GestureDetector` 的 RenderObject 从 `<flt-platform-view>` 之下挪到
+  之上 Flutter overlay canvas，浏览器 hit test 直接 fire 到 Flutter 不被 platform
+  view 容器吞掉。
+
+### 变更
+
+- **`NiumaPlayer.bottomActionsBuilder`**：从左组尾移到**右组首位**。窄屏（如 iPhone
+  竖屏全屏）下原放法会让 leftWrap 多一项溢出到额外一行 → 总共三行布局；移到右组
+  后跟 `bottomTrailingBuilder` / 右侧 enum 一起在第二行右对齐 → 两行。语义上
+  "自定义底栏 action" 也更接近右侧"settings/navigation"分组。
+
 ## [0.9.0] - 2026-05-03
 
 ### 新增
