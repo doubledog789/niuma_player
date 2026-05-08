@@ -346,6 +346,6 @@ NiumaPlayer(
 
 ## 下一步
 
-- 完整 API 参考：[`docs/api-reference.md`](api-reference.md)
+- 完整 API 参考：[`doc/api-reference.md`](api-reference.md)
 - 各 demo 源码：[`example/lib/`](../example/lib/)
 - 上一版变更：[`CHANGELOG.md`](../CHANGELOG.md)

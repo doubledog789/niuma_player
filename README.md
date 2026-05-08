@@ -94,8 +94,8 @@ controller.play();
 NiumaPlayer(controller: controller);
 ```
 
-完整接入指南：[`docs/getting-started.md`](docs/getting-started.md)
-完整 API 参考：[`docs/api-reference.md`](docs/api-reference.md)
+完整接入指南：[`doc/getting-started.md`](doc/getting-started.md)
+完整 API 参考：[`doc/api-reference.md`](doc/api-reference.md)
 
 ---
 
@@ -110,13 +110,13 @@ cd example && flutter run
 
 ### Catalog 主页
 
-<img src="docs/screenshots/01_catalog.png" width="280" alt="catalog">
+<img src="doc/screenshots/01_catalog.png" width="280" alt="catalog">
 
 8 个 demo 入口列表——brand 橙圆角 icon container + 中文标题 + 简要说明。
 
 ### 1 · 长视频
 
-<img src="docs/screenshots/02_long_video.png" width="280" alt="long video demo">
+<img src="doc/screenshots/02_long_video.png" width="280" alt="long video demo">
 
 bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩略图（拖进度条预览）。
 
@@ -124,7 +124,7 @@ bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩
 
 ### 2 · 短视频
 
-<img src="docs/screenshots/03_short_video.png" width="280" alt="short video demo">
+<img src="doc/screenshots/03_short_video.png" width="280" alt="short video demo">
 
 抖音风 PageView 翻页 / 单击 toggle play/pause / 长按 2x 倍速 / 抖音式底部细进度条 / 沉浸式弹幕 / 业务侧 overlayBuilder（点赞 / 评论 / 分享）。
 
@@ -132,7 +132,7 @@ bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩
 
 ### 3 · 失败回滚 + 自动 failover
 
-<img src="docs/screenshots/04_rollback.png" width="280" alt="rollback failover demo">
+<img src="doc/screenshots/04_rollback.png" width="280" alt="rollback failover demo">
 
 故意配 3 条线路：line1 / line2 是坏 URL，line3 是好的。截图捕获了 init 时 SDK 自动 fail 过两条最后落到好线路的事件日志。**业务方只需 0 行代码就拿到这个能力**——`NiumaPlayerOptions.autoFailoverOnInitialError` 默认 `true`。
 
@@ -140,7 +140,7 @@ bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩
 
 ### 4 · 自定义反馈 UI
 
-<img src="docs/screenshots/05_feedback.png" width="280" alt="custom feedback ui demo">
+<img src="doc/screenshots/05_feedback.png" width="280" alt="custom feedback ui demo">
 
 `loadingBuilder` / `errorBuilder` / `endedBuilder` 三态 slot——业务自家 widget 替换 SDK 默认渲染。点"切到坏的源"按钮触发 errorBuilder。
 
@@ -148,7 +148,7 @@ bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩
 
 ### 5 · 自定义控件层
 
-<img src="docs/screenshots/06_controls.png" width="280" alt="custom controls demo">
+<img src="doc/screenshots/06_controls.png" width="280" alt="custom controls demo">
 
 声明式 `NiumaControlBarConfig` 选 button / 排顺序；`buttonOverrides` 把单个 button 换成自家 widget；`bottomActionsBuilder` / `bottomTrailingBuilder` / `moreMenuBuilder` 业务侧追加。
 
@@ -156,7 +156,7 @@ bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩
 
 ### 6 · 弹幕集成
 
-<img src="docs/screenshots/07_danmaku.png" width="280" alt="danmaku demo">
+<img src="doc/screenshots/07_danmaku.png" width="280" alt="danmaku demo">
 
 `NiumaDanmakuController` 创建 + `addAll(items)` + `add(single)`；`NiumaPlayer.danmakuController` 透传；`onDanmakuInputTap` 接业务自家弹幕输入 dialog；`DanmakuSettingsPanel` bottomSheet 弹出。
 
@@ -164,7 +164,7 @@ bili 风 mockup 控件层 / 多线路切换 / Cast / PiP / 弹幕 hook / VTT 缩
 
 ### 7 · 投屏 + 画中画
 
-<img src="docs/screenshots/08_cast_pip.png" width="280" alt="cast pip demo">
+<img src="doc/screenshots/08_cast_pip.png" width="280" alt="cast pip demo">
 
 iOS / Android / Web 三端 setup 差异说明；`controller.enterPictureInPicture()` 程序触发；监听 `events` stream → `CastStarted` / `CastEnded` / `PipModeChanged` 实时打日志；状态 chip 显示 PiP 是否支持 + 当前是否在 PiP。
 
@@ -172,7 +172,7 @@ iOS / Android / Web 三端 setup 差异说明；`controller.enterPictureInPictur
 
 ### 8 · 手势 + 锁屏
 
-<img src="docs/screenshots/09_gesture.png" width="280" alt="gesture lock demo">
+<img src="doc/screenshots/09_gesture.png" width="280" alt="gesture lock demo">
 
 5 种 `GestureKind` filter chip 实时切换 `disabledGestures`；`gestureHudBuilder` 切换默认 vs 自定义 brand 色胶囊 HUD；说明 SDK 内置 `LockButton`（全屏页左中浮，点击 freeze 整个控件层 + 手势层）零配置自带。
 

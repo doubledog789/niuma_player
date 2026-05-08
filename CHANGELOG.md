@@ -70,6 +70,12 @@
   child）——`GestureDetector` 的 RenderObject 从 `<flt-platform-view>` 之下挪到
   之上 Flutter overlay canvas，浏览器 hit test 直接 fire 到 Flutter 不被 platform
   view 容器吞掉。
+- **inline `NiumaControlBar` 393pt iPhone 撞 RenderFlex overflow**：`_LegacyM9Bar`
+  之前 `< 420` 走极窄 / `>= 420` 强渲完整 9 按钮——typical iPhone inline 容器
+  （393pt 屏宽扣 padding ~ 380dp）落在 9 按钮档但宽度不够，渲染出黑黄斜纹。改成
+  3 档：`< 280` 仅 ScrubBar；`280–460` 4 按钮（play / time / spacer / fullscreen）；
+  `>= 460` 完整 9 按钮。业务侧想要完整按钮列表传 `NiumaControlBarConfig.bili` /
+  `full` 走 `_ConfigDrivenBar` 路径，不受此变更影响。
 
 ### 变更
 

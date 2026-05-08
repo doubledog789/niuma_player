@@ -573,7 +573,7 @@ abstract class CastSession {
 
 ## 进一步阅读
 
-- [`docs/getting-started.md`](getting-started.md) — 5 分钟接入
+- [`doc/getting-started.md`](getting-started.md) — 5 分钟接入
 - [`example/`](../example/) — 8 个完整 demo 源码
 - [`CHANGELOG.md`](../CHANGELOG.md) — 版本变更记录
 - [`README.md`](../README.md) — 项目主页
