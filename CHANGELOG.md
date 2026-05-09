@@ -5,7 +5,26 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
-## [0.9.1] - 2026-05-09
+## [0.0.1] - 2026-05-09
+
+**首次 pub.dev 公开发布**——版本号从内部预览的 0.9.x 重置为 0.0.1，作为公开
+SDK 的初始版本。功能集合等同于此前内部 0.9.1，含：
+
+- 三层 backend 抽象（VideoPlayerBackend / NativeBackend）+ Android Try-Fail-Remember
+- M7 编排层：多线路 / retry policy / source middleware / 续播 / WebVTT / 弹幕 /
+  auto-failover
+- M9 一体化 `NiumaPlayer` widget + 22 个原子控件 + 配置驱动 `NiumaControlBar`
+- M12 PiP（iOS 反射 hack + Android 原生）
+- M15 Cast：DLNA + AirPlay 自动注册（`NiumaCastRegistry`）
+- M16 反馈 UI builder slot：`loadingBuilder` / `errorBuilder` / `endedBuilder`
+- 短视频 player + 抖音风手势 / 进度条 / 倍速
+- Web 全屏 / 跨 backend swap 协调 / iOS Safari quirks 修复
+
+详细历史变更见下方 0.9.x / 0.8.x 等内部预览段。
+
+---
+
+## [0.9.1] - 2026-05-09 _（内部预览）_
 
 ### 新增
 
