@@ -1,8 +1,8 @@
 import 'dart:async';
 // ignore: deprecated_member_use, avoid_web_libraries_in_flutter
 import 'dart:html' as html;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js_util' as js_util;
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import 'dart:ui' show Size;
 import 'dart:ui_web' as ui_web;
 
@@ -388,8 +388,9 @@ class WebVideoBackend extends PlayerBackend {
   Future<bool> enterBrowserVideoFullscreen() async {
     if (_disposed) return false;
     try {
-      if (js_util.hasProperty(_video, 'webkitEnterFullscreen')) {
-        js_util.callMethod(_video, 'webkitEnterFullscreen', []);
+      final v = _video as JSObject;
+      if (v.has('webkitEnterFullscreen')) {
+        v.callMethod('webkitEnterFullscreen'.toJS);
         return true;
       }
     } catch (_) {/* fallback */}

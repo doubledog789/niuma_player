@@ -1,26 +1,42 @@
 # Changelog
 
-本项目所有显著变更都会记录在本文件中。
+All notable changes to this project will be documented in this file.
 
-格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
-版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
+versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.0.2] - 2026-05-09
+
+### Fixed
+
+- Replaced `dart:js_util` (removed in Dart SDK 3.11) with `dart:js_interop` /
+  `dart:js_interop_unsafe` in `web_video_backend.dart` — fixes pub.dev pana
+  static analysis failure that previously zeroed out platform support score.
+- Shortened pubspec.yaml description to fit pub.dev 60-180 char limit.
+- Added English-language summaries to `CHANGELOG.md` so non-ASCII ratio stays
+  within pub.dev convention threshold.
 
 ## [0.0.1] - 2026-05-09
 
-**首次 pub.dev 公开发布**——版本号从内部预览的 0.9.x 重置为 0.0.1，作为公开
-SDK 的初始版本。功能集合等同于此前内部 0.9.1，含：
+**First public pub.dev release** — version reset from internal-preview 0.9.x
+to 0.0.1 as the inaugural public SDK version. Feature set equivalent to
+internal 0.9.1, including:
 
-- 三层 backend 抽象（VideoPlayerBackend / NativeBackend）+ Android Try-Fail-Remember
-- M7 编排层：多线路 / retry policy / source middleware / 续播 / WebVTT / 弹幕 /
-  auto-failover
-- M9 一体化 `NiumaPlayer` widget + 22 个原子控件 + 配置驱动 `NiumaControlBar`
-- M12 PiP（iOS 反射 hack + Android 原生）
-- M15 Cast：DLNA + AirPlay 自动注册（`NiumaCastRegistry`）
-- M16 反馈 UI builder slot：`loadingBuilder` / `errorBuilder` / `endedBuilder`
-- 短视频 player + 抖音风手势 / 进度条 / 倍速
-- Web 全屏 / 跨 backend swap 协调 / iOS Safari quirks 修复
+- 3-tier backend abstraction (VideoPlayerBackend for iOS/Web, NativeBackend
+  for Android) + Android Try-Fail-Remember device memory.
+- Orchestration layer (multi-line, retry policy, source middleware, resume
+  position, WebVTT thumbnails, danmaku bucket loader, auto-failover).
+- All-in-one `NiumaPlayer` widget + 22 atomic control widgets +
+  configurable `NiumaControlBar`.
+- Picture-in-Picture (iOS via reflection bridge, Android native).
+- Cast: DLNA + AirPlay auto-registration via `NiumaCastRegistry`.
+- Feedback UI builder slots: `loadingBuilder` / `errorBuilder` /
+  `endedBuilder`.
+- Short-video player with TikTok-style gestures, scrubber, speed control.
+- Web fullscreen, cross-backend swap coordination, iOS Safari fixes.
 
-详细历史变更见下方 0.9.x / 0.8.x 等内部预览段。
+For detailed change history see internal-preview entries below
+(0.9.x / 0.8.x / ...).
 
 ---
 
