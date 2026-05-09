@@ -45,3 +45,8 @@ AGENTS.md
 
 # Claude Code scheduled tasks lock (local)
 .claude/
+
+# Xcode 默认 AppIcon placeholder（Icon-App-*x*@*x.png）— 例子用的是简化命名
+# Icon-*.png 那套（被 Contents.json 引用），Icon-App-* 是 flutter create
+# 残留死文件，不入库
+example/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-*.png
