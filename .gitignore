@@ -42,3 +42,6 @@ android/libs/
 android/localmaven/**/*.aar
 AGENTS.md
 .superpowers/
+
+# Claude Code scheduled tasks lock (local)
+.claude/

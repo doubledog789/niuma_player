@@ -2,7 +2,7 @@ name: niuma_player
 description: >-
   Flutter video player SDK with unified API across iOS / Android / Web, plus
   automatic ExoPlayer to IJK fallback on Android.
-version: 0.0.2
+version: 0.0.3
 homepage: https://github.com/axin789/niuma_player
 repository: https://github.com/axin789/niuma_player
 issue_tracker: https://github.com/axin789/niuma_player/issues
@@ -34,8 +34,12 @@ dependencies:
   # given mobile is the primary target. Re-add the dep if HLS-in-browser
   # becomes a hard requirement.
   shared_preferences: ^2.2.0
-  video_player: ">=2.8.0 <3.0.0"
+  # 2.10.0 加入 VideoPlayerController.playerId getter，iOS PiP 桥需要它把
+  # Flutter texture id 映射到原生 AVPlayer 实例（见 video_player_backend.dart）
+  video_player: ">=2.10.0 <3.0.0"
   plugin_platform_interface: ^2.0.2
+  flutter_web_plugins:
+    sdk: flutter
   # @experimental annotation 用——meta 通过 flutter SDK 已 transitive
   # 可用，这里显式声明避开 depend_on_referenced_packages lint。
   meta: ^1.10.0
@@ -64,6 +68,9 @@ flutter:
         pluginClass: NiumaPlayerPlugin
       ios:
         pluginClass: NiumaPlayerPlugin
+      web:
+        pluginClass: NiumaPlayerWebRegistrar
+        fileName: niuma_player_web.dart
   assets:
     - assets/loading/
     - assets/player_controls/
