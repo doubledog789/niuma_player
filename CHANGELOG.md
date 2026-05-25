@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2026-05-25
+
+### Fixed
+
+- Vendored the custom-compiled `ijkplayer` `.aar` (13 MB) into git and the
+  published package. It was previously git-ignored and fetched by a download
+  script whose release URL no longer exists, so neither git nor pub.dev
+  consumers received the binary and every Android build failed to resolve
+  `tv.danmaku.ijk:ijkplayer`. The aar now ships under `android/localmaven/`,
+  so Android builds work out of the box. Removed the dead download script.
+
 ## [0.0.3] - 2026-05-09
 
 ### Fixed

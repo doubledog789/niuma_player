@@ -19,9 +19,3 @@ LICENSE=LGPL-2.1
 FFMPEG_GPL=disabled
 FFMPEG_NONFREE=disabled
 OPENSSL_LINK=static
-
-# 官方 prebuilt asset（debugly/ijkplayer releases）
-PREBUILT_ASSET=ijkplayer-cmake-release.aar
-PREBUILT_URL=https://github.com/debugly/ijkplayer/releases/download/k0.8.9-beta-260402150035/ijkplayer-cmake-release.aar
-PREBUILT_SHA256=f325911be7f6b9288a58bfe5872d7860b2066982b630f6462492f56efec5f163
-PREBUILT_SIZE=13771260

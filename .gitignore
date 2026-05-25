@@ -36,10 +36,10 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 build/
 
-# Vendored ijkplayer AAR — pulled by android/scripts/compile/download-prebuilt.sh.
-# Keep .pom (version record) in git, keep .aar out (13 MB binary).
+# The custom-compiled ijkplayer .aar (13 MB) is vendored into git + the pub
+# package so Android builds work out of the box for both git and pub.dev
+# consumers — there is no public download source for it. Do NOT re-ignore it.
 android/libs/
-android/localmaven/**/*.aar
 AGENTS.md
 .superpowers/
 

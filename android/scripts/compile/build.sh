@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build ijkplayer.aar from source.
-# v0.2 path — v0.1 uses download-prebuilt.sh.
+# Build ijkplayer.aar from source. Only needed to regenerate / bump the
+# vendored aar — the current build is already committed under android/localmaven/.
 #
 # Prereqs: NDK r26b (26.1.10909125), git, bash, python3, yasm, make.
 # Override NDK path via: NDK_HOME=/path/to/ndk ./build.sh
