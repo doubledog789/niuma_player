@@ -593,3 +593,78 @@ class _WebRotationHintState extends State<_WebRotationHint> {
   }
 }
 
+/// 给 [NiumaPlayerController] 加全屏开关入口。
+///
+/// 把原先埋在 [FullscreenButton] 里的 push / pop 逻辑抽成公开 API，业务可在
+/// **任意自定义按钮**上一行触发全屏——只要 [context] 处于外层 [NiumaPlayer]
+/// 的子树内（如某个 builder slot 的 ctx），进全屏时会自动从最近的
+/// [NiumaPlayerConfigScope] 透传 theme / 控制栏配置 / 弹幕 / 广告 / builder
+/// slot 等全部配置，无需手动转发：
+///
+/// ```dart
+/// IconButton(
+///   icon: const Icon(Icons.fullscreen),
+///   onPressed: () => controller.toggleFullscreen(context),
+/// )
+/// ```
+///
+/// [context] 不在 [NiumaPlayerConfigScope] 子树内时各项退到默认值。
+extension NiumaFullscreenControl on NiumaPlayerController {
+  /// 当前 [context] 是否处于 [NiumaFullscreenPage] 全屏页内。
+  bool isInFullscreen(BuildContext context) =>
+      NiumaFullscreenScope.maybeOf(context) != null;
+
+  /// 进入全屏：push 一个 [NiumaFullscreenPage]。返回的 future 在全屏页被
+  /// pop（退出全屏）后完成。已在全屏内则为 no-op。
+  Future<void> enterFullscreen(BuildContext context) {
+    if (isInFullscreen(context)) return Future<void>.value();
+    // 从外层 NiumaPlayer 注入的 NiumaPlayerConfigScope 把全部配置透传到全屏
+    // 页，避免跨页丢配置。theme 优先用 cfg.theme，为 null 时退到 inherited
+    // 主题（README 推荐 NiumaPlayerThemeData(child: NiumaPlayer(...)) 用法下
+    // cfg.theme=null）。
+    final cfg = NiumaPlayerConfigScope.maybeOf(context);
+    final inheritedTheme = cfg?.theme ?? NiumaPlayerTheme.of(context);
+    return Navigator.of(context).push(
+      NiumaFullscreenPage.route(
+        controller: this,
+        theme: inheritedTheme,
+        adSchedule: cfg?.adSchedule,
+        adAnalyticsEmitter: cfg?.adAnalyticsEmitter,
+        pauseVideoDuringAd: cfg?.pauseVideoDuringAd ?? true,
+        controlsAutoHideAfter:
+            cfg?.controlsAutoHideAfter ?? const Duration(seconds: 5),
+        danmakuController: cfg?.danmakuController,
+        disabledGestures: cfg?.disabledGestures ?? const {},
+        gestureHudBuilder: cfg?.gestureHudBuilder,
+        title: cfg?.title,
+        subtitle: cfg?.subtitle,
+        controlBarConfig: cfg?.controlBarConfig,
+        fullscreenControlBarConfig:
+            cfg?.fullscreenControlBarConfig ?? NiumaControlBarConfig.bili,
+        buttonOverrides: cfg?.buttonOverrides,
+        bottomActionsBuilder: cfg?.bottomActionsBuilder,
+        bottomTrailingBuilder: cfg?.bottomTrailingBuilder,
+        pausedOverlayBuilder: cfg?.pausedOverlayBuilder,
+        rightRailBuilder: cfg?.rightRailBuilder,
+        moreMenuBuilder: cfg?.moreMenuBuilder,
+        chapters: cfg?.chapters,
+        onDanmakuInputTap: cfg?.onDanmakuInputTap,
+      ),
+    );
+  }
+
+  /// 退出全屏：pop 当前 [NiumaFullscreenPage]。不在全屏内则为 no-op。
+  void exitFullscreen(BuildContext context) {
+    if (isInFullscreen(context)) Navigator.of(context).pop();
+  }
+
+  /// 在全屏 / 非全屏间切换。[FullscreenButton] 即调用本方法。
+  void toggleFullscreen(BuildContext context) {
+    if (isInFullscreen(context)) {
+      Navigator.of(context).pop();
+    } else {
+      unawaited(enterFullscreen(context));
+    }
+  }
+}
+

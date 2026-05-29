@@ -36,7 +36,8 @@ export 'src/presentation/core/niuma_player_theme.dart'
 // M9 一体化组件 + 全屏 page
 export 'package:niuma_player/src/presentation/core/niuma_player.dart'
     show NiumaPlayer, NiumaPlayerConfigScope;
-export 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart' show NiumaFullscreenPage;
+export 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart'
+    show NiumaFullscreenPage, NiumaFullscreenControl;
 
 // 反馈 UI（loading / error / ended 默认实现，业务可通过 NiumaPlayer 的
 // loadingBuilder / errorBuilder / endedBuilder 覆盖）

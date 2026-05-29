@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player/src/presentation/controls/niuma_sdk_icon.dart';
-import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_page.dart';
 
 /// 全屏切换按钮。
 ///
@@ -20,70 +19,13 @@ class FullscreenButton extends StatelessWidget {
   /// [NiumaFullscreenPage]，进入 / 退出全屏不会重新 initialize。
   final NiumaPlayerController controller;
 
-  /// 判断当前 build context 是否处于 [NiumaFullscreenPage] 内。
-  ///
-  /// 通过 [NiumaFullscreenScope] InheritedWidget marker 检测——只有
-  /// 真正在全屏页里的子树才能拿到这个 marker。早先版本用
-  /// `route.isFirst` 当兜底，会把任何非 home 路由（比如 example
-  /// 里 push 上去的 demo 页）误判为"在全屏内"，导致按钮把 demo 页
-  /// 自身 pop 掉而不是进入全屏，所以彻底去掉那条 fallback。
-  bool _inFullscreenPage(BuildContext context) {
-    return NiumaFullscreenScope.maybeOf(context) != null;
-  }
-
-  void _onPressed(BuildContext context) {
-    if (_inFullscreenPage(context)) {
-      Navigator.of(context).pop();
-    } else {
-      // 从外层 NiumaPlayer 注入的 NiumaPlayerConfigScope 把 adSchedule /
-      // emitter / pauseVideoDuringAd / autoHide / theme 一并透传到全屏
-      // 页，避免全屏页里的内层 NiumaPlayer 丢失外层配置。
-      //
-      // theme 字段优先用 NiumaPlayer.theme（cfg.theme），为 null 时退到
-      // 通过 [NiumaPlayerThemeData] InheritedWidget 注入的当前主题
-      // ([NiumaPlayerTheme.of])——README 推荐的用法是
-      // `NiumaPlayerThemeData(child: NiumaPlayer(controller: ctl))`
-      // 此时 NiumaPlayer.theme=null，没这个 fallback 全屏页就拿不到外层
-      // inherited 主题，造成视觉回归。
-      final cfg = NiumaPlayerConfigScope.maybeOf(context);
-      final inheritedTheme =
-          cfg?.theme ?? NiumaPlayerTheme.of(context);
-      Navigator.of(context).push(
-        NiumaFullscreenPage.route(
-          controller: controller,
-          theme: inheritedTheme,
-          adSchedule: cfg?.adSchedule,
-          adAnalyticsEmitter: cfg?.adAnalyticsEmitter,
-          pauseVideoDuringAd: cfg?.pauseVideoDuringAd ?? true,
-          controlsAutoHideAfter:
-              cfg?.controlsAutoHideAfter ?? const Duration(seconds: 5),
-          danmakuController: cfg?.danmakuController,
-          disabledGestures: cfg?.disabledGestures ?? const {},
-          gestureHudBuilder: cfg?.gestureHudBuilder,
-          // M16 参数：从 NiumaPlayerConfigScope 读取后透传给全屏页，
-          // 确保全屏 NiumaFullscreenControlBar 能正确渲染 mockup 配置。
-          title: cfg?.title,
-          subtitle: cfg?.subtitle,
-          controlBarConfig: cfg?.controlBarConfig,
-          fullscreenControlBarConfig:
-              cfg?.fullscreenControlBarConfig ?? NiumaControlBarConfig.bili,
-          buttonOverrides: cfg?.buttonOverrides,
-          bottomActionsBuilder: cfg?.bottomActionsBuilder,
-          bottomTrailingBuilder: cfg?.bottomTrailingBuilder,
-          pausedOverlayBuilder: cfg?.pausedOverlayBuilder,
-          rightRailBuilder: cfg?.rightRailBuilder,
-          moreMenuBuilder: cfg?.moreMenuBuilder,
-          chapters: cfg?.chapters,
-          onDanmakuInputTap: cfg?.onDanmakuInputTap,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = NiumaPlayerTheme.of(context);
-    final inFullscreen = _inFullscreenPage(context);
+    // push / pop + 配置透传逻辑已抽到 NiumaPlayerController 的
+    // [NiumaFullscreenControl] 扩展（toggleFullscreen / isInFullscreen），
+    // 业务可在任意自定义按钮上复用同一入口。
+    final inFullscreen = controller.isInFullscreen(context);
     return IconButton(
       padding: EdgeInsets.zero,
       iconSize: theme.iconSize,
@@ -93,7 +35,7 @@ class FullscreenButton extends StatelessWidget {
         size: theme.iconSize,
         color: theme.iconColor,
       ),
-      onPressed: () => _onPressed(context),
+      onPressed: () => controller.toggleFullscreen(context),
     );
   }
 }

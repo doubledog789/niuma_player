@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `NiumaFullscreenControl` extension on `NiumaPlayerController` exposing
+  `enterFullscreen(context)` / `exitFullscreen(context)` /
+  `toggleFullscreen(context)` / `isInFullscreen(context)`. The push/pop logic
+  was previously locked inside `FullscreenButton`, so a custom fullscreen
+  button had no public way to trigger fullscreen. Now any custom button under
+  the `NiumaPlayer` subtree can call `controller.toggleFullscreen(context)`,
+  with outer config auto-forwarded from `NiumaPlayerConfigScope`.
+  `FullscreenButton` now delegates to this extension (behavior unchanged).
+
 ## [0.0.4] - 2026-05-25
 
 ### Fixed

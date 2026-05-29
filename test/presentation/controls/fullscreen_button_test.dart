@@ -110,6 +110,73 @@ void main() {
     expect(find.text('go-fs'), findsOneWidget,
         reason: '点击应 pop 回 home，而不是再 push 一层全屏');
   });
+
+  testWidgets('controller.toggleFullscreen 从自定义按钮 push 进全屏',
+      (tester) async {
+    // 用户场景：不用 SDK 的 FullscreenButton，自己摆一个按钮，靠公开的
+    // NiumaFullscreenControl 扩展进全屏。
+    final ctl = FakeNiumaPlayerController();
+    final navObserver = _RecordingNavigatorObserver();
+
+    await tester.pumpWidget(MaterialApp(
+      navigatorObservers: [navObserver],
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: TextButton(
+            onPressed: () => ctl.toggleFullscreen(ctx),
+            child: const Text('my-fs'),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('my-fs'));
+    await tester.pumpAndSettle();
+
+    expect(navObserver.pushedRoutes, isNotEmpty,
+        reason: '自定义按钮调 toggleFullscreen 应 push 全屏 route');
+    expect(navObserver.pushedRoutes.last.settings.name,
+        NiumaFullscreenPage.routeName,
+        reason: 'push 的应是 NiumaFullscreenPage');
+  });
+
+  testWidgets('全屏内调用 controller.toggleFullscreen → pop 退出',
+      (tester) async {
+    final ctl = FakeNiumaPlayerController();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(ctx).push<void>(
+              MaterialPageRoute(
+                builder: (_) => NiumaFullscreenScope(
+                  child: Builder(
+                    builder: (fctx) => Scaffold(
+                      body: TextButton(
+                        onPressed: () => ctl.toggleFullscreen(fctx),
+                        child: const Text('exit-fs'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            child: const Text('go'),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(find.text('exit-fs'), findsOneWidget);
+
+    await tester.tap(find.text('exit-fs'));
+    await tester.pumpAndSettle();
+    expect(find.text('go'), findsOneWidget,
+        reason: '全屏内 toggleFullscreen 应 pop 回上层');
+  });
 }
 
 class _RecordingNavigatorObserver extends NavigatorObserver {
