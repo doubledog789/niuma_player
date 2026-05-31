@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -31,7 +32,7 @@ class PlayPauseButton extends StatelessWidget {
           iconSize: theme.iconSize,
           color: theme.iconColor,
           icon: NiumaSdkIcon(
-            asset: NiumaSdkAssets.playPauseIcon(isPlaying: isPlaying),
+            asset: NiumaUiAssets.playPauseIcon(isPlaying: isPlaying),
             size: theme.iconSize,
             color: theme.iconColor,
           ),

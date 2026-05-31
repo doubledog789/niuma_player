@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -27,7 +28,7 @@ class QualitySelector extends StatelessWidget {
       iconColor: theme.iconColor,
       tooltip: '画质',
       icon: NiumaSdkIcon(
-        asset: NiumaSdkAssets.icQuality,
+        asset: NiumaUiAssets.icQuality,
         size: theme.iconSize,
         color: theme.iconColor,
       ),

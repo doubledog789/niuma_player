@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../controls/niuma_sdk_icon.dart';
 import '../core/niuma_player_theme.dart';
 
@@ -33,7 +34,7 @@ class NiumaCastButton extends StatelessWidget {
         if (session == null) {
           return IconButton(
             icon: NiumaSdkIcon(
-              asset: NiumaSdkAssets.icCast,
+              asset: NiumaUiAssets.icCast,
               color: theme.iconColor,
             ),
             onPressed: onTap,
@@ -45,7 +46,7 @@ class NiumaCastButton extends StatelessWidget {
           children: [
             IconButton(
               icon: const NiumaSdkIcon(
-                asset: NiumaSdkAssets.icCastConnected,
+                asset: NiumaUiAssets.icCastConnected,
                 color: Colors.lightBlueAccent,
               ),
               onPressed: onTap,

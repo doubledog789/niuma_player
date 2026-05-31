@@ -2,11 +2,41 @@ import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
 import '../controls/niuma_sdk_icon.dart';
+import '../niuma_ui_assets.dart';
 import '../shared/glass_card.dart';
 
 // 牛马品牌色（design-tokens.json brand.primary / primary_light）
 const _brandOrange = Color(0xFFEF9F27);
 const _brandLight = Color(0xFFFAC775);
+
+/// 把 headless 核手势产出的语义 [GestureHudIcon] 映射到本皮的 SVG 资源。
+String? _assetForHudIcon(GestureHudIcon? icon) {
+  switch (icon) {
+    case GestureHudIcon.play:
+      return NiumaUiAssets.icPlay;
+    case GestureHudIcon.pause:
+      return NiumaUiAssets.icPause;
+    case GestureHudIcon.speed:
+      return NiumaUiAssets.icSpeedAlt;
+    case GestureHudIcon.seekForward:
+      return NiumaUiAssets.icForward10;
+    case GestureHudIcon.seekBackward:
+      return NiumaUiAssets.icRewind10;
+    case GestureHudIcon.brightness:
+      return NiumaUiAssets.icSettings;
+    case GestureHudIcon.volume:
+      return NiumaUiAssets.icVolume;
+    case GestureHudIcon.volumeMute:
+      return NiumaUiAssets.icVolumeMute;
+    case null:
+      return null;
+  }
+}
+
+/// 解析 HUD 该渲染哪个 SVG：优先显式 [GestureFeedbackState.iconAsset]
+/// （本皮 gesture_layer 直接填的资源路径），否则映射核手势的语义 hudIcon。
+String? _resolveAsset(GestureFeedbackState state) =>
+    state.iconAsset ?? _assetForHudIcon(state.hudIcon);
 
 /// 默认手势 HUD（B 站 / YouTube 风）。
 ///
@@ -186,12 +216,13 @@ class _ValueCard extends StatelessWidget {
     final isBrightness = state.kind == GestureKind.brightness;
     // 亮度走牛马 highlight（暖金 #FAC775），音量走牛马 primary（橙 #EF9F27）
     final accent = isBrightness ? _brandLight : _brandOrange;
+    final asset = _resolveAsset(state);
     return GlassCard(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state.iconAsset != null) ...[
-            NiumaSdkIcon(asset: state.iconAsset!, color: accent, size: 36),
+          if (asset != null) ...[
+            NiumaSdkIcon(asset: asset, color: accent, size: 36),
             const SizedBox(height: 10),
           ] else if (state.icon != null) ...[
             Icon(state.icon, color: accent, size: 36),
@@ -222,15 +253,16 @@ class _SpeedPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final asset = _resolveAsset(state);
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       radius: 999,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state.iconAsset != null) ...[
+          if (asset != null) ...[
             NiumaSdkIcon(
-              asset: state.iconAsset!,
+              asset: asset,
               color: _brandOrange,
               size: 18,
             ),
@@ -261,6 +293,7 @@ class _IconFlash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final asset = _resolveAsset(state);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -275,10 +308,10 @@ class _IconFlash extends StatelessWidget {
               width: 0.5,
             ),
           ),
-          child: state.iconAsset != null
+          child: asset != null
               ? Center(
                   child: NiumaSdkIcon(
-                    asset: state.iconAsset!,
+                    asset: asset,
                     color: _brandOrange,
                     size: 44,
                   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../danmaku/niuma_danmaku_scope.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
@@ -30,7 +31,7 @@ class DanmakuButton extends StatelessWidget {
         child: IconButton(
           onPressed: null,
           icon: NiumaSdkIcon(
-            asset: NiumaSdkAssets.icDanmakuOff,
+            asset: NiumaUiAssets.icDanmakuOff,
             color: Colors.white38,
           ),
           tooltip: '弹幕（未注入 controller）',
@@ -46,7 +47,7 @@ class DanmakuButton extends StatelessWidget {
           onPressed: () => ctl.updateSettings(
               ctl.settings.copyWith(visible: !on)),
           icon: NiumaSdkIcon(
-            asset: NiumaSdkAssets.danmakuToggleIcon(isOn: on),
+            asset: NiumaUiAssets.danmakuToggleIcon(isOn: on),
             color: theme.iconColor,
           ),
           tooltip: on ? '关闭弹幕' : '开启弹幕',

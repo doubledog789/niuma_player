@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 
 import 'niuma_short_video_theme.dart';
-import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../controls/niuma_sdk_icon.dart';
 
 /// 短视频暂停态中央粘性图标。
@@ -40,7 +40,7 @@ class NiumaShortVideoPauseIndicator extends StatelessWidget {
           // 用 icPlayCircle 会再画一个 SVG 内置圆环，srcIn 强行染色后双圆叠
           // 出来奇怪的半透明轮廓。
           child: NiumaSdkIcon(
-            asset: NiumaSdkAssets.icPlay,
+            asset: NiumaUiAssets.icPlay,
             color: theme.pauseIndicatorIconColor,
             size: theme.pauseIndicatorIconSize,
           ),

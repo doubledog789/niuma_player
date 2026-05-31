@@ -9,7 +9,7 @@ import 'package:niuma_player_example/niuma_ui/controls/niuma_sdk_icon.dart';
 /// 找到第一个 [NiumaSdkIcon]，其 `asset` 字段等于 [assetPath]。
 ///
 /// ```dart
-/// expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsOneWidget);
+/// expect(findNiumaIcon(NiumaUiAssets.icPlay), findsOneWidget);
 /// ```
 Finder findNiumaIcon(String assetPath) {
   return find.byWidgetPredicate(

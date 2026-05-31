@@ -4,6 +4,7 @@
 import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter/widgets.dart' show IconData;
 
+import 'package:niuma_player/src/domain/gesture_hud_icon.dart';
 import 'package:niuma_player/src/domain/gesture_kind.dart';
 
 /// 手势 HUD 数据快照。
@@ -16,6 +17,7 @@ class GestureFeedbackState {
     this.label,
     this.icon,
     this.iconAsset,
+    this.hudIcon,
   });
 
   /// 当前手势类型。
@@ -27,13 +29,18 @@ class GestureFeedbackState {
   /// 中央文字显示（如 "+15s / 1:23 / 4:56" 或 "65%" 或 "2x 倍速"）。
   final String? label;
 
-  /// Material 图标。仅在 [iconAsset] 为 null 时由默认 HUD 渲染——
-  /// niuma 资源包覆盖到的图标走 [iconAsset]，没覆盖到的（如亮度）走 [icon]。
+  /// Material 图标。通用 fallback，HUD 在 [hudIcon] / [iconAsset] 都为 null
+  /// 时渲染。
   final IconData? icon;
 
-  /// niuma SDK SVG 资源路径（[NiumaSdkAssets.icXxx]）。优先于 [icon]——
-  /// 默认 HUD 看到非空时用 [SvgPicture.asset] 渲染，让品牌视觉贯穿手势 HUD。
+  /// 任意资源路径字符串（如消费方 app 的 SVG asset key）。HUD 看到非空时优先
+  /// 用 `SvgPicture.asset` 渲染。**headless 核不再填这个字段**——核手势改发
+  /// 语义 [hudIcon]，由消费方映射到自家资源。
   final String? iconAsset;
+
+  /// 语义 HUD 图标（headless 核手势路径产出的字段）。消费方 HUD widget 把它
+  /// 映射到自家 icon 资源（[GestureHudIcon.pause] → 暂停图标 等）。
+  final GestureHudIcon? hudIcon;
 
   /// 返回字段更新后的新实例。
   GestureFeedbackState copyWith({
@@ -42,6 +49,7 @@ class GestureFeedbackState {
     String? label,
     IconData? icon,
     String? iconAsset,
+    GestureHudIcon? hudIcon,
   }) =>
       GestureFeedbackState(
         kind: kind ?? this.kind,
@@ -49,6 +57,7 @@ class GestureFeedbackState {
         label: label ?? this.label,
         icon: icon ?? this.icon,
         iconAsset: iconAsset ?? this.iconAsset,
+        hudIcon: hudIcon ?? this.hudIcon,
       );
 
   @override
@@ -59,8 +68,10 @@ class GestureFeedbackState {
           progress == other.progress &&
           label == other.label &&
           icon == other.icon &&
-          iconAsset == other.iconAsset;
+          iconAsset == other.iconAsset &&
+          hudIcon == other.hudIcon;
 
   @override
-  int get hashCode => Object.hash(kind, progress, label, icon, iconAsset);
+  int get hashCode =>
+      Object.hash(kind, progress, label, icon, iconAsset, hudIcon);
 }

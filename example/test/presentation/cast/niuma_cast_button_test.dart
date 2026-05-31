@@ -13,8 +13,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: NiumaCastButton(controller: ctl)),
     ));
-    expect(findNiumaIcon(NiumaSdkAssets.icCast), findsOneWidget);
-    expect(findNiumaIcon(NiumaSdkAssets.icCastConnected), findsNothing);
+    expect(findNiumaIcon(NiumaUiAssets.icCast), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icCastConnected), findsNothing);
   });
 
   testWidgets('castSession 非 null → 显示 cast_connected 图标 + 设备名', (tester) async {
@@ -23,7 +23,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: NiumaCastButton(controller: ctl)),
     ));
-    expect(findNiumaIcon(NiumaSdkAssets.icCastConnected), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icCastConnected), findsOneWidget);
     expect(find.text('客厅小米电视'), findsOneWidget);
   });
 }

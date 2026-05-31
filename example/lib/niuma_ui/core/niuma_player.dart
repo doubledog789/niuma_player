@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../cast/cast_registry.dart';
 import '../ad/ad_schedule.dart';
 import '../ad/ad_scheduler.dart';
@@ -641,7 +642,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
               child: Row(
                 children: const [
                   NiumaSdkIcon(
-                    asset: NiumaSdkAssets.icCast,
+                    asset: NiumaUiAssets.icCast,
                     size: 18,
                     color: itemIconColor,
                   ),
@@ -655,7 +656,7 @@ class _NiumaPlayerState extends State<NiumaPlayer> {
               child: Row(
                 children: const [
                   NiumaSdkIcon(
-                    asset: NiumaSdkAssets.icPip,
+                    asset: NiumaUiAssets.icPip,
                     size: 18,
                     color: itemIconColor,
                   ),

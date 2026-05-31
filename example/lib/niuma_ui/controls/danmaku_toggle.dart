@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -26,7 +26,7 @@ class DanmakuToggle extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 NiumaSdkIcon(
-                  asset: NiumaSdkAssets.danmakuToggleIcon(isOn: on),
+                  asset: NiumaUiAssets.danmakuToggleIcon(isOn: on),
                   color: theme.actionIconColor,
                   size: 18,
                 ),

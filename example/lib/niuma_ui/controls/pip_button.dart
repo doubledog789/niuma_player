@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -36,7 +37,7 @@ class PipButton extends StatelessWidget {
             child: IconButton(
               onPressed: null,
               icon: NiumaSdkIcon(
-                asset: NiumaSdkAssets.icPip,
+                asset: NiumaUiAssets.icPip,
                 color: Colors.white38,
               ),
               tooltip: 'PiP（设备不支持）',
@@ -47,7 +48,7 @@ class PipButton extends StatelessWidget {
           return IconButton(
             onPressed: () => controller.exitPictureInPicture(),
             icon: NiumaSdkIcon(
-              asset: NiumaSdkAssets.icPipExit,
+              asset: NiumaUiAssets.icPipExit,
               color: theme.iconColor,
             ),
             tooltip: '退出画中画',
@@ -56,7 +57,7 @@ class PipButton extends StatelessWidget {
         return IconButton(
           onPressed: () => controller.enterPictureInPicture(),
           icon: NiumaSdkIcon(
-            asset: NiumaSdkAssets.icPip,
+            asset: NiumaUiAssets.icPip,
             color: theme.iconColor,
           ),
           tooltip: '进入画中画',

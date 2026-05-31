@@ -18,7 +18,7 @@ void main() {
       home: Scaffold(body: FullscreenButton(controller: ctl)),
     ));
 
-    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenEnter), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icFullscreenEnter), findsOneWidget);
 
     await tester.tap(find.byType(FullscreenButton));
     await tester.pumpAndSettle();
@@ -60,11 +60,11 @@ void main() {
     navObserver.pushedRoutes.clear();
 
     // demo 页不在全屏内 → icon 应是 fullscreen（不是 fullscreen_exit）。
-    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenEnter), findsOneWidget,
+    expect(findNiumaIcon(NiumaUiAssets.icFullscreenEnter), findsOneWidget,
         reason: 'demo 子 route 没有 NiumaFullscreenScope，应显示进入图标');
 
     // 点击应当 push 新 route（进入全屏），而不是 pop。
-    await tester.tap(findNiumaIcon(NiumaSdkAssets.icFullscreenEnter));
+    await tester.tap(findNiumaIcon(NiumaUiAssets.icFullscreenEnter));
     await tester.pumpAndSettle();
     expect(navObserver.pushedRoutes, isNotEmpty,
         reason: '没有 NiumaFullscreenScope 的子 route 点击应 push，不是 pop');
@@ -101,10 +101,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // 子 route 包裹了 NiumaFullscreenScope → icon = fullscreen_exit。
-    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenExit), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icFullscreenExit), findsOneWidget);
 
     // 点击应 pop——回到 home（找回 'go-fs' 文本）。
-    await tester.tap(findNiumaIcon(NiumaSdkAssets.icFullscreenExit));
+    await tester.tap(findNiumaIcon(NiumaUiAssets.icFullscreenExit));
     await tester.pumpAndSettle();
     expect(find.text('go-fs'), findsOneWidget,
         reason: '点击应 pop 回 home，而不是再 push 一层全屏');

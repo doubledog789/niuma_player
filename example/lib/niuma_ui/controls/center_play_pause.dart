@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -43,7 +44,7 @@ class CenterPlayPause extends StatelessWidget {
                 // 橙——不用 icPlayCircle 避免 SVG 内置圆环 srcIn 后变成不
                 // 透明色块跟外层 Material 圆叠出怪异轮廓。
                 child: NiumaSdkIcon(
-                  asset: NiumaSdkAssets.icPlay,
+                  asset: NiumaUiAssets.icPlay,
                   color: theme.actionIconColor,
                   size: theme.centerPlayPauseSize / 2,
                 ),

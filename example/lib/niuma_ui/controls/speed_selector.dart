@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -25,7 +26,7 @@ class SpeedSelector extends StatelessWidget {
       iconColor: theme.iconColor,
       tooltip: '倍速',
       icon: NiumaSdkIcon(
-        asset: NiumaSdkAssets.icSpeed,
+        asset: NiumaUiAssets.icSpeed,
         size: theme.iconSize,
         color: theme.iconColor,
       ),

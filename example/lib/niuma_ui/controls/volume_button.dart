@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -37,7 +38,7 @@ class _VolumeButtonState extends State<VolumeButton> {
       iconSize: theme.iconSize,
       color: theme.iconColor,
       icon: NiumaSdkIcon(
-        asset: NiumaSdkAssets.volumeIcon(volume: _muted ? 0.0 : 1.0),
+        asset: NiumaUiAssets.volumeIcon(volume: _muted ? 0.0 : 1.0),
         size: theme.iconSize,
         color: theme.iconColor,
       ),

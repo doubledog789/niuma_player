@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -62,7 +62,7 @@ class _LockButtonState extends State<LockButton> {
         // 锁屏 / 解锁两态都用同一个颜色（actionIconColor，默认白），
         // 不做 active 高亮——状态靠 lock ↔ unlock 图标本身区分。
         icon: NiumaSdkIcon(
-          asset: locked ? NiumaSdkAssets.icLock : NiumaSdkAssets.icUnlock,
+          asset: locked ? NiumaUiAssets.icLock : NiumaUiAssets.icUnlock,
           color: theme.actionIconColor,
         ),
       ),

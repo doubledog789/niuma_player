@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import 'icon_label_action.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -20,7 +21,7 @@ class PipAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconLabelAction(
-      icon: const NiumaSdkIcon(asset: NiumaSdkAssets.icPip),
+      icon: const NiumaSdkIcon(asset: NiumaUiAssets.icPip),
       label: '画中画',
       onTap: onTap ?? () {},
     );

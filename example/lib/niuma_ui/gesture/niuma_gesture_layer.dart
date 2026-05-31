@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import 'niuma_gesture_hud.dart';
 
 
@@ -108,7 +109,7 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
         progress: 1.0,
         label: '已暂停',
         icon: Icons.pause,
-        iconAsset: NiumaSdkAssets.icPause,
+        iconAsset: NiumaUiAssets.icPause,
       ));
     } else {
       widget.controller.play();
@@ -117,7 +118,7 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
         progress: 1.0,
         label: '播放中',
         icon: Icons.play_arrow,
-        iconAsset: NiumaSdkAssets.icPlay,
+        iconAsset: NiumaUiAssets.icPlay,
       ));
     }
     _scheduleHide();
@@ -132,7 +133,7 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
       progress: 1.0,
       label: '2x 倍速',
       icon: Icons.fast_forward,
-      iconAsset: NiumaSdkAssets.icSpeedAlt,
+      iconAsset: NiumaUiAssets.icSpeedAlt,
     ));
   }
 
@@ -203,8 +204,8 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
               '/ ${formatVideoTime(clamped)} / ${formatVideoTime(duration)}',
           icon: Icons.fast_forward,
           iconAsset: seekDeltaMs >= 0
-              ? NiumaSdkAssets.icForward10
-              : NiumaSdkAssets.icRewind10,
+              ? NiumaUiAssets.icForward10
+              : NiumaUiAssets.icRewind10,
         ));
       case GestureKind.brightness:
       case GestureKind.volume:
@@ -236,10 +237,10 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
           // 资源包约定：ic_settings 是亮度图标；ic_volume / ic_volume_mute
           // 是音量图标（音量为 0 走 mute 版本）。
           iconAsset: _lockedKind == GestureKind.brightness
-              ? NiumaSdkAssets.icSettings
+              ? NiumaUiAssets.icSettings
               : (newValue == 0
-                  ? NiumaSdkAssets.icVolumeMute
-                  : NiumaSdkAssets.icVolume),
+                  ? NiumaUiAssets.icVolumeMute
+                  : NiumaUiAssets.icVolume),
         ));
       case GestureKind.doubleTap:
       case GestureKind.longPressSpeed:

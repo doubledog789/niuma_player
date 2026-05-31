@@ -15,7 +15,7 @@ void main() {
     ));
 
     // length == 1 → SizedBox.shrink，没有图标。
-    expect(findNiumaIcon(NiumaSdkAssets.icQuality), findsNothing);
+    expect(findNiumaIcon(NiumaUiAssets.icQuality), findsNothing);
   });
 
   testWidgets('source.lines.length > 1 时渲染并展开 popup', (tester) async {
@@ -40,7 +40,7 @@ void main() {
       home: Scaffold(body: Center(child: QualitySelector(controller: ctl))),
     ));
 
-    expect(findNiumaIcon(NiumaSdkAssets.icQuality), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icQuality), findsOneWidget);
 
     await tester.tap(find.byType(QualitySelector));
     await tester.pumpAndSettle();

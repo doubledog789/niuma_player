@@ -146,12 +146,13 @@ void main() {
     await controller.dispose();
   });
 
-  test('双击播放中 → 暂停 + HUD 用 iconAsset 不引 material icon', () async {
+  test('双击播放中 → 暂停 + HUD 用语义 hudIcon 不引 material icon / 资源路径', () async {
     final (controller, backend, g) = await build();
     g.onDoubleTap();
     final hud = controller.gestureFeedback.value;
     expect(hud?.kind, GestureKind.doubleTap);
-    expect(hud?.iconAsset, NiumaSdkAssets.icPause);
+    expect(hud?.hudIcon, GestureHudIcon.pause);
+    expect(hud?.iconAsset, isNull); // headless：核不发资源路径
     expect(hud?.icon, isNull); // headless：不设 material IconData
     await controller.dispose();
   });

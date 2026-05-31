@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 
 /// 进度条上的牛马表情头像（Debug 风格 thumb）。
 ///
@@ -14,7 +14,7 @@ import 'package:niuma_player/niuma_player.dart';
 ///   - seekFast       → 吃惊
 ///   - paused（5s+） → 睡觉
 ///
-/// 资源在 [NiumaSdkAssets.thumbDefault]…[NiumaSdkAssets.thumbSleep]。
+/// 资源在 [NiumaUiAssets.thumbDefault]…[NiumaUiAssets.thumbSleep]。
 class NiumaProgressThumb extends StatefulWidget {
   const NiumaProgressThumb({
     super.key,
@@ -122,7 +122,7 @@ class _NiumaProgressThumbState extends State<NiumaProgressThumb> {
     final child = builder != null
         ? KeyedSubtree(key: ValueKey(_state), child: builder(context, _state))
         : SvgPicture.asset(
-            NiumaSdkAssets.thumbForState(_state),
+            NiumaUiAssets.thumbForState(_state),
             key: ValueKey(_state),
             width: widget.size,
             height: widget.size,

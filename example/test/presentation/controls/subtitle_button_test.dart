@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
-import 'package:niuma_player_example/niuma_ui/controls/subtitle_button.dart';
 
 import '../../_helpers/svg_finder.dart';
 
@@ -12,11 +10,11 @@ void main() {
       home: Scaffold(body: SubtitleButton()),
     ));
 
-    expect(findNiumaIcon(NiumaSdkAssets.icSubtitle), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icSubtitle), findsOneWidget);
     // disabled 视觉：用 Opacity wrap，opacity < 1.0
     final opacityWidget = tester.widget<Opacity>(
       find.ancestor(
-        of: findNiumaIcon(NiumaSdkAssets.icSubtitle),
+        of: findNiumaIcon(NiumaUiAssets.icSubtitle),
         matching: find.byType(Opacity),
       ),
     );

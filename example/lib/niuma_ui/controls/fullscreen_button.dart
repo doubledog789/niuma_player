@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import '../fullscreen/niuma_fullscreen_page.dart';
 import 'niuma_sdk_icon.dart';
@@ -33,7 +34,7 @@ class FullscreenButton extends StatelessWidget {
       iconSize: theme.iconSize,
       color: theme.iconColor,
       icon: NiumaSdkIcon(
-        asset: NiumaSdkAssets.fullscreenIcon(isFullscreen: inFullscreen),
+        asset: NiumaUiAssets.fullscreenIcon(isFullscreen: inFullscreen),
         size: theme.iconSize,
         color: theme.iconColor,
       ),

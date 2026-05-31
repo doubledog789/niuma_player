@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:ui' show Offset, Size;
 
 import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
+import 'package:niuma_player/src/domain/gesture_hud_icon.dart';
 import 'package:niuma_player/src/domain/gesture_kind.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
-import 'package:niuma_player/src/niuma_sdk_assets.dart';
 import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
 import 'package:niuma_player/src/presentation/shared/video_time_format.dart';
 
@@ -22,9 +22,9 @@ import 'package:niuma_player/src/presentation/shared/video_time_format.dart';
 /// - 左半屏垂直 pan → 亮度（立即生效，节流 50ms）
 /// - 右半屏垂直 pan → 音量（同上）
 ///
-/// HUD 反馈只产出 [GestureFeedbackState.iconAsset]（SDK 资源路径），不引
-/// material `Icons`——5 项手势的 HUD 资源包都已覆盖，所以核里零 material 依赖；
-/// 参考皮的 HUD widget 按 iconAsset 渲染即可。
+/// HUD 反馈只产出语义 [GestureFeedbackState.hudIcon]（[GestureHudIcon] 枚举），
+/// 不引 material `Icons`、也不绑定任何资源路径——核里零 material、零 UI 资源
+/// 依赖；消费方 HUD widget 把 [GestureHudIcon] 映射到自家 icon 资源即可。
 class NiumaGestureController {
   /// 构造一个手势编排器，驱动给定 [player]。
   NiumaGestureController(this.player, {this.disabledGestures = const {}});
@@ -76,7 +76,7 @@ class NiumaGestureController {
         kind: GestureKind.doubleTap,
         progress: 1.0,
         label: '已暂停',
-        iconAsset: NiumaSdkAssets.icPause,
+        hudIcon: GestureHudIcon.pause,
       ));
     } else {
       player.play();
@@ -84,7 +84,7 @@ class NiumaGestureController {
         kind: GestureKind.doubleTap,
         progress: 1.0,
         label: '播放中',
-        iconAsset: NiumaSdkAssets.icPlay,
+        hudIcon: GestureHudIcon.play,
       ));
     }
     _scheduleHide();
@@ -99,7 +99,7 @@ class NiumaGestureController {
       kind: GestureKind.longPressSpeed,
       progress: 1.0,
       label: '2x 倍速',
-      iconAsset: NiumaSdkAssets.icSpeedAlt,
+      hudIcon: GestureHudIcon.speed,
     ));
   }
 
@@ -169,9 +169,9 @@ class NiumaGestureController {
               clamped.inMilliseconds / duration.inMilliseconds.clamp(1, 1 << 30),
           label: '${seekDeltaMs >= 0 ? '+' : ''}${seekDeltaMs ~/ 1000}s '
               '/ ${formatVideoTime(clamped)} / ${formatVideoTime(duration)}',
-          iconAsset: seekDeltaMs >= 0
-              ? NiumaSdkAssets.icForward10
-              : NiumaSdkAssets.icRewind10,
+          hudIcon: seekDeltaMs >= 0
+              ? GestureHudIcon.seekForward
+              : GestureHudIcon.seekBackward,
         ));
       case GestureKind.brightness:
       case GestureKind.volume:
@@ -197,13 +197,11 @@ class NiumaGestureController {
           kind: _lockedKind!,
           progress: newValue,
           label: '${(newValue * 100).round()}%',
-          // 资源包约定：ic_settings 是亮度图标；ic_volume / ic_volume_mute
-          // 是音量图标（音量为 0 走 mute 版本）。
-          iconAsset: _lockedKind == GestureKind.brightness
-              ? NiumaSdkAssets.icSettings
+          hudIcon: _lockedKind == GestureKind.brightness
+              ? GestureHudIcon.brightness
               : (newValue == 0
-                  ? NiumaSdkAssets.icVolumeMute
-                  : NiumaSdkAssets.icVolume),
+                  ? GestureHudIcon.volumeMute
+                  : GestureHudIcon.volume),
         ));
       case GestureKind.doubleTap:
       case GestureKind.longPressSpeed:

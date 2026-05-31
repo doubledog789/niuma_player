@@ -73,7 +73,4 @@ flutter:
         pluginClass: NiumaPlayerWebRegistrar
         fileName: niuma_player_web.dart
   assets:
-    - assets/loading/
-    - assets/player_controls/
-    - assets/progress_thumbs/
     - assets/hls/

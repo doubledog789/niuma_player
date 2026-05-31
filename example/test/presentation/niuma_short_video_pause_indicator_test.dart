@@ -1,7 +1,6 @@
 // test/presentation/niuma_short_video_pause_indicator_test.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 
 import '../_helpers/svg_finder.dart';
@@ -16,7 +15,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icPlay), findsOneWidget);
   });
 
   testWidgets('容器尺寸 == theme.pauseIndicatorSize', (tester) async {

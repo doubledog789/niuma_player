@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
-import 'package:niuma_player_example/niuma_ui/controls/play_pause_button.dart';
 
 import '../../_helpers/svg_finder.dart';
 import 'fake_controller.dart';
@@ -17,8 +16,8 @@ void main() {
       home: Scaffold(body: PlayPauseButton(controller: ctl)),
     ));
 
-    expect(findNiumaIcon(NiumaSdkAssets.icPause), findsOneWidget);
-    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsNothing);
+    expect(findNiumaIcon(NiumaUiAssets.icPause), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icPlay), findsNothing);
   });
 
   testWidgets('phase=paused 显示 play 图标', (tester) async {
@@ -30,8 +29,8 @@ void main() {
       home: Scaffold(body: PlayPauseButton(controller: ctl)),
     ));
 
-    expect(findNiumaIcon(NiumaSdkAssets.icPlay), findsOneWidget);
-    expect(findNiumaIcon(NiumaSdkAssets.icPause), findsNothing);
+    expect(findNiumaIcon(NiumaUiAssets.icPlay), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icPause), findsNothing);
   });
 
   testWidgets('phase=playing 时点击调 controller.pause()', (tester) async {

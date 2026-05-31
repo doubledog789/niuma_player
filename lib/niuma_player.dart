@@ -42,9 +42,8 @@ export 'package:niuma_player/src/presentation/core/niuma_player_view.dart';
 // 留核（widget / resolver / cache 实现细节在参考皮里）。
 export 'package:niuma_player/src/presentation/thumbnail/thumbnail_frame.dart' show ThumbnailFrame;
 
-// 资源包路径常量 + 进度条牛马表情 thumb 状态枚举
-export 'src/niuma_sdk_assets.dart'
-    show NiumaSdkAssets, NiumaProgressThumbState;
+// 运行时资源常量（仅 web 后端 hls.js 路径；UI 资源已移出核）
+export 'src/niuma_sdk_assets.dart' show NiumaSdkAssets;
 
 // 编排
 export 'src/orchestration/multi_source.dart'
@@ -95,6 +94,7 @@ export 'package:niuma_player/src/observability/analytics_emitter.dart' show Anal
 // M13 手势（headless：意图映射 controller + 值对象，HUD widget 在参考皮）
 export 'package:niuma_player/src/domain/gesture_kind.dart' show GestureKind;
 export 'package:niuma_player/src/domain/gesture_feedback_state.dart' show GestureFeedbackState;
+export 'package:niuma_player/src/domain/gesture_hud_icon.dart' show GestureHudIcon;
 export 'package:niuma_player/src/presentation/gesture/niuma_gesture_controller.dart'
     show NiumaGestureController;
 

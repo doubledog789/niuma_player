@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -15,7 +15,7 @@ class BackAction extends StatelessWidget {
     final theme = NiumaPlayerTheme.of(context);
     return IconButton(
       icon: NiumaSdkIcon(
-        asset: NiumaSdkAssets.icBack,
+        asset: NiumaUiAssets.icBack,
         size: 18,
         color: theme.actionIconColor,
       ),

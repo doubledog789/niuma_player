@@ -18,8 +18,8 @@ void main() {
       ),
     ));
 
-    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenEnter), findsOneWidget);
-    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenExit), findsNothing);
+    expect(findNiumaIcon(NiumaUiAssets.icFullscreenEnter), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icFullscreenExit), findsNothing);
   });
 
   testWidgets('在 M9 NiumaFullscreenScope 内显示 Icons.fullscreen_exit',
@@ -34,8 +34,8 @@ void main() {
       ),
     ));
 
-    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenExit), findsOneWidget);
-    expect(findNiumaIcon(NiumaSdkAssets.icFullscreenEnter), findsNothing);
+    expect(findNiumaIcon(NiumaUiAssets.icFullscreenExit), findsOneWidget);
+    expect(findNiumaIcon(NiumaUiAssets.icFullscreenEnter), findsNothing);
   });
 
   testWidgets('不在 scope 时点击 push 一个新 route', (tester) async {

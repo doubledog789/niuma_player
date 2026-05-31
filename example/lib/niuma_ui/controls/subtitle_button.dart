@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -24,7 +24,7 @@ class SubtitleButton extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: NiumaSdkIcon(
-              asset: NiumaSdkAssets.icSubtitle,
+              asset: NiumaUiAssets.icSubtitle,
               size: theme.iconSize,
               color: theme.iconColor,
             ),

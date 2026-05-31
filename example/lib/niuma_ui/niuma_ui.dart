@@ -15,6 +15,9 @@
 /// 为本地相对路径即可。
 library;
 
+// UI 资源路径常量 + 进度条牛马表情 thumb 状态枚举
+export 'niuma_ui_assets.dart' show NiumaUiAssets, NiumaProgressThumbState;
+
 // 一体化 widget + 主题
 export 'core/niuma_player.dart' show NiumaPlayer, NiumaPlayerConfigScope;
 export 'core/niuma_player_theme.dart'

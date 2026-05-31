@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import '../niuma_ui_assets.dart';
 import 'icon_label_action.dart';
 import 'niuma_sdk_icon.dart';
 
@@ -21,7 +22,7 @@ class CastAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconLabelAction(
-      icon: const NiumaSdkIcon(asset: NiumaSdkAssets.icCast),
+      icon: const NiumaSdkIcon(asset: NiumaUiAssets.icCast),
       label: '投屏',
       onTap: onTap ?? () {},
     );
