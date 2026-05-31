@@ -7,7 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:niuma_player/niuma_player.dart';
 
-import '_root_bg_io.dart' if (dart.library.html) '_root_bg_web.dart';
+import '_root_bg_io.dart' if (dart.library.js_interop) '_root_bg_web.dart';
 
 /// Web 全屏路由计数——有 N 个 [NiumaFullscreenPage] 处于活跃路由栈时为 N。
 ///

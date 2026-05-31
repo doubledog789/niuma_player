@@ -63,7 +63,7 @@
 | **iOS** | AVPlayer (`video_player`) | ✅ 原生 | ✅ 反射 AVPlayer | ✅ AirPlay | ✅ |
 | **Android** | ExoPlayer ↔ IJK (自家 plugin) | ✅ 原生 | ✅ 业务 1 行接入 | ✅ DLNA | ✅ |
 | **Safari (PWA)** | 自家 `<video>` element | ✅ 原生 | ⚠️ 隐藏（user gesture 限制） | ⚠️ 隐藏 | ⚠️ no-op + 旋转提示 |
-| **Chrome / Firefox / Edge** | 自家 `<video>` element | ⚠️ 需引入 hls.js（不内置） | ⚠️ 隐藏 | ⚠️ 隐藏 | ⚠️ no-op + 旋转提示 |
+| **Chrome / Firefox / Edge** | 自家 `<video>` element | ✅ hls.js（内置自动注入） | ⚠️ 隐藏 | ⚠️ 隐藏 | ⚠️ no-op + 旋转提示 |
 
 ---
 
@@ -369,7 +369,7 @@ A：v0.9.1 起 `bottomActionsBuilder` 默认放右组首位（语义更接近 se
 A：`gestureHudBuilder` / `loadingBuilder` / `errorBuilder` / `endedBuilder` 全 slot 化，业务可任意替换。参考 [`custom_feedback_ui_demo.dart`](example/lib/custom_feedback_ui_demo.dart)。
 
 **Q：Chrome 上 HLS 不能播？**
-A：Chrome 没原生 HLS。`pubspec.yaml` 加 `video_player_web_hls` 引入 hls.js 兜底。SDK 不内置因为体积考虑（hls.js ~250KB）。
+A：开箱即用，无需额外配置。SDK 已内置 vendored `hls.js`（`assets/hls/hls.min.js`，~415KB），仅在「放 HLS 源 + 非 Safari 浏览器」时运行时懒注入 `<script>`；纯 mp4 页面不加载任何额外 JS。Safari 走浏览器原生 HLS。
 
 ---
 

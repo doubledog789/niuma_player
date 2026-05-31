@@ -19,6 +19,13 @@ class NiumaSdkAssets {
   static const String _thumb = 'packages/$_pkg/assets/progress_thumbs';
   static const String _load = 'packages/$_pkg/assets/loading';
 
+  /// Web-only：vendored hls.js（HLS-in-Chrome）的 **HTTP 运行时 URL**——
+  /// 注意不是 `rootBundle` 的 asset key（那个是 `packages/$_pkg/...`），
+  /// 而是 flutter web 构建后 package asset 对外暴露的 `assets/packages/...`
+  /// 路径，供 [WebVideoBackend] 动态注入 `<script src>` 用。
+  static const String hlsJsUrl =
+      'assets/packages/$_pkg/assets/hls/hls.min.js';
+
   // ===== 播放控制 =====
   static const String icPlay = '$_ctrl/ic_play.svg';
   static const String icPause = '$_ctrl/ic_pause.svg';

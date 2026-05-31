@@ -15,7 +15,8 @@ topics:
   - ijkplayer
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  # 3.4 needed for package:web + dart:js_interop_unsafe (web 后端用)。
+  sdk: '>=3.4.0 <4.0.0'
   flutter: '>=3.10.0'
 
 dependencies:
@@ -27,12 +28,11 @@ dependencies:
   # VideoPlayerBackend on the Dart side imports it. AGP just leaves the
   # video_player_android plugin's small Java surface unused.
   #
-  # Web HLS note: we deliberately do NOT depend on video_player_web_hls.
-  # mp4/webm play natively in all browsers via <video>, and Safari supports
-  # m3u8 natively. Chrome/Firefox/Edge can't play m3u8 here, but pulling in
-  # hls.js (~250KB minified) for that one case isn't worth the bundle cost
-  # given mobile is the primary target. Re-add the dep if HLS-in-browser
-  # becomes a hard requirement.
+  # Web HLS note: mp4 plays natively via <video> in all browsers, Safari plays
+  # m3u8 natively. Chrome/Firefox/Edge need hls.js (MSE) for HLS — we vendor
+  # it under assets/hls/hls.min.js and lazy-inject the <script> only when an
+  # HLS source actually plays on a non-Safari browser (see web_video_backend).
+  # Nothing extra is loaded for mp4-only pages.
   shared_preferences: ^2.2.0
   # 2.10.0 加入 VideoPlayerController.playerId getter，iOS PiP 桥需要它把
   # Flutter texture id 映射到原生 AVPlayer 实例（见 video_player_backend.dart）
@@ -49,6 +49,9 @@ dependencies:
   http: ^1.0.0
   # 渲染资源包里的 niuma 风格 SVG 图标 + loading 动画。
   flutter_svg: ^2.0.9
+  # Web 后端用 <video> + DOM 操作。用 package:web（替代已废弃的 dart:html），
+  # 让 web 端可随 `flutter build web --wasm` 编译。
+  web: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -75,3 +78,4 @@ flutter:
     - assets/loading/
     - assets/player_controls/
     - assets/progress_thumbs/
+    - assets/hls/

@@ -1,17 +1,18 @@
 import 'dart:async';
-// ignore: deprecated_member_use, avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:ui' show Size;
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/foundation.dart';
+import 'package:web/web.dart' as web;
 
 import 'package:niuma_player/src/data/_pip_event_bus.dart';
+import 'package:niuma_player/src/data/hls_detect.dart';
 import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/domain/player_backend.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
+import 'package:niuma_player/src/niuma_sdk_assets.dart';
 
 /// 自家 web 实现——直接用 `<video>` HTML element + `ui_web`
 /// `platformViewRegistry` 注册 view factory，**不依赖 `package:video_player`
@@ -30,19 +31,35 @@ import 'package:niuma_player/src/domain/player_state.dart';
 /// - PiP：浏览器有原生 `<video>` PiP 但需要用户手势触发，SDK 不强制
 /// - 投屏：web 不支持 DLNA / AirPlay 程序化触发——仍可通过浏览器 cast 菜单
 /// - 设置亮度 / 系统音量：浏览器无 API
+///
+/// 实现基于 `package:web` + `dart:js_interop`（不用已废弃的 `dart:html`），
+/// 因此可随 `flutter build web --wasm` 一起编译。
 class WebVideoBackend extends PlayerBackend {
   WebVideoBackend(this._dataSource)
       : _viewType = 'niuma-video-${_nextId++}' {
     final headers = _dataSource.headers ?? const <String, String>{};
-    _video = html.VideoElement()
-      ..src = _dataSource.uri
+    _video = web.document.createElement('video') as web.HTMLVideoElement
       ..autoplay = false
       ..controls = false
-      ..crossOrigin = headers.isNotEmpty ? 'anonymous' : null
-      ..style.pointerEvents = 'none'
-      ..style.objectFit = 'contain'
-      ..style.width = '100%'
-      ..style.height = '100%';
+      ..crossOrigin = headers.isNotEmpty ? 'anonymous' : null;
+    _video.style
+      ..setProperty('pointer-events', 'none')
+      ..setProperty('object-fit', 'contain')
+      ..setProperty('width', '100%')
+      ..setProperty('height', '100%');
+    // HLS(.m3u8) 哪些浏览器需要 hls.js：
+    // - Safari / iOS（含 iOS Chrome，底层都是 WebKit）：原生支持 HLS，
+    //   走 <video>.src，不下 hls.js。
+    // - Chrome / Firefox / Edge：原生不支持，需 hls.js（MSE）。
+    //
+    // **不能用 `canPlayType('application/vnd.apple.mpegurl')` 判定**——实测
+    // 部分 Chromium 对该 MIME 返 "maybe" 却根本解不了（native demuxer 直接
+    // DEMUXER_ERROR_COULD_NOT_PARSE）。用 navigator.vendor 区分 Apple WebKit
+    // （原生 HLS）更可靠。
+    _useHlsJs = isHlsUrl(_dataSource.uri) && !_isAppleWebKit() && _hasMse();
+    if (!_useHlsJs) {
+      _video.src = _dataSource.uri;
+    }
     // iOS Safari 经典坑：<video> 默认第一次 play 时**自动**进入 fullscreen
     // player（非 inline）——即使没调 fullscreen API。必须显式 playsinline
     // 让 video 在 inline 容器内播放。
@@ -62,11 +79,12 @@ class WebVideoBackend extends PlayerBackend {
     // 在 fullscreen overlay 场景下事件路由整体崩——所有按钮失灵 + 视频
     // 黑屏。已回退。Web 上"在视频外侧 tap"或"用底栏进度条 / 暂停按钮"
     // 是当前 workaround；后续如有更稳的事件穿透方案再启用。
-    _wrapper = html.DivElement()
-      ..style.pointerEvents = 'none'
-      ..style.width = '100%'
-      ..style.height = '100%'
-      ..append(_video);
+    _wrapper = web.document.createElement('div') as web.HTMLDivElement;
+    _wrapper.style
+      ..setProperty('pointer-events', 'none')
+      ..setProperty('width', '100%')
+      ..setProperty('height', '100%');
+    _wrapper.appendChild(_video);
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
       (int viewId) => _wrapper,
@@ -80,8 +98,15 @@ class WebVideoBackend extends PlayerBackend {
 
   final NiumaDataSource _dataSource;
   final String _viewType;
-  late final html.VideoElement _video;
-  late final html.DivElement _wrapper;
+  late final web.HTMLVideoElement _video;
+  late final web.HTMLDivElement _wrapper;
+
+  /// 构造时算出：true 表示该源需要 hls.js（HLS 源 + 浏览器原生不支持）。
+  late final bool _useHlsJs;
+
+  /// hls.js 实例（JS `Hls` object）——仅 [_useHlsJs] 时在 [initialize]
+  /// 创建，[dispose] 销毁。
+  JSObject? _hls;
 
   bool _disposed = false;
   bool _initialized = false;
@@ -108,9 +133,17 @@ class WebVideoBackend extends PlayerBackend {
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast();
 
-  // 监听 video element 各种事件——event listener 持有引用方便 dispose 时移除。
-  final List<StreamSubscription<dynamic>> _subs = <StreamSubscription<dynamic>>[];
+  // video element 事件监听——保存 removeEventListener 回调，dispose 时统一移除。
+  final List<void Function()> _listenerRemovers = <void Function()>[];
   StreamSubscription<dynamic>? _pipEventSub;
+
+  /// 注册一个 video element 事件 listener，并登记反注册回调。listener 体
+  /// 都不关心 event 对象（一律读 `_video.xxx`），所以 handler 不带参。
+  void _on(String type, void Function() handler) {
+    final cb = ((web.Event _) => handler()).toJS;
+    _video.addEventListener(type, cb);
+    _listenerRemovers.add(() => _video.removeEventListener(type, cb));
+  }
 
   @override
   PlayerBackendKind get kind => PlayerBackendKind.videoPlayer;
@@ -185,37 +218,37 @@ class WebVideoBackend extends PlayerBackend {
   }
 
   void _attachListeners() {
-    _subs.add(_video.onLoadedMetadata.listen((_) {
+    _on('loadedmetadata', () {
       _maybeMarkInitialized();
       _maybeUpdateSize();
-    }));
-    _subs.add(_video.onDurationChange.listen((_) => _maybeMarkInitialized()));
-    _subs.add(_video.onCanPlay.listen((_) {
+    });
+    _on('durationchange', _maybeMarkInitialized);
+    _on('canplay', () {
       _maybeMarkInitialized();
       _maybeUpdateSize();
-    }));
-    _subs.add(_video.onPlay.listen((_) {
+    });
+    _on('play', () {
       if (_disposed) return;
       _setPhase(PlayerPhase.playing);
-    }));
-    _subs.add(_video.onPause.listen((_) {
+    });
+    _on('pause', () {
       if (_disposed) return;
       // ended 状态下 pause 事件也会触发——避免覆盖 ended phase
       if (_value.phase == PlayerPhase.ended) return;
       _setPhase(PlayerPhase.paused);
-    }));
-    _subs.add(_video.onWaiting.listen((_) {
+    });
+    _on('waiting', () {
       if (_disposed) return;
       _setPhase(PlayerPhase.buffering);
-    }));
-    _subs.add(_video.onPlaying.listen((_) {
+    });
+    _on('playing', () {
       if (_disposed) return;
       _setPhase(PlayerPhase.playing);
       // 首帧渲染后 iOS Safari 才把真实尺寸塞进 videoWidth/videoHeight，
       // 这时再 retry 一次同步到 value.size。
       _maybeUpdateSize();
-    }));
-    _subs.add(_video.onTimeUpdate.listen((_) {
+    });
+    _on('timeupdate', () {
       if (_disposed) return;
       _emit(_value.copyWith(
         position: Duration(
@@ -227,10 +260,10 @@ class WebVideoBackend extends PlayerBackend {
       if (_value.size.width <= 0 || _value.size.height <= 0) {
         _maybeUpdateSize();
       }
-    }));
-    // buffered 进度跟随 timeupdate 一起更新（progress event dart:html 暴露
-    // 不一致，timeupdate 频率够用）
-    _subs.add(_video.onTimeUpdate.listen((_) {
+    });
+    // buffered 进度跟随 timeupdate 一起更新（progress event 暴露不一致，
+    // timeupdate 频率够用）
+    _on('timeupdate', () {
       if (_disposed) return;
       final buf = _video.buffered;
       if (buf.length == 0) return;
@@ -238,13 +271,13 @@ class WebVideoBackend extends PlayerBackend {
       _emit(_value.copyWith(
         bufferedPosition: Duration(milliseconds: (end * 1000).round()),
       ));
-    }));
-    _subs.add(_video.onEnded.listen((_) {
+    });
+    _on('ended', () {
       if (_disposed) return;
       // 如果设了 loop，浏览器自动 seek 0 + replay——不会触发 ended
       _setPhase(PlayerPhase.ended);
-    }));
-    _subs.add(_video.onError.listen((_) {
+    });
+    _on('error', () {
       if (_disposed) return;
       final code = _video.error?.code;
       final msg = _video.error?.message ?? 'unknown video error';
@@ -276,7 +309,7 @@ class WebVideoBackend extends PlayerBackend {
       if (c != null && !c.isCompleted) {
         c.completeError(err);
       }
-    }));
+    });
 
     // 监听共享 PiP event bus（web 上没真正 PiP plugin，但保持 API
     // 一致——other backends 的 PiP 事件不会泄漏到 web，这条 sub 在 web
@@ -289,18 +322,81 @@ class WebVideoBackend extends PlayerBackend {
     if (_disposed) return;
     final completer = Completer<void>();
     _initCompleter = completer;
-    // browser 接到 src 后异步加载 metadata——event listener 在
-    // [_maybeMarkInitialized]（成功）/ onError（失败）里 complete completer，
-    // 让 `await initialize()` 真正等到 load 结果。
-    _video.load();
+    if (_useHlsJs) {
+      // hls.js 路径：异步加载脚本 + attachMedia 后，<video> 的标准 media
+      // 事件（loadedmetadata / canplay）照常触发，completer 仍由
+      // [_maybeMarkInitialized]（成功）/ hls.js fatal error（失败）完成。
+      await _initHlsJs();
+    } else {
+      // browser 接到 src 后异步加载 metadata——event listener 在
+      // [_maybeMarkInitialized]（成功）/ onError（失败）里 complete completer，
+      // 让 `await initialize()` 真正等到 load 结果。
+      _video.load();
+    }
     return completer.future;
+  }
+
+  /// 加载 hls.js → 检查 MSE → `new Hls()` + attachMedia + loadSource。
+  /// 脚本加载失败或浏览器无 MSE 时直接 [_failInit]。
+  Future<void> _initHlsJs() async {
+    try {
+      await _ensureHlsJsLoaded();
+    } catch (e) {
+      _failInit(PlayerError(
+        category: PlayerErrorCategory.network,
+        message: 'hls.js failed to load: $e',
+      ));
+      return;
+    }
+    if (_disposed) return;
+    final hlsCtor = globalContext.getProperty('Hls'.toJS) as JSFunction;
+    final supported = (hlsCtor.getProperty('isSupported'.toJS) as JSFunction)
+        .callAsFunction(hlsCtor) as JSBoolean?;
+    if (supported?.toDart != true) {
+      _failInit(PlayerError(
+        category: PlayerErrorCategory.codecUnsupported,
+        message: 'MSE (Media Source Extensions) not supported by this browser',
+      ));
+      return;
+    }
+    final hls = hlsCtor.callAsConstructor<JSObject>(JSObject());
+    _hls = hls;
+    // 只处理 fatal error 映射进 PlayerError；非 fatal 交给 hls.js 自愈，
+    // fatal 上抛后由 orchestration 层 auto-failover / 换线接管（与既有架构
+    // 一致，backend 内不自己 retry）。'hlsError' === Hls.Events.ERROR。
+    hls.callMethod('on'.toJS, 'hlsError'.toJS, _onHlsError.toJS);
+    hls.callMethod('attachMedia'.toJS, _video as JSObject);
+    hls.callMethod('loadSource'.toJS, _dataSource.uri.toJS);
+  }
+
+  void _onHlsError(JSAny _, JSObject data) {
+    if (_disposed) return;
+    final fatal = data.getProperty<JSBoolean?>('fatal'.toJS)?.toDart ?? false;
+    if (!fatal) return;
+    final type = data.getProperty<JSString?>('type'.toJS)?.toDart;
+    final details = data.getProperty<JSString?>('details'.toJS)?.toDart ??
+        'hls.js fatal error';
+    final category = switch (type) {
+      'networkError' => PlayerErrorCategory.network,
+      'mediaError' => PlayerErrorCategory.codecUnsupported,
+      _ => PlayerErrorCategory.unknown,
+    };
+    _failInit(PlayerError(category: category, message: details, code: type));
+  }
+
+  /// 把错误同步进 phase，并让仍在 await 的 [initialize] 立刻拿到——不等
+  /// 30s initTimeout 撞墙（与 [_attachListeners] 里 onError 同款语义）。
+  void _failInit(PlayerError err) {
+    _setPhase(PlayerPhase.error, error: err);
+    final c = _initCompleter;
+    if (c != null && !c.isCompleted) c.completeError(err);
   }
 
   @override
   Future<void> play() async {
     if (_disposed) return;
     try {
-      await _video.play();
+      await _video.play().toDart;
     } catch (e) {
       if (kDebugMode) debugPrint('[WebVideoBackend] play() rejected: $e');
       // 区分 fatal vs 非 fatal：
@@ -395,7 +491,7 @@ class WebVideoBackend extends PlayerBackend {
       }
     } catch (_) {/* fallback */}
     try {
-      await _video.requestFullscreen();
+      await _video.requestFullscreen().toDart;
       return true;
     } catch (_) {
       return false;
@@ -411,13 +507,16 @@ class WebVideoBackend extends PlayerBackend {
     if (c != null && !c.isCompleted) {
       c.completeError(StateError('WebVideoBackend disposed before initialize'));
     }
-    for (final s in _subs) {
-      await s.cancel();
+    for (final remove in _listenerRemovers) {
+      remove();
     }
-    _subs.clear();
+    _listenerRemovers.clear();
     await _pipEventSub?.cancel();
     _pipEventSub = null;
     _video.pause();
+    // hls.js 持有 MSE buffer / xhr，必须显式 destroy 释放，否则泄漏。
+    _hls?.callMethod('destroy'.toJS);
+    _hls = null;
     // 清 src 让浏览器释放底层资源
     _video.src = '';
     _video.load();
@@ -426,3 +525,58 @@ class WebVideoBackend extends PlayerBackend {
     _isWebFullscreen.dispose();
   }
 }
+
+/// 进程级缓存：hls.js 脚本只注入一次，多个 [WebVideoBackend] 实例共享。
+Future<void>? _hlsLoadFuture;
+
+/// 懒注入 vendored hls.js `<script>`，await 到 load 完成。幂等：window.Hls
+/// 已存在（消费方自己在 index.html 引了，或上次已注入）直接返回；加载失败
+/// 不缓存失败 future，下次还能重试。
+Future<void> _ensureHlsJsLoaded() {
+  final existing = _hlsLoadFuture;
+  if (existing != null) return existing;
+  if (globalContext.has('Hls')) {
+    return _hlsLoadFuture = Future<void>.value();
+  }
+  final completer = Completer<void>();
+  final script = web.document.createElement('script') as web.HTMLScriptElement
+    ..src = NiumaSdkAssets.hlsJsUrl
+    ..type = 'text/javascript';
+  late final JSFunction onLoad;
+  late final JSFunction onError;
+  void cleanup() {
+    script.removeEventListener('load', onLoad);
+    script.removeEventListener('error', onError);
+  }
+
+  onLoad = ((web.Event _) {
+    if (!completer.isCompleted) completer.complete();
+    cleanup();
+  }).toJS;
+  onError = ((web.Event _) {
+    if (!completer.isCompleted) {
+      _hlsLoadFuture = null;
+      completer.completeError(
+        StateError('failed to load hls.js from ${NiumaSdkAssets.hlsJsUrl}'),
+      );
+    }
+    cleanup();
+  }).toJS;
+  script.addEventListener('load', onLoad);
+  script.addEventListener('error', onError);
+  web.document.head!.appendChild(script);
+  return _hlsLoadFuture = completer.future;
+}
+
+/// navigator.vendor === 'Apple Computer, Inc.'——Safari / iOS WebKit（含
+/// iOS Chrome）。这些浏览器原生支持 HLS，无需 hls.js。
+bool _isAppleWebKit() {
+  final nav = globalContext.getProperty('navigator'.toJS) as JSObject?;
+  final vendor = nav?.getProperty('vendor'.toJS) as JSString?;
+  return vendor?.toDart == 'Apple Computer, Inc.';
+}
+
+/// 浏览器是否有 MSE（hls.js 的硬性前提）。iPhone Safari 历史上无
+/// `MediaSource`（iOS 17.1+ 才补 `ManagedMediaSource`），两者都查。
+bool _hasMse() =>
+    globalContext.has('MediaSource') || globalContext.has('ManagedMediaSource');
