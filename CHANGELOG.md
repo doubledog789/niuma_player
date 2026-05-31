@@ -7,16 +7,64 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
+## [0.1.0]
+
+### BREAKING CHANGE: 重定位为 headless 播放内核
+
+`niuma_player` 现在只导出播放内核：`NiumaPlayerController` + 全部编排逻辑
+（多线路 / 续播 / retry / source middleware / auto-failover / 弹幕引擎 /
+缩略图轨道）+ 手势 / 全屏 / 弹幕的 **headless controller**
+（`NiumaGestureController` / `NiumaFullscreenController` /
+`NiumaDanmakuController`）+ cast 抽象（`CastService` 接口除外，见下）。
+
+所有 UI widget（`NiumaPlayer` 一体化、22 个原子控件、控件条、全屏页、反馈
+态、弹幕 / 广告 / 缩略图 / cast / 短视频 UI、主题）已移出包，作为**可拷贝参考
+皮**存放于 `example/lib/niuma_ui/`，不再进 semver 契约。
+
+**新增导出**：
+
+- `NiumaGestureController`——手势几何量 → 播放意图 + HUD 反馈的 headless 编排
+  器（参考皮的 gesture layer widget 只透传坐标）。
+- `NiumaFullscreenController`——进 / 退全屏的屏幕方向锁定 + system UI 切换。
+- `NiumaFullscreenScope` / `webFullscreenRouteCount` /
+  `webFullscreenRouteCountListenable`——web 单 `<video>` 在 inline / 全屏间
+  搬迁的协调契约（`NiumaPlayerView` 读，参考皮全屏页写）。
+- `DanmakuTrackAllocator`（弹幕轨道分配）/ `formatVideoTime`（时长格式化纯
+  函数）——参考皮渲染需要。
+
+**移除导出**（全部移至 `example/lib/niuma_ui/`）：`NiumaPlayer` /
+`NiumaPlayerConfigScope` / `NiumaPlayerTheme` / `NiumaFullscreenPage` /
+`NiumaFullscreenControl` / 全部 feedback / 全部原子控件（裸名 + `Niuma*`
+alias）/ 控件条全套 / `NiumaThumbnailView` / `NiumaScrubPreview` /
+`ThumbnailFrame` 仍留（见下）/ 弹幕 overlay+scope+settings_panel / gesture
+layer+hud / 全部 short_video + `NiumaShortVideoTheme` / 广告
+（`NiumaAdOverlay` / `AdSchedulerOrchestrator` / `NiumaAdSchedule` 等）/
+cast UI（`NiumaCastButton` / `NiumaCastOverlay` / `NiumaCastPickerPanel`）/
+cast 协议实现（`DlnaCastService` / `AirPlayCastService` /
+`NiumaCastRegistry` / `CastService` SPI）。
+
+**仍留核**：`ThumbnailFrame`（`controller.thumbnailFor` 的返回类型）/ cast
+抽象 `CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`
+（事件模型 `CastStarted` / `CastEnded` + `controller.connectCast` 依赖）。
+`CastDevice.icon` 默认值从 `Icons.tv` 改为 `null`（核去 material 依赖，参考皮
+渲染时 `device.icon ?? Icons.tv` 兜底）。
+
+**迁移指南**：
+
+1. 从 `example/lib/niuma_ui/` 拷贝所需子目录到你的工程，改 import 为本地相对
+   路径；`NiumaPlayerController` 与编排 API 保持兼容。
+2. cast（DLNA / AirPlay 协议 + UI）、广告、缩略图 widget 整块移入参考皮，接入
+   方自维护——拷 `niuma_ui/cast/`（含 DLNA SSDP / SOAP 9 文件）即获完整投屏
+   能力。
+3. 参考 `example/lib/niuma_ui/niuma_ui.dart` 皮 barrel 了解可拷贝符号清单；各
+   demo 页是活的拷贝示范。
+
+### Added (此前 Unreleased)
 
 - `NiumaFullscreenControl` extension on `NiumaPlayerController` exposing
   `enterFullscreen(context)` / `exitFullscreen(context)` /
-  `toggleFullscreen(context)` / `isInFullscreen(context)`. The push/pop logic
-  was previously locked inside `FullscreenButton`, so a custom fullscreen
-  button had no public way to trigger fullscreen. Now any custom button under
-  the `NiumaPlayer` subtree can call `controller.toggleFullscreen(context)`,
-  with outer config auto-forwarded from `NiumaPlayerConfigScope`.
-  `FullscreenButton` now delegates to this extension (behavior unchanged).
+  `toggleFullscreen(context)` / `isInFullscreen(context)`. 该扩展随全屏页一起
+  移入参考皮（`example/lib/niuma_ui/fullscreen/`）。
 
 ## [0.0.4] - 2026-05-25
 

@@ -3,7 +3,18 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/flutter-%E2%89%A53.10-blue)](https://flutter.dev)
 
-生产级 Flutter 视频播放器 SDK——**iOS / Android / Web 三端**统一 API，开箱即用 UI（长视频 bili 风 + 短视频抖音风），多线路自动 failover / 失败回滚，弹幕、画中画、投屏全套内置。
+**Headless Flutter 视频播放内核**——**iOS / Android / Web 三端**统一 controller API + 全套播放编排逻辑（多线路自动 failover / 失败回滚 / 续播 / 弹幕引擎 / 缩略图轨道 / 手势·全屏·弹幕 headless controller）。
+
+> **0.1.0 起重定位（BREAKING）**：niuma_player 只导出**播放内核**——唯一稳定 API 是 `NiumaPlayerController` + 纯逻辑。所有 UI widget（长视频 bili 风 + 短视频抖音风外壳、22 个原子控件、控件条、全屏页、反馈态、弹幕 / 广告 / 缩略图 / **投屏** / 短视频 UI、主题）作为**可拷贝参考皮**存放在 [`example/lib/niuma_ui/`](example/lib/niuma_ui/)，不进 semver 契约——拷进你自己的工程随便改。
+
+### 如何用这套参考皮
+
+```dart
+import 'package:niuma_player/niuma_player.dart';   // headless 核
+import 'package:your_app/niuma_ui/niuma_ui.dart';  // 拷过来的参考皮
+```
+
+把 [`example/lib/niuma_ui/`](example/lib/niuma_ui/) 整个（或所需子目录：`core/` 一体化 widget、`controls/` 原子控件、`control_bar/`、`fullscreen/`、`feedback/`、`gesture/`、`danmaku/`、`thumbnail/`、`ad/`、`cast/`、`short_video/`、`shared/`）拷进你的工程，改 import 为本地相对路径即可。`example/` 下 8 个 demo 页是活的拷贝示范。想要投屏就拷 `niuma_ui/cast/`（含 DLNA SSDP / SOAP 9 文件），自己维护协议。
 
 ---
 

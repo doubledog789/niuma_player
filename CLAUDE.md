@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目定位
 
-`niuma_player` 是一个 Flutter 视频播放器 **SDK 包**（不是 app），通过统一 `NiumaPlayerController` API 覆盖 iOS / Android / Web 三端，并在 Android 上提供 ExoPlayer → IJK 自动回退。`example/` 是消费这个 SDK 的演示 app，不是被测主体。
+`niuma_player` 是一个 **headless Flutter 视频播放内核 SDK 包**（不是 app）。0.1.0 起重定位：包**只导出播放内核**——`NiumaPlayerController` + 全部编排逻辑（orchestration）+ 手势 / 全屏 / 弹幕 headless controller + cast 抽象 + 缩略图数据类，覆盖 iOS / Android / Web 三端，Android 上 ExoPlayer → IJK 自动回退。**所有 UI widget 已移出 `lib/`**，作为可拷贝、可丢弃、不进 semver 契约的官方参考皮存放在 `example/lib/niuma_ui/`。`example/` 既是消费内核的演示 app，也是参考皮的家——但不是被测主体（核的测试在 `test/`，参考皮的 widget 测试在 `example/test/`）。
+
+**核 vs 参考皮边界**：判定规则——文件 import `package:flutter/material.dart` 或是纯 UI widget（`CustomPainter` / `InheritedWidget` / `StatefulWidget`）= chrome，归参考皮。例外：`NiumaFullscreenScope` marker + `webFullscreenRouteCount` 这套 web 全屏协调契约留核（`lib/src/presentation/core/web_fullscreen_coordination.dart`），因为核的 `NiumaPlayerView` 要读它；`gesture_feedback_state` 只 import `widgets` 的 `IconData`（非 material），留核。
 
 ## 常用命令
 
@@ -84,11 +86,14 @@ iOS PiP（`ios/Classes/NiumaPipPlugin.swift`）依赖反射 `video_player_avfoun
 
 ## 公开 API 边界
 
-`lib/niuma_player.dart` 是唯一的 barrel export。**任何 `lib/src/` 内部符号要对外暴露，必须显式 `export ... show ...;`** 这里。改这个文件等同于改 SDK 的公开 API：
+`lib/niuma_player.dart` 是唯一的 barrel export，0.1.0 起**只导出 headless 核**：backends / bridge / device_memory / data_source / player_state / `NiumaPlayerController` + options / `NiumaPlayerView` / 全部 orchestration / observability / 弹幕模型 + `NiumaDanmakuController` + `DanmakuTrackAllocator` / `NiumaGestureController` / `NiumaFullscreenController` / `NiumaFullscreenScope` + `webFullscreenRouteCount` / cast 抽象（`CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`）/ `ThumbnailFrame` / `formatVideoTime` / `NiumaSdkAssets`。**绝不导出任何 UI widget**——它们在参考皮里。
+
+**任何 `lib/src/` 内部符号要对外暴露，必须显式 `export ... show ...;`** 这里。改这个文件等同于改 SDK 的公开 API：
 
 - 删除/重命名导出符号 = breaking change，必须在 `CHANGELOG.md` 写 `BREAKING CHANGE:` 并 bump major-ish
 - 新增导出 = minor bump
 - 加 `lib/src/testing/` 下的 fake = patch（这些通过 `lib/testing.dart` 导出）
+- **参考皮（`example/lib/niuma_ui/`）改动不影响 semver**——它不是包的公开 API
 
 公开 Dart 符号必须写 `///` 文档注释（见 `analysis_options.yaml` 的 `flutter_lints` 严格档）。
 
@@ -110,23 +115,37 @@ PiP 需要业务侧 `MainActivity.onPictureInPictureModeChanged` 调 `NiumaPlaye
 
 **修 Swift / ObjC 后必须跑 `flutter build ios --no-codesign --debug` 验证编译过**——hot reload 不重 build native，直接让用户 cold start 测会反复浪费时间（曾踩过这坑）。
 
-## `presentation/` 目录组织
+## `presentation/` 目录组织（headless 化后）
+
+0.1.0 起 `lib/src/presentation/` **只剩 headless 部分**（其余全部迁到 `example/lib/niuma_ui/`）：
 
 ```
-lib/src/presentation/
-├── core/         NiumaPlayer + Controller + View + Theme + popup_menu(part) + pip_lifecycle (6)
-├── controls/     22 个原子控件（PlayPauseButton / ScrubBar / 等）
-├── control_bar/  NiumaControlBar / Config / Button / FullscreenControlBar / button_override (6)
-├── fullscreen/   NiumaFullscreenPage (1)
-├── feedback/     NiumaLoadingIndicator / NiumaProgressThumb / NiumaErrorView / NiumaEndedView (4)
-├── ad/           ad_schedule / ad_scheduler / NiumaAdOverlay (3)
-├── cast/         NiumaCastButton / Overlay / PickerPanel (3)
-├── danmaku/      NiumaDanmaku* + DanmakuSettingsPanel (5)
-├── gesture/      NiumaGestureLayer / Hud (2)
-├── thumbnail/    thumbnail_cache / frame / resolver / NiumaThumbnailView / ScrubPreview (5)
-├── short_video/  5 个 NiumaShortVideo* widget
-└── shared/       glass_card / video_time_format (2)
+lib/src/presentation/        ← 核：只剩 headless controller / view / 协调契约
+├── core/        niuma_player_controller / niuma_player_view / pip_lifecycle_observer
+│                / web_fullscreen_coordination(NiumaFullscreenScope + web 全屏计数) (4)
+├── danmaku/     niuma_danmaku_controller (1，弹幕引擎入口)
+├── gesture/     niuma_gesture_controller (1，手势→意图 headless)
+├── fullscreen/  niuma_fullscreen_controller (1，朝向/SystemUI headless)
+├── thumbnail/   thumbnail_cache / frame / resolver (3，controller.thumbnailFor 契约)
+└── shared/      video_time_format (1，纯 Duration 格式化)
+
+example/lib/niuma_ui/        ← 参考皮：所有 UI widget（拷贝即用，不进 semver）
+├── core/        NiumaPlayer + Theme + popup_menu(part)
+├── controls/    22 原子控件 + niuma_sdk_icon + aliases
+├── control_bar/ NiumaControlBar / Config / Button / FullscreenControlBar / button_override / resolver
+├── fullscreen/  NiumaFullscreenPage + _root_bg_io/web（消费 NiumaFullscreenController）
+├── feedback/    NiumaLoadingIndicator / ProgressThumb / ErrorView / EndedView
+├── gesture/     NiumaGestureLayer（消费 NiumaGestureController）/ Hud
+├── danmaku/     NiumaDanmakuOverlay / Painter / Scope / SettingsPanel
+├── thumbnail/   NiumaThumbnailView / ScrubPreview
+├── ad/          ad_schedule / ad_scheduler / NiumaAdOverlay
+├── cast/        cast 协议（DLNA 9 / AirPlay / registry / CastService SPI）+ UI（Button/Overlay/Picker）
+├── short_video/ 5 个 NiumaShortVideo* widget + NiumaShortVideoTheme
+├── shared/      glass_card
+└── niuma_ui.dart  皮 barrel（演示可拷贝符号清单）
 ```
+
+迁参考皮的 widget 改 import 规则：引核符号 → `package:niuma_player/niuma_player.dart`；引参考皮内其他文件 → 相对路径。`example/test/` 放参考皮 widget 测试。
 
 ## 资源约定
 
