@@ -1,11 +1,11 @@
 /// `niuma_player` —— **headless 视频播放内核**。
 ///
 /// 本包只导出播放内核：`NiumaPlayerController` + 全部编排逻辑（多线路 / 续播 /
-/// retry / source middleware / auto-failover / 弹幕引擎 / 缩略图轨道）+
-/// 手势 / 全屏 / 弹幕的 **headless controller**。所有 UI widget（一体化
-/// `NiumaPlayer`、原子控件、控件条、全屏页、反馈态、弹幕 / 广告 / 缩略图 /
-/// cast / 短视频 UI、主题）作为**可拷贝参考皮**存放于 `example/lib/niuma_ui/`，
-/// 不进 semver 契约——接入方按需拷贝、自由改造。
+/// retry / source middleware / auto-failover / 弹幕引擎）+ 手势 / 全屏 / 弹幕的
+/// **headless controller**。所有 UI widget（一体化 `NiumaPlayer`、原子控件、
+/// 控件条、全屏页、反馈态、弹幕 / 广告 / 缩略图 / cast / 短视频 UI、主题）以及
+/// 缩略图取帧逻辑作为**可拷贝参考皮**存放于 `example/lib/niuma_ui/`，不进 semver
+/// 契约——接入方按需拷贝、自由改造。
 library;
 
 // 内核
@@ -35,12 +35,8 @@ export 'src/domain/player_state.dart'
         CastEnded,
         CastError;
 export 'src/presentation/core/niuma_player_controller.dart'
-    show NiumaPlayerController, NiumaPlayerOptions, ThumbnailFetcher;
+    show NiumaPlayerController, NiumaPlayerOptions;
 export 'package:niuma_player/src/presentation/core/niuma_player_view.dart';
-
-// 缩略图：解析数据类 ThumbnailFrame 是 controller.thumbnailFor 的返回类型，
-// 留核（widget / resolver / cache 实现细节在参考皮里）。
-export 'package:niuma_player/src/presentation/thumbnail/thumbnail_frame.dart' show ThumbnailFrame;
 
 // 运行时资源常量（仅 web 后端 hls.js 路径；UI 资源已移出核）
 export 'src/niuma_sdk_assets.dart' show NiumaSdkAssets;
@@ -48,8 +44,6 @@ export 'src/niuma_sdk_assets.dart' show NiumaSdkAssets;
 // 编排
 export 'src/orchestration/multi_source.dart'
     show MediaQuality, MediaLine, NiumaMediaSource, MultiSourcePolicy;
-export 'src/orchestration/thumbnail_track.dart'
-    show WebVttCue, ThumbnailLoadState;
 export 'src/orchestration/source_middleware.dart'
     show
         SourceMiddleware,

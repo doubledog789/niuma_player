@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
-import 'package:niuma_player/niuma_player.dart';
+import 'thumbnail_frame.dart';
 
 /// 把 [ThumbnailFrame] 渲染到屏幕上的助手 widget。
 ///
@@ -19,7 +19,7 @@ import 'package:niuma_player/niuma_player.dart';
 ///
 /// 典型用法：
 /// ```dart
-/// final frame = controller.thumbnailFor(scrubPosition);
+/// final frame = thumbnailController.thumbnailFor(scrubPosition);
 /// NiumaThumbnailView(
 ///   frame: frame,
 ///   width: 160,

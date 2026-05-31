@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/orchestration/webvtt_parser.dart';
+import 'package:niuma_player_example/niuma_ui/thumbnail/webvtt_parser.dart';
 
 void main() {
   group('WebVttParser.parseThumbnails', () {

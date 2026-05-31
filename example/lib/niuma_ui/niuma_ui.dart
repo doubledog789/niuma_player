@@ -33,7 +33,11 @@ export 'feedback/niuma_error_view.dart' show NiumaErrorView;
 export 'feedback/niuma_ended_view.dart' show NiumaEndedView;
 export 'feedback/niuma_progress_thumb.dart' show NiumaProgressThumb;
 
-// 缩略图 widget
+// 缩略图（取帧逻辑 + widget——核已不再承载，此为参考皮自包含实现）
+export 'thumbnail/thumbnail_controller.dart'
+    show ThumbnailController, ThumbnailFetcher;
+export 'thumbnail/thumbnail_frame.dart' show ThumbnailFrame;
+export 'thumbnail/thumbnail_track.dart' show WebVttCue, ThumbnailLoadState;
 export 'thumbnail/niuma_thumbnail_view.dart' show NiumaThumbnailView;
 export 'thumbnail/niuma_scrub_preview.dart' show NiumaScrubPreview;
 

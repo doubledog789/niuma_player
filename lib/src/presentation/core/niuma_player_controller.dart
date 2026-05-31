@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart' show experimental;
 
 import 'package:niuma_player/src/data/default_backend_factory.dart';
@@ -20,97 +17,9 @@ import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/orchestration/multi_source.dart';
 import 'package:niuma_player/src/orchestration/retry_policy.dart';
 import 'package:niuma_player/src/orchestration/source_middleware.dart';
-import 'package:niuma_player/src/orchestration/thumbnail_track.dart';
-import 'package:niuma_player/src/orchestration/webvtt_parser.dart';
 import 'package:niuma_player/src/cast/cast_session.dart';
 import 'package:niuma_player/src/cast/cast_state.dart';
 import 'package:niuma_player/src/presentation/core/pip_lifecycle_observer.dart';
-import 'package:niuma_player/src/presentation/thumbnail/thumbnail_cache.dart';
-import 'package:niuma_player/src/presentation/thumbnail/thumbnail_frame.dart';
-import 'package:niuma_player/src/presentation/thumbnail/thumbnail_resolver.dart';
-
-/// 拉取 WebVTT body 的函数签名。
-///
-/// 默认是 `http.get` 的薄封装。测试注入 fake 避免真实网络调用。
-/// 抛异常或返回非 VTT body 都是安全的——controller 把任何失败视为
-/// "thumbnails 关闭"，正常继续播放视频。
-typedef ThumbnailFetcher = Future<String> Function(
-  Uri uri,
-  Map<String, String> headers,
-);
-
-/// 暴露给测试用的内部 helper：用给定的 [client] 流式拉取 VTT body，
-/// 遵守 [timeout]（wall-clock）和 [maxBytes]（body 大小上限）。
-///
-/// 实现使用 [http.Client.send]（不是 `client.get`），因此在做 size cap
-/// 检查之前**不会**把 body 完整 buffer 到内存。流程是：
-///   1. 打开响应流 + 给 headers 阶段加 [timeout]；
-///   2. 拒绝非 2xx 状态码；
-///   3. 如果服务器声明了 `Content-Length` 且已超过 [maxBytes]，
-///      在读 body 前直接拒绝；
-///   4. 否则边累积 chunk 边检查；一旦累计超过 [maxBytes] 立即中止——
-///      恶意服务器无法骗 VM 先 buffer 任意字节。
-///
-/// 非 2xx、超大 body、timeout 都抛 [http.ClientException]。
-/// 生产环境中 controller 的默认 fetcher（由 `_makeDefaultThumbnailFetcher`
-/// 构造）传入一个新 `http.Client()`；测试可以传 `MockClient` 来驱动
-/// size cap / timeout / error 分支，不用碰真实网络。
-@visibleForTesting
-Future<String> fetchThumbnailVtt(
-  Uri uri,
-  Map<String, String> headers,
-  http.Client client, {
-  Duration timeout = const Duration(seconds: 30),
-  int maxBytes = 5 * 1024 * 1024,
-}) async {
-  try {
-    final request = http.Request('GET', uri);
-    request.headers.addAll(headers);
-    final streamed = await client.send(request).timeout(timeout);
-    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
-      throw http.ClientException(
-        'thumbnail VTT fetch failed: HTTP ${streamed.statusCode}',
-        uri,
-      );
-    }
-    // 服务器诚实声明 Content-Length 时利用它：在读 body 之前就可以
-    // 拒绝。
-    final declared = streamed.contentLength;
-    if (declared != null && declared > maxBytes) {
-      throw http.ClientException(
-        'thumbnail VTT body too large per Content-Length: '
-        '$declared (max $maxBytes)',
-        uri,
-      );
-    }
-    final builder = BytesBuilder(copy: false);
-    await for (final chunk in streamed.stream) {
-      builder.add(chunk);
-      if (builder.length > maxBytes) {
-        throw http.ClientException(
-          'thumbnail VTT body exceeded $maxBytes bytes during streaming',
-          uri,
-        );
-      }
-    }
-    return utf8.decode(builder.toBytes());
-  } finally {
-    client.close();
-  }
-}
-
-/// 构造调用方未注入自定义 fetcher 时使用的默认 [ThumbnailFetcher]
-/// 闭包。捕获 [options]，使每个 controller 自己的 timeout / size cap
-/// 设置能透到 [fetchThumbnailVtt]。
-ThumbnailFetcher _makeDefaultThumbnailFetcher(NiumaPlayerOptions options) {
-  return (uri, headers) => fetchThumbnailVtt(
-        uri,
-        headers,
-        http.Client(),
-        timeout: options.thumbnailFetchTimeout,
-        maxBytes: options.thumbnailMaxBodyBytes,
-      );
-}
 
 /// 调整 [NiumaPlayerController] 行为的选项。所有字段都有合理默认值，
 /// 大多数调用方无需触碰。
@@ -119,8 +28,6 @@ class NiumaPlayerOptions {
   const NiumaPlayerOptions({
     this.initTimeout = const Duration(seconds: 30),
     this.forceIjkOnAndroid = false,
-    this.thumbnailFetchTimeout = const Duration(seconds: 30),
-    this.thumbnailMaxBodyBytes = 5 * 1024 * 1024,
     this.unsafePipAutoBackgroundOnEnter = false,
     this.rollbackOnSwitchFailure = true,
     this.autoFailoverOnInitialError = true,
@@ -137,22 +44,6 @@ class NiumaPlayerOptions {
   /// 用于紧急覆盖或 A/B 测试兜底路径。iOS 和 Web 忽略本标志
   /// （永远走 video_player）。
   final bool forceIjkOnAndroid;
-
-  /// 默认 VTT 拉取的 wall-clock 硬上限。超过即视为服务器卡死，
-  /// 缩略图轨道静默关闭（失败开放——视频继续播放）。
-  ///
-  /// 仅对**默认** [ThumbnailFetcher] 生效。如果调用方通过
-  /// [NiumaPlayerController.thumbnailFetcher] 注入了自家 fetcher，
-  /// 由其自行管理 timeout 策略。
-  final Duration thumbnailFetchTimeout;
-
-  /// VTT body 大小硬上限（字节）。默认 fetcher 流式读取响应，一旦
-  /// 累计超过该值立即中止——恶意服务器无法强迫 VM 先把整个 body
-  /// buffer 完再被拒绝。
-  ///
-  /// 5MB 已意味着上万条 cue；典型 thumbnail VTT 只有几 KB。仅对
-  /// 默认 [ThumbnailFetcher] 生效。
-  final int thumbnailMaxBodyBytes;
 
   /// **⚠️ App Store 不兼容**——启用后 host app **无法过 App Store 审核**。
   /// 仅适合 Ad Hoc / Enterprise / 越狱设备等内部分发场景。
@@ -229,9 +120,8 @@ class NiumaPlayerOptions {
 /// 2. **`events` 监听里手动检测** [SchedulerBinding.schedulerPhase]，
 ///    在 `idle` 之外的相位用 `addPostFrameCallback` 把 setState 延后到
 ///    下一帧。
-/// 3. 参考 `example/lib/thumbnail_demo_page.dart` 的 `_safeSetState`
-///    封装——把"如果在 build / layout 阶段就 post-frame 延后，否则同步
-///    setState" 这套防御封装成助手函数，所有事件监听都过它。
+/// 3. 把"如果在 build / layout 阶段就 post-frame 延后，否则同步 setState"
+///    这套防御封装成助手函数，所有事件监听都过它。
 class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
     this.source, {
@@ -240,15 +130,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
-    ThumbnailFetcher? thumbnailFetcher,
   })  : options = options ?? const NiumaPlayerOptions(),
         _platform = platform ?? const DefaultPlatformBridge(),
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
-        _thumbnailFetcher = thumbnailFetcher ??
-            _makeDefaultThumbnailFetcher(options ?? const NiumaPlayerOptions()),
-        _thumbnailLoadState = source.thumbnailVtt == null
-            ? ThumbnailLoadState.none
-            : ThumbnailLoadState.idle,
         super(NiumaPlayerValue.uninitialized()) {
     // PiP lifecycle 兜底——永远 add，构造时一次。autoEnterPip flag 决定
     // shouldEnter() 真假，但 onResume 兜底重置 stale PiP state 始终生效。
@@ -271,14 +155,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
-    ThumbnailFetcher? thumbnailFetcher,
   }) =>
       NiumaPlayerController(
         NiumaMediaSource.single(ds, thumbnailVtt: thumbnailVtt),
         options: options,
         platform: platform,
         backendFactory: backendFactory,
-        thumbnailFetcher: thumbnailFetcher,
       );
 
   /// 描述本 controller 所有可用播放线路的 [NiumaMediaSource]。
@@ -334,26 +216,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 经过 [middlewares] 流水线后的数据源。
   /// 由 [_runInitialize] 起始处填充，[_initNative] 复用。
   NiumaDataSource? _resolvedSource;
-
-  // ----- Thumbnail (M8) -----
-  final ThumbnailCache _thumbnailCache = ThumbnailCache();
-  List<WebVttCue> _thumbnailCues = const <WebVttCue>[];
-  String? _resolvedThumbnailUrl;
-  final ThumbnailFetcher _thumbnailFetcher;
-  ThumbnailLoadState _thumbnailLoadState;
-
-  /// 进行中的加载 future——用于去重并发 [_loadThumbnailsIfAny] 调用，
-  /// 让多次 `unawaited(...)` 触发也只做一次 fetch。
-  Future<void>? _thumbnailLoadFuture;
-
-  /// 当前缩略图加载状态。详见 [ThumbnailLoadState] 文档。
-  ///
-  /// 状态变更**不会**触发 ValueNotifier 通知或 events 流广播——避免和
-  /// player 自身的 value / 事件混在一起。如果上层需要响应这个状态：
-  /// 1. 在 build 时直接读这个 getter；
-  /// 2. 围绕 player 自身的 events 做轮询（loading→ready 通常 < 100ms）；
-  /// 3. 简单 setState 后让 [thumbnailFor] 返回值自然反映"暂时还没好"。
-  ThumbnailLoadState get thumbnailLoadState => _thumbnailLoadState;
 
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast(sync: true);
@@ -477,7 +339,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
             PlayerBackendKind.videoPlayer,
             fromMemory: false,
           ));
-          unawaited(_loadThumbnailsIfAny());
           return;
         } catch (e, st) {
           lastError = e;
@@ -499,7 +360,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     // 时，dispose 之后用 `forceIjk=true` 重开。
     if (options.forceIjkOnAndroid) {
       await _initNative(forceIjk: true);
-      unawaited(_loadThumbnailsIfAny());
       return;
     }
 
@@ -516,79 +376,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       await _disposeCurrentBackend();
       await _initNative(forceIjk: true);
     }
-    unawaited(_loadThumbnailsIfAny());
-  }
-
-  /// 在后台加载并解析可选的 [NiumaMediaSource.thumbnailVtt]。失败会被
-  /// swallow（通过 [debugPrint] 打日志），保证视频播放永远不受坏掉
-  /// 的缩略图轨道影响。
-  ///
-  /// 单次加载内幂等：并发调用共享同一个进行中的 future（I6）。完成后
-  /// 缓存的 future 被清空（`whenComplete`），未来再调一次（例如外部
-  /// 重试）就能真正重新发起 fetch（R2-I1）。目前 controller 自身不会
-  /// 主动触发重新加载，但门已经打开（dartdoc 不再骗人说会重置）。
-  Future<void> _loadThumbnailsIfAny() {
-    if (_thumbnailLoadFuture != null) return _thumbnailLoadFuture!;
-    final future = _runThumbnailLoad().whenComplete(() {
-      _thumbnailLoadFuture = null;
-    });
-    _thumbnailLoadFuture = future;
-    return future;
-  }
-
-  Future<void> _runThumbnailLoad() async {
-    // R2-S4：防御性入口闸。镜像本方法内每个 await 后的 `_disposed` 守卫
-    // （I5/I9），保证排在 dispose() 之后的加载根本不会把状态翻成 loading。
-    if (_disposed) return;
-    final url = source.thumbnailVtt;
-    if (url == null) return;
-    _thumbnailLoadState = ThumbnailLoadState.loading;
-    try {
-      final ds = await runSourceMiddlewares(
-        NiumaDataSource.network(url),
-        middlewares,
-      );
-      if (_disposed) return;
-      final body = await _thumbnailFetcher(
-        Uri.parse(ds.uri),
-        ds.headers ?? const <String, String>{},
-      );
-      if (_disposed) return;
-      final cues = WebVttParser.parseThumbnails(body);
-      if (_disposed) return;
-      // 顺序很关键：解析完成后才把两个状态字段（cues + resolvedUrl）一起设进去。
-      // 这样 thumbnailFor 看到 _thumbnailCues 非空时也一定有 _resolvedThumbnailUrl。
-      _thumbnailCues = cues;
-      _resolvedThumbnailUrl = ds.uri;
-      _thumbnailLoadState = ThumbnailLoadState.ready;
-    } catch (e) {
-      // I5：进 catch 前先检查 _disposed——dispose 中途完成的 fetcher
-      // 不应该再去写已 dispose 的字段。
-      if (_disposed) return;
-      debugPrint('[niuma_player] thumbnail VTT 加载失败：$e（不影响播放）');
-      // I9：同时清空两个状态字段，避免 partial state（cues 空但 resolvedUrl 有值）。
-      _thumbnailCues = const <WebVttCue>[];
-      _resolvedThumbnailUrl = null;
-      _thumbnailLoadState = ThumbnailLoadState.failed;
-    }
-  }
-
-  /// 根据当前播放位置 [position] 返回对应的 [ThumbnailFrame]，没有命中或缩略图
-  /// 还未就绪时返回 `null`。
-  ///
-  /// 安全调用：在 [initialize] 之前 / 缩略图加载失败 / 没配置 thumbnailVtt
-  /// 都会返回 `null`。**在所有合法输入下不抛**——实现内部 [ThumbnailResolver]
-  /// 已用 try/catch 防御 `Uri.parse` 等可抛点；但极端非法输入（例如自行
-  /// 构造 cue 时传入 NaN 时间）仍可能触发 framework-level 异常，调用方
-  /// 不应依赖"绝对不抛"的强保证。
-  ThumbnailFrame? thumbnailFor(Duration position) {
-    if (_thumbnailCues.isEmpty || _resolvedThumbnailUrl == null) return null;
-    return ThumbnailResolver.resolve(
-      position: position,
-      cues: _thumbnailCues,
-      baseUrl: _resolvedThumbnailUrl!,
-      cache: _thumbnailCache,
-    );
   }
 
   Future<void> _initNative({required bool forceIjk}) async {
@@ -1097,7 +884,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     }
     await _disposeCurrentBackend();
     await _eventController.close();
-    _thumbnailCache.clear();
     danmakuVisibility.dispose();
     _gestureFeedback.dispose();
     _castSession.dispose();

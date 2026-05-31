@@ -5,14 +5,9 @@ import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 
 import 'fake_controller.dart';
 
-/// 受控替身：把 thumbnailFor 接到测试可控的 frame 上。
+/// 受控替身：source 可注入 thumbnailVtt 以驱动 ScrubBar 的缩略图分支。
 class _StubThumbController extends FakeNiumaPlayerController {
   _StubThumbController({super.source});
-
-  ThumbnailFrame? frameToReturn;
-
-  @override
-  ThumbnailFrame? thumbnailFor(Duration position) => frameToReturn;
 }
 
 NiumaPlayerValue _vAt({

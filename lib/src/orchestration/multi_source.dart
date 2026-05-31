@@ -180,10 +180,10 @@ class NiumaMediaSource {
   /// 由构造时校验保证一定能在 [lines] 中找到对应条目。
   final String defaultLineId;
 
-  /// 可选的 WebVTT 缩略图轨道 URL。
+  /// 可选的 WebVTT 缩略图轨道 URL。**纯数据字段**——核不对它做任何处理。
   ///
-  /// 为 `null` 时表示不启用缩略图功能。Controller 启动后若不为 `null`，
-  /// 会异步走 `SourceMiddleware` 流水线 + fetch + 解析；解析失败静默降级。
+  /// 为 `null` 时表示未声明缩略图轨道。UI 层（参考皮 `niuma_ui/thumbnail/`）
+  /// 读这个 URL 自行 fetch + 解析 + 取帧，核已不再承载这套逻辑。
   ///
   /// 不区分清晰度——thumbnail 是内容属性，所有 [lines] 共享一份。
   final String? thumbnailVtt;

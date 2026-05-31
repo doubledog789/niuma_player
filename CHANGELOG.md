@@ -7,6 +7,26 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### BREAKING CHANGE: 缩略图功能从核摘除
+
+缩略图（thumbnail）的取帧逻辑 + widget 全部移出核，作为可拷贝参考皮迁入
+`example/lib/niuma_ui/thumbnail/`。
+
+**移除的公开 API**：
+
+- `NiumaPlayerController.thumbnailFor(Duration)`
+- `NiumaPlayerController.thumbnailLoadState` getter
+- `NiumaPlayerController(... thumbnailFetcher:)` 与
+  `NiumaPlayerController.dataSource(... thumbnailFetcher:)` 构造参数
+- `ThumbnailFetcher` typedef、`ThumbnailFrame`、`WebVttCue`、
+  `ThumbnailLoadState` 导出
+- `NiumaPlayerOptions.thumbnailFetchTimeout` / `thumbnailMaxBodyBytes` 字段
+- 依赖 `http`（核不再 fetch VTT）
+
+**保留**：`NiumaMediaSource.thumbnailVtt` 降级为纯数据字段（仍校验 URL），
+UI 层读它自行 fetch + 解析 + 取帧。参考实现见 `niuma_ui/thumbnail/`
+（`ThumbnailController` + `WebVttParser` + `ThumbnailResolver` + cache）。
+
 ## [0.1.0]
 
 ### BREAKING CHANGE: 重定位为 headless 播放内核

@@ -4,6 +4,7 @@ import 'package:niuma_player/niuma_player.dart';
 import '../core/niuma_player_theme.dart';
 import '../feedback/niuma_progress_thumb.dart';
 import '../thumbnail/niuma_scrub_preview.dart';
+import '../thumbnail/thumbnail_controller.dart';
 
 /// B 站风格密集进度条。
 ///
@@ -38,8 +39,27 @@ class ScrubBar extends StatefulWidget {
 }
 
 class _ScrubBarState extends State<ScrubBar> {
+  /// 缩略图取帧协调器——仅当 source 声明了 thumbnailVtt 时创建并启动加载。
+  ThumbnailController? _thumbnails;
+
   /// 拖动中的目标位置（毫秒）；`null` 表示不在拖动中。
   double? _scrubMs;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.controller.source.thumbnailVtt != null) {
+      final thumbnails = ThumbnailController(widget.controller);
+      _thumbnails = thumbnails;
+      thumbnails.load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _thumbnails?.dispose();
+    super.dispose();
+  }
 
   /// 上一帧 scrubMs / 时间，用来给 [NiumaProgressThumb] 算 seekDirection +
   /// seekSpeed。pointer up 后清零。
@@ -80,7 +100,7 @@ class _ScrubBarState extends State<ScrubBar> {
   /// inline 状态不显示 VTT 缩略图预览（仅全屏沉浸式拖动需要）——
   /// 通过检测当前 BuildContext 是否在 [NiumaFullscreenScope] 内决定。
   bool get _hasThumbnail =>
-      widget.controller.source.thumbnailVtt != null &&
+      _thumbnails != null &&
       NiumaFullscreenScope.maybeOf(context) != null;
 
   /// 进度条本体的高度——足以容纳"拖动 thumb"圆点（thumbRadiusActive=9 → 18px
@@ -136,7 +156,7 @@ class _ScrubBarState extends State<ScrubBar> {
                       bottom: theme.scrubBarThumbRadiusActive * 2 + 8,
                       child: IgnorePointer(
                         child: NiumaScrubPreview(
-                          controller: widget.controller,
+                          thumbnails: _thumbnails!,
                           scrubPosition:
                               Duration(milliseconds: positionMs.toInt()),
                         ),
