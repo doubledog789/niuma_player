@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart' show IconData, immutable;
 
 /// 一台被发现的投屏目标设备。
 @immutable
@@ -7,7 +7,7 @@ class CastDevice {
     required this.id,
     required this.name,
     required this.protocolId,
-    this.icon = Icons.tv,
+    this.icon,
   });
 
   /// 全局唯一 id。约定格式：`<protocolId>:<协议内设备指纹>`，
@@ -20,8 +20,9 @@ class CastDevice {
   /// 协议 id：`dlna` / `airplay`。
   final String protocolId;
 
-  /// UI 图标，默认 [Icons.tv]。
-  final IconData icon;
+  /// UI 图标。核里不指定默认值（`Icons.tv` 属 material，归参考皮）；
+  /// 参考皮的 cast UI 在渲染时按 `device.icon ?? Icons.tv` 兜底。
+  final IconData? icon;
 
   @override
   bool operator ==(Object other) =>

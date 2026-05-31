@@ -82,7 +82,7 @@ packages:
     source: hosted
     version: "1.0.8"
   fake_async:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: fake_async
       sha256: "511392330127add0b769b75a987850d136345d9227c6b94c96a04cf4a391bf78"
@@ -253,7 +253,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.0.3"
+    version: "0.0.4"
   path:
     dependency: transitive
     description:
@@ -335,7 +335,7 @@ packages:
     source: hosted
     version: "5.0.2"
   shared_preferences:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: shared_preferences
       sha256: "6e8bf70b7fef813df4e9a36f658ac46d107db4b4cfe1048b477d4e453a8159f5"
@@ -548,7 +548,7 @@ packages:
     source: hosted
     version: "14.3.0"
   web:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: web
       sha256: "868d88a33d8a87b18ffc05f9f030ba328ffefba92d6c127917a2ba740f9cfe4a"

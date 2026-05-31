@@ -30,8 +30,14 @@ dependencies:
   # 注：DLNA / AirPlay 投屏协议从 niuma_player 0.x 开始内置，不再需要
   # niuma_player_dlna / niuma_player_airplay 这两个 companion package。
 
-  # demo 直接渲染 niuma 资源包 SVG（Home 列表 / tab 图标）
+  # demo 直接渲染 niuma 资源包 SVG（Home 列表 / tab 图标）+ 参考皮控件 / 反馈 UI
+  # 渲染 niuma SVG 图标（headless 核已不依赖 flutter_svg，UI 在这套参考皮里）
   flutter_svg: ^2.0.9
+
+  # niuma_ui 参考皮里 DLNA 投屏历史持久化（cast/persistent_history.dart）
+  shared_preferences: ^2.2.0
+  # niuma_ui 参考皮里 web 全屏根背景操作（fullscreen/_root_bg_web.dart）
+  web: ^1.1.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -42,6 +48,8 @@ dev_dependencies:
     sdk: flutter
   flutter_test:
     sdk: flutter
+  # niuma_ui 参考皮 widget 测试里用 FakeAsync 驱动 auto-hide / 动画计时
+  fake_async: ^1.3.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

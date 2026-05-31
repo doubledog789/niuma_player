@@ -47,8 +47,6 @@ dependencies:
   # Cross-platform: VM uses dart:io HttpClient, web auto-routes to
   # XMLHttpRequest. CORS for web is the caller's responsibility.
   http: ^1.0.0
-  # 渲染资源包里的 niuma 风格 SVG 图标 + loading 动画。
-  flutter_svg: ^2.0.9
   # Web 后端用 <video> + DOM 操作。用 package:web（替代已废弃的 dart:html），
   # 让 web 端可随 `flutter build web --wasm` 编译。
   web: ^1.1.0
