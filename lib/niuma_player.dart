@@ -34,9 +34,9 @@ export 'src/domain/player_state.dart'
         CastStarted,
         CastEnded,
         CastError;
-export 'src/presentation/core/niuma_player_controller.dart'
+export 'src/player/niuma_player_controller.dart'
     show NiumaPlayerController, NiumaPlayerOptions;
-export 'package:niuma_player/src/presentation/core/niuma_player_view.dart';
+export 'package:niuma_player/src/player/niuma_player_view.dart';
 
 // 运行时资源常量（仅 web 后端 hls.js 路径；UI 资源已移出核）
 export 'src/niuma_sdk_assets.dart' show NiumaSdkAssets;
@@ -67,11 +67,11 @@ export 'src/orchestration/danmaku_models.dart'
     show DanmakuItem, DanmakuMode, DanmakuSettings, DanmakuLoader;
 export 'src/orchestration/danmaku_track_allocator.dart'
     show DanmakuTrackAllocator;
-export 'src/presentation/danmaku/niuma_danmaku_controller.dart'
+export 'src/player/niuma_danmaku_controller.dart'
     show NiumaDanmakuController;
 
 // 视频时长格式化纯函数——手势 / 短视频参考皮渲染 HUD / 进度 label 复用。
-export 'src/presentation/shared/video_time_format.dart' show formatVideoTime;
+export 'src/player/video_time_format.dart' show formatVideoTime;
 
 // 可观测性
 export 'src/observability/analytics_event.dart'
@@ -89,13 +89,13 @@ export 'package:niuma_player/src/observability/analytics_emitter.dart' show Anal
 export 'package:niuma_player/src/domain/gesture_kind.dart' show GestureKind;
 export 'package:niuma_player/src/domain/gesture_feedback_state.dart' show GestureFeedbackState;
 export 'package:niuma_player/src/domain/gesture_hud_icon.dart' show GestureHudIcon;
-export 'package:niuma_player/src/presentation/gesture/niuma_gesture_controller.dart'
+export 'package:niuma_player/src/player/niuma_gesture_controller.dart'
     show NiumaGestureController;
 
 // 全屏（headless：朝向 / SystemUI 编排 controller，全屏页 widget 在参考皮）
-export 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_controller.dart'
+export 'package:niuma_player/src/player/niuma_fullscreen_controller.dart'
     show NiumaFullscreenController;
-export 'package:niuma_player/src/presentation/core/web_fullscreen_coordination.dart'
+export 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
     show NiumaFullscreenScope, webFullscreenRouteCount, webFullscreenRouteCountListenable;
 
 // M15 投屏（Cast）抽象层——controller.connectCast / castSession + 事件模型依赖

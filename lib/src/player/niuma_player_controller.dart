@@ -19,7 +19,7 @@ import 'package:niuma_player/src/orchestration/retry_policy.dart';
 import 'package:niuma_player/src/orchestration/source_middleware.dart';
 import 'package:niuma_player/src/cast/cast_session.dart';
 import 'package:niuma_player/src/cast/cast_state.dart';
-import 'package:niuma_player/src/presentation/core/pip_lifecycle_observer.dart';
+import 'package:niuma_player/src/player/pip_lifecycle_observer.dart';
 
 /// 调整 [NiumaPlayerController] 行为的选项。所有字段都有合理默认值，
 /// 大多数调用方无需触碰。

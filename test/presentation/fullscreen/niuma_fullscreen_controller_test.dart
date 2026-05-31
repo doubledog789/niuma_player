@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/presentation/fullscreen/niuma_fullscreen_controller.dart';
+import 'package:niuma_player/src/player/niuma_fullscreen_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -5,8 +5,8 @@ import 'package:video_player/video_player.dart';
 import 'package:niuma_player/src/data/video_player_backend.dart';
 import 'package:niuma_player/src/domain/player_backend.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
-import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
-import 'package:niuma_player/src/presentation/core/web_fullscreen_coordination.dart'
+import 'package:niuma_player/src/player/niuma_player_controller.dart';
+import 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
     show NiumaFullscreenScope, webFullscreenRouteCountListenable;
 
 /// 渲染 [NiumaPlayerController] 当前激活的 backend。

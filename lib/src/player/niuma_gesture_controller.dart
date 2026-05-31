@@ -5,8 +5,8 @@ import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
 import 'package:niuma_player/src/domain/gesture_hud_icon.dart';
 import 'package:niuma_player/src/domain/gesture_kind.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
-import 'package:niuma_player/src/presentation/core/niuma_player_controller.dart';
-import 'package:niuma_player/src/presentation/shared/video_time_format.dart';
+import 'package:niuma_player/src/player/niuma_player_controller.dart';
+import 'package:niuma_player/src/player/video_time_format.dart';
 
 /// 视频手势的 **headless 编排器**——把"原始手势几何量 → 播放意图 + HUD 反馈"
 /// 的纯逻辑从 widget 里剥出来，不持有任何 `BuildContext` / widget tree 概念。
