@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 
 /// 短视频 PageView 示例。
 ///

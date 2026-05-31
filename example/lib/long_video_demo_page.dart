@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 
 /// 长视频 demo——演示 M16 inline → 全屏 mockup 风格切换 + 配置驱动 + 业务侧 slot。
 ///

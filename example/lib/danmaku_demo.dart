@@ -3,6 +3,7 @@ import 'dart:math' show Random;
 
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 
 /// 演示 SDK 的弹幕系统集成：
 ///

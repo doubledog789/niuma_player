@@ -3,7 +3,6 @@ import 'dart:ui' show Offset, Size;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
-import 'package:niuma_player/src/presentation/gesture/niuma_gesture_controller.dart';
 
 /// 可控 + 记录型 fake backend：可直接 emit 带 duration 的 value，并记录
 /// seek / 亮度 / 音量调用，用于断言 [NiumaGestureController] 的纯逻辑。

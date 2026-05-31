@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/cast/cast_device.dart';
 import 'package:niuma_player/src/cast/cast_state.dart';
@@ -26,9 +25,9 @@ void main() {
       expect(a, isNot(equals(b)));
     });
 
-    test('默认 icon 是 Icons.tv', () {
+    test('默认 icon 为 null（headless 核不绑定 material Icons.tv，由参考皮兜底）', () {
       const d = CastDevice(id: 'x', name: 'X', protocolId: 'dlna');
-      expect(d.icon, Icons.tv);
+      expect(d.icon, isNull);
     });
   });
 

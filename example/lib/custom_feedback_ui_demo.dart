@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 
 /// 演示 `NiumaPlayer` 的三态反馈 UI 自定义 slot：
 ///

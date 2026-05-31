@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
+import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 
 /// 演示 SDK 投屏（DLNA / AirPlay）+ PiP（画中画）的接入：
 ///
