@@ -2,10 +2,11 @@
 ///
 /// 本包只导出播放内核：`NiumaPlayerController` + 编排逻辑（多线路 /
 /// retry / source middleware / auto-failover）+ 手势 / 全屏的
-/// **headless controller**。所有 UI widget（一体化 `NiumaPlayer`、原子控件、
-/// 控件条、全屏页、反馈态、弹幕 / 广告 / 缩略图 / cast / 短视频 UI、主题）以及
-/// 缩略图取帧逻辑作为**可拷贝参考皮**存放于 `example/lib/niuma_ui/`，不进 semver
-/// 契约——接入方按需拷贝、自由改造。
+/// **headless controller**。**本包不含任何 UI widget**——曾经的整套参考皮
+/// （一体化播放器壳、原子控件、控件条、全屏页、反馈态、弹幕引擎 + overlay、
+/// 广告、缩略图取帧、cast 协议、短视频、主题）保留在 **git 历史**里，需要时
+/// `git log --all -- 'example/lib/niuma_ui/**'` 捞取，或喂给 AI 当参考。
+/// 接入方用 `NiumaPlayerView` + 监听 `controller.value` 自己拼 UI。
 library;
 
 // 内核

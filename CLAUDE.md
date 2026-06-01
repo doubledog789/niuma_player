@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目定位
 
-`niuma_player` 是一个 **headless Flutter 视频播放内核 SDK 包**（不是 app）。0.1.0 起重定位：包**只导出播放内核**——`NiumaPlayerController` + 全部编排逻辑（orchestration）+ 手势 / 全屏 / 弹幕 headless controller + cast 抽象 + 缩略图数据类，覆盖 iOS / Android / Web 三端，Android 上 ExoPlayer → IJK 自动回退。**所有 UI widget 已移出 `lib/`**，作为可拷贝、可丢弃、不进 semver 契约的官方参考皮存放在 `example/lib/niuma_ui/`。`example/` 既是消费内核的演示 app，也是参考皮的家——但不是被测主体（核的测试在 `test/`，参考皮的 widget 测试在 `example/test/`）。
+`niuma_player` 是一个 **headless Flutter 视频播放内核 SDK 包**（不是 app）。0.1.0 起重定位：包**只导出播放内核**——`NiumaPlayerController` + 全部编排逻辑（orchestration：多线路 / auto-failover / retry / source middleware）+ 手势 / 全屏 headless controller + cast 值类型，覆盖 iOS / Android / Web 三端，Android 上 ExoPlayer → IJK 自动回退。**包内零 UI widget**：接入方用 `NiumaPlayerView` 渲染画面 + 监听 `controller.value` 自己拼 UI（或让 AI 生成）。`example/` 是消费内核的 **100 行最小 demo**（`example/lib/main.dart`），不是被测主体——核的测试在 `test/`。
 
-**核 vs 参考皮边界**：判定规则——文件 import `package:flutter/material.dart` 或是纯 UI widget（`CustomPainter` / `InheritedWidget` / `StatefulWidget`）= chrome，归参考皮。例外：`NiumaFullscreenScope` marker + `webFullscreenRouteCount` 这套 web 全屏协调契约留核（`lib/src/presentation/core/web_fullscreen_coordination.dart`），因为核的 `NiumaPlayerView` 要读它；`gesture_feedback_state` 只 import `widgets` 的 `IconData`（非 material），留核。
+**曾经的整套参考皮（88 文件 niuma_ui：一体化壳 / 原子控件 / 控件条 / 全屏页 / 弹幕引擎 + overlay / 广告调度 / 缩略图取帧 / DLNA + AirPlay 投屏协议与 UI / 短视频 / 主题）已移出本仓，保留在 git 历史**——需要时 `git log --all -- 'example/lib/niuma_ui/**'` 定位 commit，`git show <sha>:...` 取文件，或喂给 AI 当参考。它们不进 semver 契约。
+
+**核 vs 参考皮边界**：判定规则——文件 import `package:flutter/material.dart` 或是纯 UI widget（`CustomPainter` / `InheritedWidget` / `StatefulWidget`）= chrome，不属于核。例外：`NiumaPlayerView`（渲染面，必须在核）、`NiumaFullscreenScope` marker + web 全屏路由协调契约（`lib/src/player/web_fullscreen_coordination.dart`，核的 `NiumaPlayerView` 要读它）。
 
 ## 常用命令
 
@@ -36,7 +38,7 @@ flutter build web
 ### 1. 三层 backend 抽象 + DI 是测试可行的关键
 
 ```
-NiumaPlayerController (lib/src/presentation/niuma_player_controller.dart)
+NiumaPlayerController (lib/src/player/niuma_player_controller.dart)
   │ 持有 ValueNotifier<NiumaPlayerValue>，单一公共门面
   │
   ├─ BackendFactory (lib/src/domain/backend_factory.dart)            ← 接口
@@ -54,27 +56,25 @@ NiumaPlayerController (lib/src/presentation/niuma_player_controller.dart)
 
 设备记忆 (`DeviceMemoryStore.kt`) 存在 **Kotlin 一侧** 的 `SharedPreferences`，不是 Dart。第一次播放失败时 Dart 调 `initialize(forceIjk: true)` 重试，原生侧把"该设备走 IJK"持久化。`NiumaPlayerController.clearDeviceMemory()` 是公开重置入口。
 
-### 3. M7 编排层独立于 backend
+### 3. 编排层独立于 backend
 
-`lib/src/orchestration/` 全部是纯 Dart 业务逻辑（多线路、retry policy、source middleware、续播、WebVTT 解析、弹幕 bucket loader / 轨道分配、auto-failover）。**只 import `flutter/foundation`**——没有 widget / painting / material / cupertino 依赖，可在纯 Dart 测试里跑。
+`lib/src/orchestration/` 全部是纯 Dart 业务逻辑（多线路 `multi_source`、auto-failover、retry policy、source middleware）。**只 import `flutter/foundation`**——没有 widget / painting / material / cupertino 依赖，可在纯 Dart 测试里跑。改这里务必维持这个边界。
 
-凡是要触碰 `Widget` / `BuildContext` / `ImageProvider` 的"编排级"组件（广告调度 `ad/ad_schedule` / `ad/ad_scheduler`、缩略图缓存与 resolver、`ThumbnailFrame`）一律放 `lib/src/presentation/`——它们是 widget 适配器，不是纯业务规则。
+### 4. headless controller：渲染面 + 手势 / 全屏
 
-### 4. M9 一体化 widget 与 9 个原子控件
+核**不含任何 UI widget**。唯一的 widget 是 `NiumaPlayerView`（`lib/src/player/niuma_player_view.dart`，一块无样式视频纹理 / `<video>` 表面）。播放控件全部由接入方监听 `controller.value` 自拼。
 
-`NiumaPlayer` (`lib/src/presentation/core/niuma_player.dart`) 是 90% 用户的入口；底层 9 个原子控件（`PlayPauseButton` / `ScrubBar` / `FullscreenButton` / ...）在 `lib/src/presentation/controls/` 单独导出，供需要自定义布局的业务直接拼装。`NiumaFullscreenPage` 通过 `InheritedWidget` marker 检测"是否已在全屏"决定 push/pop，**全屏路由透传** ad / theme / autoHide / loadingBuilder / errorBuilder / endedBuilder 等全部配置。
+- `NiumaGestureController`（`lib/src/player/niuma_gesture_controller.dart`）：把拖动几何量映射成播放意图 + `GestureFeedbackState`（HUD 反馈状态），HUD widget 由接入方按 `feedback` ValueListenable 渲染。值对象 `GestureKind` / `GestureFeedbackState` / `GestureHudIcon` 在 `lib/src/domain/`，只产出语义 `hudIcon`（不带 `IconData`）。
+- `NiumaFullscreenController`（`lib/src/player/niuma_fullscreen_controller.dart`）：进 / 退全屏的屏幕方向锁定 + system UI 切换 headless 编排。
+- web 全屏协调：`web_fullscreen_coordination.dart` 的 `NiumaFullscreenScope` marker + `enterWebFullscreenRoute()` / `exitWebFullscreenRoute()` / `webFullscreenRouteCountListenable`——单 `<video>` 在 inline / 全屏路由间搬迁的契约，`NiumaPlayerView` 读它。
 
-**原子控件命名**：业务侧推荐用 `Niuma*` 前缀 alias（`NiumaPlayPauseButton` / `NiumaScrubBar` 等）避免命名空间冲突。alias 在 `lib/src/control_aliases.dart` 定义，仍 export 原裸名向后兼容。
+弹幕引擎 / 广告调度 / 缩略图取帧 / 一体化壳 / 原子控件 / 控件条 / 全屏页全部**不在核**——在 git 历史的参考皮里。
 
-**反馈 UI builder slot**：`NiumaPlayer` 提供 `loadingBuilder` / `errorBuilder` / `endedBuilder` 三态可覆盖；不传走默认 `NiumaLoadingIndicator` / `NiumaErrorView` / `NiumaEndedView`（在 `lib/src/presentation/feedback/`）。`NiumaProgressThumb` 提供 `iconBuilder` slot 替换默认 niuma 表情。
+### 5. Cast 投屏：值类型留核、协议在 git 历史
 
-### 5. M15 Cast 投屏（合并主包）
+`lib/src/cast/` 只剩**值类型**：`CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`。`NiumaPlayerController.connectCast(session)` / `disconnectCast(...)` + `castSession` getter + `CastStarted` / `CastEnded` 事件依赖它们，故留核。
 
-`lib/src/cast/` 含**协议抽象 + 实现**：抽象层 `CastService` / `CastDevice` / `CastSession` / `NiumaCastRegistry`，实现层 `cast/dlna/`（DLNA SSDP + SOAP 协议 9 文件）、`cast/airplay_cast_service.dart`（iOS 系统 RoutePicker）。
-
-**自动注册**：`NiumaCastRegistry` 首次访问 `all()` / `byProtocolId()` 时 lazy 把 `DlnaCastService` + `AirPlayCastService` 加进来，业务方 0 配置就能用。仍可在 `main()` 里调 `register(...)` 注入自家协议（如 Chromecast）替代或补充。
-
-之前是 federated 分包模式（`niuma_player_dlna` + `niuma_player_airplay` companion package）——0.x 起合并进主包，分包 sibling repo 已 orphaned。
+**协议实现（DLNA SSDP/SOAP、AirPlay RoutePicker）+ `CastService` SPI + `NiumaCastRegistry` + 投屏 UI 全部移出核**，在 git 历史的参考皮（`example/lib/niuma_ui/cast/`）里。接入方自实现 `CastService` 产出 `CastSession`，交给 `controller.connectCast(...)`。
 
 ### 6. iOS PiP 反射 hack 区
 
@@ -82,18 +82,16 @@ iOS PiP（`ios/Classes/NiumaPipPlugin.swift`）依赖反射 `video_player_avfoun
 
 **关键防御**：`safeKVCValue` helper 在 KVC 之前用 ObjC runtime 检测 selector / property / ivar 存在，避免 `valueForUndefinedKey:` 抛 NSException 死锁线程；`NiumaObjCExceptionCatcher.{h,m}` 提供 `@try`/`@catch` 桥让 Swift 能抓 NSException（Swift 原生 `do-catch` 抓不到）。
 
-**`unsafePipAutoBackgroundOnEnter`**：`NiumaPlayerOptions` 里的 opt-in flag（`@experimental`）。打开时 iOS 端调私有 API `UIApplication.shared.perform(Selector("suspend"))` 模拟 home 键让 PiP 立刻飘出。**启用后 host app 无法过 App Store 审核**——文档里 `lib/src/presentation/core/niuma_player_controller.dart` 字段 doc 第一行就大字 `**⚠️ App Store 不兼容**`。Android 忽略此 flag。
+**`unsafePipAutoBackgroundOnEnter`**：`NiumaPlayerOptions` 里的 opt-in flag（`@experimental`）。打开时 iOS 端调私有 API `UIApplication.shared.perform(Selector("suspend"))` 模拟 home 键让 PiP 立刻飘出。**启用后 host app 无法过 App Store 审核**——文档里 `lib/src/player/niuma_player_controller.dart` 字段 doc 第一行就大字 `**⚠️ App Store 不兼容**`。Android 忽略此 flag。
 
 ## 公开 API 边界
 
-`lib/niuma_player.dart` 是唯一的 barrel export，0.1.0 起**只导出 headless 核**：backends / bridge / device_memory / data_source / player_state / `NiumaPlayerController` + options / `NiumaPlayerView` / 全部 orchestration / observability / 弹幕模型 + `NiumaDanmakuController` + `DanmakuTrackAllocator` / `NiumaGestureController` / `NiumaFullscreenController` / `NiumaFullscreenScope` + `webFullscreenRouteCount` / cast 抽象（`CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`）/ `ThumbnailFrame` / `formatVideoTime` / `NiumaSdkAssets`。**绝不导出任何 UI widget**——它们在参考皮里。
+`lib/niuma_player.dart` 是唯一的 barrel export，0.1.0 起**只导出 headless 核**：backends / bridge / device_memory / data_source / player_state（`NiumaPlayerValue` / `PlayerPhase` / 事件模型）/ `NiumaPlayerController` + `NiumaPlayerOptions` / `NiumaPlayerView` / 全部 orchestration（`NiumaMediaSource` / `MediaLine` / `MultiSourcePolicy` / `SourceMiddleware` 家族 / `RetryPolicy` / `AutoFailoverOrchestrator`）/ `NiumaGestureController` + 手势值对象（`GestureKind` / `GestureFeedbackState` / `GestureHudIcon`）/ `NiumaFullscreenController` + web 全屏协调（`NiumaFullscreenScope` / `enterWebFullscreenRoute` / `exitWebFullscreenRoute` / `webFullscreenRouteCountListenable`）/ cast 值类型（`CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`）/ `formatVideoTime` / `NiumaSdkAssets`。**绝不导出任何 UI widget**——它们在 git 历史的参考皮里。
 
 **任何 `lib/src/` 内部符号要对外暴露，必须显式 `export ... show ...;`** 这里。改这个文件等同于改 SDK 的公开 API：
 
 - 删除/重命名导出符号 = breaking change，必须在 `CHANGELOG.md` 写 `BREAKING CHANGE:` 并 bump major-ish
 - 新增导出 = minor bump
-- 加 `lib/src/testing/` 下的 fake = patch（这些通过 `lib/testing.dart` 导出）
-- **参考皮（`example/lib/niuma_ui/`）改动不影响 semver**——它不是包的公开 API
 
 公开 Dart 符号必须写 `///` 文档注释（见 `analysis_options.yaml` 的 `flutter_lints` 严格档）。
 
@@ -111,42 +109,33 @@ iOS PiP（`ios/Classes/NiumaPipPlugin.swift`）依赖反射 `video_player_avfoun
 | Android | `android/src/main/kotlin/cn/niuma/niuma_player/NiumaPlayerPlugin.kt`（package: `cn.niuma.niuma_player`） |
 | iOS | `ios/Classes/NiumaPlayerPlugin.swift` + `NiumaPipPlugin.swift` + `NiumaSystemPlugin.swift` + `NiumaAirPlayPlugin.swift` + `NiumaObjCExceptionCatcher.{h,m}` |
 
-PiP 需要业务侧 `MainActivity.onPictureInPictureModeChanged` 调 `NiumaPlayerPlugin.reportPipModeChanged(...)` 回调进 SDK——这个在 README "M12 特性" 段有完整接入步骤，改 PiP 相关代码前先看那段。
+PiP 需要业务侧 `MainActivity.onPictureInPictureModeChanged` 调 `NiumaPlayerPlugin.reportPipModeChanged(...)` 回调进 SDK——README "平台原生接入" 段有完整接入步骤，改 PiP 相关代码前先看那段。
 
 **修 Swift / ObjC 后必须跑 `flutter build ios --no-codesign --debug` 验证编译过**——hot reload 不重 build native，直接让用户 cold start 测会反复浪费时间（曾踩过这坑）。
 
-## `presentation/` 目录组织（headless 化后）
-
-0.1.0 起 `lib/src/presentation/` **只剩 headless 部分**（其余全部迁到 `example/lib/niuma_ui/`）：
+## `lib/src/` 目录组织（headless 核，33 文件 6 块）
 
 ```
-lib/src/presentation/        ← 核：只剩 headless controller / view / 协调契约
-├── core/        niuma_player_controller / niuma_player_view / pip_lifecycle_observer
-│                / web_fullscreen_coordination(NiumaFullscreenScope + web 全屏计数) (4)
-├── danmaku/     niuma_danmaku_controller (1，弹幕引擎入口)
-├── gesture/     niuma_gesture_controller (1，手势→意图 headless)
-├── fullscreen/  niuma_fullscreen_controller (1，朝向/SystemUI headless)
-├── thumbnail/   thumbnail_cache / frame / resolver (3，controller.thumbnailFor 契约)
-└── shared/      video_time_format (1，纯 Duration 格式化)
-
-example/lib/niuma_ui/        ← 参考皮：所有 UI widget（拷贝即用，不进 semver）
-├── core/        NiumaPlayer + Theme + popup_menu(part)
-├── controls/    22 原子控件 + niuma_sdk_icon + aliases
-├── control_bar/ NiumaControlBar / Config / Button / FullscreenControlBar / button_override / resolver
-├── fullscreen/  NiumaFullscreenPage + _root_bg_io/web（消费 NiumaFullscreenController）
-├── feedback/    NiumaLoadingIndicator / ProgressThumb / ErrorView / EndedView
-├── gesture/     NiumaGestureLayer（消费 NiumaGestureController）/ Hud
-├── danmaku/     NiumaDanmakuOverlay / Painter / Scope / SettingsPanel
-├── thumbnail/   NiumaThumbnailView / ScrubPreview
-├── ad/          ad_schedule / ad_scheduler / NiumaAdOverlay
-├── cast/        cast 协议（DLNA 9 / AirPlay / registry / CastService SPI）+ UI（Button/Overlay/Picker）
-├── short_video/ 5 个 NiumaShortVideo* widget + NiumaShortVideoTheme
-├── shared/      glass_card
-└── niuma_ui.dart  皮 barrel（演示可拷贝符号清单）
+lib/src/
+├── data/           三平台后端 + 平台桥
+│                   default_backend_factory(.io/.web) / video_player_backend(iOS·Web)
+│                   / native_backend(Android ExoPlayer↔IJK) / web_video_backend
+│                   / hls_detect / default_platform_bridge / device_memory / _pip_event_bus
+├── domain/         接口 + 状态值对象
+│                   backend_factory / player_backend / platform_bridge / data_source
+│                   / player_state(NiumaPlayerValue / PlayerPhase / 事件)
+│                   / gesture_kind / gesture_feedback_state / gesture_hud_icon
+├── orchestration/  纯 Dart 编排：multi_source / auto_failover / retry_policy / source_middleware
+├── cast/           投屏值类型：cast_device / cast_session / cast_state（协议在 git 历史）
+├── player/         controller + 渲染面 + headless controller
+│                   niuma_player_controller / niuma_player_view
+│                   / niuma_gesture_controller / niuma_fullscreen_controller
+│                   / web_fullscreen_coordination / pip_lifecycle_observer / video_time_format
+└── niuma_sdk_assets.dart  运行时 asset 常量（仅 web hls.js 路径）
 ```
 
-迁参考皮的 widget 改 import 规则：引核符号 → `package:niuma_player/niuma_player.dart`；引参考皮内其他文件 → 相对路径。`example/test/` 放参考皮 widget 测试。
+**没有 `presentation/`、没有 `niuma_ui`、没有任何 UI widget。** 所有 UI（弹幕 / 广告 / 缩略图 / 投屏协议 / 一体化壳 / 原子控件 / 控件条 / 全屏页 / 短视频 / 主题）在 git 历史的参考皮里。
 
 ## 资源约定
 
-`pubspec.yaml` 声明的 asset 目录：`assets/loading/` / `assets/player_controls/` / `assets/progress_thumbs/`。访问统一走 `NiumaSdkAssets` 常量（`lib/src/niuma_sdk_assets.dart`），**不要硬编码字符串路径**——`niuma_player.dart` 已经把这个类 re-export，业务和内部代码用同一个入口。
+`pubspec.yaml` 声明的 asset 目录 `assets/hls/`（vendored `hls.min.js`，web HLS 懒注入用）。访问统一走 `NiumaSdkAssets` 常量（`lib/src/niuma_sdk_assets.dart`），**不要硬编码字符串路径**——`niuma_player.dart` 已经把这个类 re-export，业务和内部代码用同一个入口。

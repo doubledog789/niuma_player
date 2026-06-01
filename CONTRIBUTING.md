@@ -26,16 +26,20 @@ flutter run -d <device>
 
 ## 项目结构
 
+`niuma_player` 是 **headless 视频播放内核**——包内零 UI widget（除无样式渲染面
+`NiumaPlayerView`）。曾经的整套 UI 参考皮（niuma_ui）保留在 git 历史。
+
 ```
-lib/                       公开 Dart API（NiumaPlayerController 等）
-├── src/domain/            纯接口（PlayerBackend、BackendFactory…）
-├── src/data/              具体后端实现（VideoPlayerBackend、NativeBackend）
-└── src/presentation/      Widget 与 controller
-android/src/main/kotlin/   Android 原生插件（ExoPlayer + IJK）
-ios/                       iOS pod（基于 video_player AVPlayer）
+lib/                       公开 Dart API（barrel：lib/niuma_player.dart）
+├── src/domain/            纯接口 + 状态值对象（PlayerBackend / player_state / 手势值对象…）
+├── src/data/              三平台后端 + 平台桥（VideoPlayerBackend / NativeBackend / web…）
+├── src/orchestration/     纯 Dart 编排（multi_source / auto_failover / retry / middleware）
+├── src/cast/              投屏值类型（CastDevice / CastSession / CastState）
+└── src/player/            controller + NiumaPlayerView + 手势/全屏 headless controller
+android/src/main/kotlin/   Android 原生插件（ExoPlayer ↔ IJK，IJK 已升 FFmpeg 7.1.1）
+ios/                       iOS pod（基于 video_player AVPlayer）+ PiP 反射桥
 test/                      纯 Dart 单元测试
-example/                   示例 app，覆盖每条代码路径
-doc/plans/                 设计文档与里程碑计划
+example/                   100 行最小 demo（消费内核）
 ```
 
 ## 提 PR 之前

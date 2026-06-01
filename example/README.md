@@ -1,16 +1,21 @@
 # niuma_player_example
 
-演示如何使用 niuma_player 插件。
+niuma_player（headless 视频播放内核）的**最小用法 demo**。
 
-## 入门
+`lib/main.dart` 约 100 行，演示接入 headless 核的最小闭环：
 
-本项目是一个 Flutter 应用的起点。
+- `NiumaPlayerController.dataSource(NiumaDataSource.network(url))..initialize()` 驱动播放
+- `AspectRatio(16/9, child: NiumaPlayerView(c))` 渲染画面
+- `ValueListenableBuilder<NiumaPlayerValue>` 监听状态，自己拼播放/暂停按钮 +
+  进度 Slider + 时间 label
 
-如果这是你的第一个 Flutter 项目，下面这些资源能帮你上手：
+niuma_player **不含任何 UI widget**——控件都由接入方监听 `controller.value` 自
+己写。复杂控件（长视频壳 / 短视频 / 弹幕 overlay / 投屏面板 / 缩略图预览）的参考
+实现保留在 git 历史的 niuma_ui 参考皮里，需要时 `git log` / `git show` 捞，或让
+AI 按需生成。
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 运行
 
-如需 Flutter 开发的更多帮助，请查阅
-[在线文档](https://docs.flutter.dev/)，里面提供教程、
-示例、移动开发指引以及完整的 API 参考。
+```bash
+flutter run -d <device-id>
+```

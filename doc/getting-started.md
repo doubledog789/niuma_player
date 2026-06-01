@@ -1,6 +1,10 @@
 # Getting Started
 
-5 分钟把 niuma_player 接入到自家 Flutter app。
+把 niuma_player（headless 视频播放内核）接入到自家 Flutter app。
+
+> niuma_player 不含任何 UI widget。你用 `NiumaPlayerView` 渲染画面、监听
+> `controller.value` 自己拼控件。需要现成的复杂控件参考实现，看 git 历史里的
+> niuma_ui 参考皮，或让 AI 按你的 design token 生成。
 
 ---
 
@@ -25,7 +29,7 @@ flutter pub get
 
 ### 2.1 iOS
 
-**`ios/Runner/Info.plist`**：
+`ios/Runner/Info.plist`：
 
 ```xml
 <!-- 允许 HTTP 视频源（HTTPS 不需要这一段） -->
@@ -42,33 +46,28 @@ flutter pub get
 </array>
 ```
 
-PiP 不需要额外原生代码——SDK 内部反射 `video_player_avfoundation` 拿 AVPlayer 接 `AVPictureInPictureController`。
+PiP 不需要额外原生代码——核内部反射 `video_player_avfoundation` 拿 AVPlayer 接
+`AVPictureInPictureController`。
 
 ### 2.2 Android
 
-**`android/app/src/main/AndroidManifest.xml`**：
+`android/app/src/main/AndroidManifest.xml`：
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
 <application
     android:usesCleartextTraffic="true">                 <!-- 允许 HTTP 视频源 -->
     <activity
         android:name=".MainActivity"
-        android:exported="true"
-        android:launchMode="singleTop"
-        android:taskAffinity=""                          <!-- PiP 推荐 -->
         android:supportsPictureInPicture="true"          <!-- PiP 必需 -->
-        android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-        android:hardwareAccelerated="true"
-        android:windowSoftInputMode="adjustResize">
+        android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
         ...
     </activity>
 </application>
 ```
 
-**`android/app/src/main/kotlin/.../MainActivity.kt`**——必须接 PiP 回调：
+`MainActivity.kt`——必须接 PiP 回调，否则核收不到进/退 PiP 事件：
 
 ```kotlin
 package com.your.package
@@ -88,24 +87,25 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
-> 不接这一行，PiP 退出时 SDK 收不到事件，控件层会一直被藏。SDK v0.9.1 加了 lifecycle resume 兜底但仍建议正确接入。
-
 ### 2.3 Web
 
-**`web/index.html`** `<head>` 内：
+`web/index.html` `<head>` 内：
 
 ```html
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 ```
 
-`viewport-fit=cover` 让 PWA 全屏可以覆盖到 iPhone notch / home indicator 区域（SDK 用 SafeArea 主动补 inset）。
-
-如果 Chrome / Firefox 需要 HLS：在 `pubspec.yaml` 加 `video_player_web_hls`（SDK 不内置）。
+HLS：mp4 在所有浏览器原生可播，m3u8 在 Safari 原生可播。Chrome / Firefox /
+Edge 的 HLS 走核内置 vendored `hls.js`，仅在播放 HLS 源时运行时懒注入，无需额外
+配置。Web 端基于 `package:web`，可随 `flutter build web --wasm` 编译。
 
 ---
 
 ## 3. Hello World
+
+`NiumaPlayerView` 渲染画面，`ValueListenableBuilder<NiumaPlayerValue>` 监听状态
+自己拼控件。
 
 ```dart
 import 'package:flutter/material.dart';
@@ -118,36 +118,65 @@ class VideoPage extends StatefulWidget {
 }
 
 class _VideoPageState extends State<VideoPage> {
-  late final NiumaPlayerController _controller;
+  late final NiumaPlayerController _c;
 
   @override
   void initState() {
     super.initState();
-    _controller = NiumaPlayerController.dataSource(
+    _c = NiumaPlayerController.dataSource(
       NiumaDataSource.network('https://example.com/video.mp4'),
-    );
-    _controller.initialize().then((_) => _controller.play());
+    )..initialize();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _c.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: NiumaPlayer(controller: _controller),
-        ),
+      body: Column(
+        children: [
+          AspectRatio(aspectRatio: 16 / 9, child: NiumaPlayerView(_c)),
+          ValueListenableBuilder<NiumaPlayerValue>(
+            valueListenable: _c,
+            builder: (context, value, _) {
+              final maxMs = value.duration.inMilliseconds;
+              return Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                        value.isPlaying ? Icons.pause : Icons.play_arrow),
+                    onPressed: value.isPlaying ? _c.pause : _c.play,
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: value.position.inMilliseconds
+                          .clamp(0, maxMs)
+                          .toDouble(),
+                      max: maxMs > 0 ? maxMs.toDouble() : 1,
+                      onChanged: maxMs > 0
+                          ? (v) => _c
+                              .seekTo(Duration(milliseconds: v.round()))
+                          : null,
+                    ),
+                  ),
+                  Text('${formatVideoTime(value.position)} / '
+                      '${formatVideoTime(value.duration)}'),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
 }
 ```
+
+可运行版本就是 [`example/lib/main.dart`](../example/lib/main.dart)。
 
 ---
 
@@ -161,13 +190,13 @@ final controller = NiumaPlayerController(
         id: 'main',
         label: '主线路',
         priority: 0,
-        source: NiumaDataSource.network('https://cdn1.../video.m3u8'),
+        source: NiumaDataSource.network('https://cdn1/video.m3u8'),
       ),
       MediaLine(
         id: 'backup',
         label: '备线路',
         priority: 1,
-        source: NiumaDataSource.network('https://cdn2.../video.m3u8'),
+        source: NiumaDataSource.network('https://cdn2/video.m3u8'),
       ),
     ],
     defaultLineId: 'main',
@@ -177,7 +206,7 @@ final controller = NiumaPlayerController(
     autoFailoverOnInitialError: true,   // 主线路 init 失败 → 自动尝试 backup
     rollbackOnSwitchFailure: true,      // 用户主动切换失败 → 回滚原线路
   ),
-);
+)..initialize();
 ```
 
 业务侧主动切换：
@@ -185,7 +214,8 @@ final controller = NiumaPlayerController(
 await controller.switchLine('backup');
 ```
 
-如果切换失败（且 `rollbackOnSwitchFailure: true`），controller 会静默回滚，`await` 不抛错。监听事件流可以拿到失败信号：
+切换失败（且 `rollbackOnSwitchFailure: true`）时 controller 静默回滚，`await`
+不抛错。监听事件流拿失败信号：
 ```dart
 controller.events.listen((e) {
   if (e is LineSwitchFailed) {
@@ -196,156 +226,32 @@ controller.events.listen((e) {
 
 ---
 
-## 5. 短视频 PageView
+## 5. 自己拼控件 / 让 AI 生成
 
-```dart
-class FeedPage extends StatefulWidget {
-  // ...
-}
+所有播放控件都由 `controller.value` 驱动，你自己写：
 
-class _FeedPageState extends State<FeedPage> {
-  final PageController _pageController = PageController();
-  final List<NiumaPlayerController> _controllers = [];
-  int _currentIndex = 0;
+- 播放 / 暂停：`value.isPlaying ? controller.pause() : controller.play()`
+- 进度条：`value.position` / `value.duration` / `controller.seekTo(...)`
+- 倍速：`controller.setPlaybackSpeed(1.5)`
+- 音量：`controller.setVolume(0.8)`
+- 缓冲：`value.bufferedPosition`
+- loading / error / ended 三态：看 `value.phase`（`opening` / `buffering` /
+  `error` → `value.error` / `ended`）
 
-  void _initController(String url) {
-    final c = NiumaPlayerController.dataSource(NiumaDataSource.network(url));
-    c.initialize();
-    _controllers.add(c);
-  }
+复杂控件（bili 风长视频壳、抖音风短视频、弹幕 overlay、投屏面板、缩略图预
+览）有成熟参考实现保留在 **git 历史**的 niuma_ui 参考皮里：
 
-  @override
-  Widget build(BuildContext context) {
-    return PageView.builder(
-      controller: _pageController,
-      scrollDirection: Axis.vertical,
-      onPageChanged: (i) => setState(() => _currentIndex = i),
-      itemCount: _controllers.length,
-      itemBuilder: (ctx, i) => NiumaShortVideoPlayer(
-        controller: _controllers[i],
-        isActive: i == _currentIndex,    // PageView 协调：只播当前页
-        loop: true,
-        leftCenterBuilder: (c, ctl) =>
-            NiumaShortVideoFullscreenButton(controller: ctl),
-      ),
-    );
-  }
-}
+```bash
+git log --all -- 'example/lib/niuma_ui/**'           # 定位 commit
+git show <sha>:example/lib/niuma_ui/core/niuma_player.dart   # 取文件
 ```
 
-完整短视频 demo：[`example/lib/short_video_demo_page.dart`](../example/lib/short_video_demo_page.dart)
-
----
-
-## 6. 集成弹幕
-
-```dart
-final danmaku = NiumaDanmakuController()
-  ..addAll([
-    DanmakuItem(
-      position: const Duration(seconds: 5),
-      text: 'awsl 这画面太顶了',
-      color: Colors.white,
-    ),
-    // ... 业务从 API 拉的弹幕
-  ]);
-
-NiumaPlayer(
-  controller: controller,
-  danmakuController: danmaku,
-  onDanmakuInputTap: () async {
-    // 业务自家弹幕输入 UI
-    final text = await showMyDanmakuInput(context);
-    if (text != null) {
-      danmaku.add(DanmakuItem(
-        position: controller.value.position,
-        text: text,
-      ));
-    }
-  },
-)
-```
-
-完整弹幕 demo：[`example/lib/danmaku_demo.dart`](../example/lib/danmaku_demo.dart)
-
----
-
-## 7. 自定义 UI
-
-### 7.1 控件条配置
-
-SDK 自带 3 个 preset：
-
-```dart
-fullscreenControlBarConfig: NiumaControlBarConfig.minimal,  // 最简
-fullscreenControlBarConfig: NiumaControlBarConfig.bili,     // bili 风（默认）
-fullscreenControlBarConfig: NiumaControlBarConfig.full,     // 全开（含 cast/PiP/lineSwitch/more）
-```
-
-或自家配：
-
-```dart
-fullscreenControlBarConfig: const NiumaControlBarConfig(
-  topLeading: [NiumaControlButton.back, NiumaControlButton.title],
-  topActions: [NiumaControlButton.more],
-  bottomLeft: [
-    NiumaControlButton.playPause,
-    NiumaControlButton.danmakuToggle,
-    NiumaControlButton.danmakuInput,
-  ],
-  bottomRight: [
-    NiumaControlButton.speed,
-    NiumaControlButton.lineSwitch,
-  ],
-  centerPlayPause: true,
-  showProgressBar: true,
-)
-```
-
-### 7.2 按钮级 override
-
-把某个 enum 槽换成自家完全自定义 widget：
-
-```dart
-buttonOverrides: {
-  NiumaControlButton.speed: ButtonOverride.builder((ctx) {
-    return TextButton(
-      onPressed: () => showMySpeedSheet(ctx),
-      child: const Text('🚀 极速'),
-    );
-  }),
-}
-```
-
-或保留 SDK 框架但换 icon / label / onTap：
-
-```dart
-buttonOverrides: {
-  NiumaControlButton.cast: ButtonOverride.fields(
-    icon: const Icon(Icons.tv),
-    label: '投到电视',
-    onTap: () => showMyCastSheet(),
-  ),
-}
-```
-
-### 7.3 反馈 UI
-
-```dart
-NiumaPlayer(
-  controller: controller,
-  loadingBuilder: (ctx) => MyLoadingWidget(),
-  errorBuilder: (ctx, err) => MyErrorWidget(err.message, onRetry: ...),
-  endedBuilder: (ctx) => MyEndedWidget(onReplay: ...),
-)
-```
-
-完整自定义 UI demo：[`example/lib/custom_controls_demo.dart`](../example/lib/custom_controls_demo.dart) + [`custom_feedback_ui_demo.dart`](../example/lib/custom_feedback_ui_demo.dart)
+或者把 `controller.value` 字段表 + 你的 design token 喂给 AI，让它按需生成。
 
 ---
 
 ## 下一步
 
-- 完整 API 参考：[`doc/api-reference.md`](api-reference.md)
-- 各 demo 源码：[`example/lib/`](../example/lib/)
-- 上一版变更：[`CHANGELOG.md`](../CHANGELOG.md)
+- 完整公开符号速查：[`doc/api-reference.md`](api-reference.md)
+- 最小 demo 源码：[`example/lib/main.dart`](../example/lib/main.dart)
+- 版本变更：[`CHANGELOG.md`](../CHANGELOG.md)
