@@ -10,7 +10,6 @@ import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
 import 'package:niuma_player_example/niuma_ui/controls/back_action.dart';
 import 'package:niuma_player_example/niuma_ui/controls/more_action.dart';
 import 'package:niuma_player_example/niuma_ui/core/niuma_player.dart' as np_internal;
-import 'package:niuma_player/testing.dart';
 
 import 'controls/fake_controller.dart';
 

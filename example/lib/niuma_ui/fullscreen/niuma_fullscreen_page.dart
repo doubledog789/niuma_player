@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:niuma_player/niuma_player.dart';
 
 import '../ad/ad_schedule.dart';
+import '../ad/analytics_emitter.dart';
 import '../control_bar/button_override.dart';
 import '../control_bar/niuma_control_bar_config.dart';
 import '../control_bar/niuma_control_button.dart';

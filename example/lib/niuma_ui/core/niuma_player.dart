@@ -9,6 +9,7 @@ import '../niuma_ui_assets.dart';
 import '../cast/cast_registry.dart';
 import '../ad/ad_schedule.dart';
 import '../ad/ad_scheduler.dart';
+import '../ad/analytics_emitter.dart';
 import '../control_bar/niuma_fullscreen_control_bar.dart';
 import '../control_bar/button_override.dart';
 import '../cast/niuma_cast_overlay.dart';

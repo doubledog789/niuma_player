@@ -73,18 +73,6 @@ export 'src/player/niuma_danmaku_controller.dart'
 // 视频时长格式化纯函数——手势 / 短视频参考皮渲染 HUD / 进度 label 复用。
 export 'src/player/video_time_format.dart' show formatVideoTime;
 
-// 可观测性
-export 'src/observability/analytics_event.dart'
-    show
-        AnalyticsEvent,
-        AdScheduled,
-        AdImpression,
-        AdClick,
-        AdDismissed,
-        AdCueType,
-        AdDismissReason;
-export 'package:niuma_player/src/observability/analytics_emitter.dart' show AnalyticsEmitter;
-
 // M13 手势（headless：意图映射 controller + 值对象，HUD widget 在参考皮）
 export 'package:niuma_player/src/domain/gesture_kind.dart' show GestureKind;
 export 'package:niuma_player/src/domain/gesture_feedback_state.dart' show GestureFeedbackState;

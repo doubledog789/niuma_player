@@ -61,6 +61,19 @@ export 'ad/ad_schedule.dart'
         PauseAdShowPolicy;
 export 'ad/ad_scheduler.dart' show AdSchedulerOrchestrator;
 export 'ad/niuma_ad_overlay.dart' show NiumaAdOverlay;
+// 广告 analytics 事件模型 + emitter（原 headless 核 observability，已随广告
+// 调度搬到参考皮）。
+export 'ad/analytics_event.dart'
+    show
+        AnalyticsEvent,
+        AdScheduled,
+        AdImpression,
+        AdClick,
+        AdDismissed,
+        AdCueType,
+        AdDismissReason;
+export 'ad/analytics_emitter.dart' show AnalyticsEmitter;
+export 'ad/fake_analytics_emitter.dart' show FakeAnalyticsEmitter;
 
 // 弹幕渲染 widget + 设置面板
 export 'danmaku/niuma_danmaku_overlay.dart' show NiumaDanmakuOverlay;

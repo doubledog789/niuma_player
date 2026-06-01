@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'ad_schedule.dart';
 import 'ad_scheduler.dart';
+import 'analytics_emitter.dart';
+import 'analytics_event.dart';
 
 /// 广告 overlay：把 [AdSchedulerOrchestrator.activeCue] 翻译成
 /// 屏幕上的真正 widget。

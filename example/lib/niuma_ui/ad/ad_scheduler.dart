@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:niuma_player/niuma_player.dart';
 import 'ad_schedule.dart';
+import 'analytics_emitter.dart';
+import 'analytics_event.dart';
 
 /// 基于 [ValueListenable<NiumaPlayerValue>] 的状态变化编排广告 cue 的触发。
 ///
