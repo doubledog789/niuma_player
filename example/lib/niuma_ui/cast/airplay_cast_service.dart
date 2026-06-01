@@ -1,6 +1,5 @@
 import 'package:niuma_player/niuma_player.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cast_service.dart';
@@ -35,7 +34,6 @@ class AirPlayCastService extends CastService {
         id: 'airplay:system',
         name: 'AirPlay (iOS 设备)',
         protocolId: 'airplay',
-        icon: Icons.airplay,
       ),
     ];
   }

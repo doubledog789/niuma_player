@@ -7,6 +7,25 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### BREAKING CHANGE: 公开 API 契约 polish
+
+- `GestureFeedbackState` 删除 `icon`（`IconData?`）与 `iconAsset`（`String?`）
+  字段——核手势统一只产出语义 `hudIcon`（`GestureHudIcon?`），由消费方 HUD
+  映射到自家资源。`domain` 层不再 import `flutter/widgets` 的 `IconData`。
+- `CastDevice` 删除 `icon`（`IconData?`）字段；UI 兜底 `Icons.tv` 归参考皮。
+- `NiumaPlayerController` 删除 `gestureFeedback` getter、
+  `setGestureFeedbackInternal()`、`debugSetGestureFeedback()`——手势 HUD 状态
+  归属移进 `NiumaGestureController`（新增 `feedback`
+  `ValueListenable<GestureFeedbackState?>` getter，监听它渲染 HUD）。
+- `web_fullscreen_coordination`：不再导出裸 `webFullscreenRouteCount`
+  `ValueNotifier`；改为只读 `webFullscreenRouteCountListenable` + 一对协调 API
+  `enterWebFullscreenRoute()` / `exitWebFullscreenRoute()`。
+- 广告 analytics 事件模型（`AnalyticsEvent` / `AdScheduled` / `AdImpression`
+  / `AdClick` / `AdDismissed` / `AdCueType` / `AdDismissReason`）、
+  `AnalyticsEmitter` typedef、`FakeAnalyticsEmitter`（原 `testing.dart` 导出）
+  全部移出核——随广告调度迁入参考皮 `example/lib/niuma_ui/ad/`。核 controller
+  从不依赖它们。
+
 ### BREAKING CHANGE: 缩略图功能从核摘除
 
 缩略图（thumbnail）的取帧逻辑 + widget 全部移出核，作为可拷贝参考皮迁入

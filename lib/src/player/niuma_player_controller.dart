@@ -9,7 +9,6 @@ import 'package:niuma_player/src/data/default_platform_bridge.dart';
 import 'package:niuma_player/src/data/device_memory.dart' show DeviceMemory;
 import 'package:niuma_player/src/data/native_backend.dart';
 import 'package:niuma_player/src/domain/backend_factory.dart';
-import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
 import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/domain/platform_bridge.dart';
 import 'package:niuma_player/src/domain/player_backend.dart';
@@ -514,9 +513,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       await session.play();
       return;
     }
-    debugPrint(
-      '[niuma_player] play() backend=${_backend?.kind.name ?? "<null>"}',
-    );
     await _backend?.play();
     // PiP RemoteAction 同步走 value setter（valueStream listener 保留
     // isInPictureInPicture，setter 检测 isPlaying 变化自动触发 update）。
@@ -530,9 +526,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       await session.pause();
       return;
     }
-    debugPrint(
-      '[niuma_player] pause() backend=${_backend?.kind.name ?? "<null>"}',
-    );
     await _backend?.pause();
   }
 
@@ -685,31 +678,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 直接写 `.value = false` 即可关闭；[NiumaPlayerController.dispose]
   /// 会自动 dispose 此 notifier。
   final ValueNotifier<bool> danmakuVisibility = ValueNotifier(true);
-
-  // ────────────── M13 手势 HUD ──────────────
-
-  final ValueNotifier<GestureFeedbackState?> _gestureFeedback =
-      ValueNotifier<GestureFeedbackState?>(null);
-
-  /// 当前手势 HUD 状态。null = 无手势进行中。
-  ///
-  /// [NiumaGestureLayer]（M13）通过 [debugSetGestureFeedback] 推送状态变化；
-  /// 业务监听 `controller.gestureFeedback.value` 即可拿到当前手势 + 进度。
-  ValueListenable<GestureFeedbackState?> get gestureFeedback =>
-      _gestureFeedback;
-
-  /// SDK 内部用：[NiumaGestureLayer] 推 HUD 状态。
-  /// 业务层一般不直接调（不公开导出）。
-  // ignore: use_setters_to_change_properties
-  void setGestureFeedbackInternal(GestureFeedbackState? state) {
-    _gestureFeedback.value = state;
-  }
-
-  /// 测试辅助：同 [setGestureFeedbackInternal]，加 @visibleForTesting
-  /// 让测试代码可显式通过带 debug 前缀的方法推状态。
-  @visibleForTesting
-  void debugSetGestureFeedback(GestureFeedbackState? state) =>
-      setGestureFeedbackInternal(state);
 
   // ────────────── M12 PiP（画中画） ──────────────
 
@@ -885,7 +853,6 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     await _disposeCurrentBackend();
     await _eventController.close();
     danmakuVisibility.dispose();
-    _gestureFeedback.dispose();
     _castSession.dispose();
     super.dispose();
   }

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
+import 'package:niuma_player/src/domain/gesture_hud_icon.dart';
 import 'package:niuma_player/src/domain/gesture_kind.dart';
 
 void main() {
@@ -9,7 +9,7 @@ void main() {
     expect(s.kind, GestureKind.doubleTap);
     expect(s.progress, 0.5);
     expect(s.label, isNull);
-    expect(s.icon, isNull);
+    expect(s.hudIcon, isNull);
   });
 
   test('equality 全字段覆盖', () {
@@ -17,13 +17,13 @@ void main() {
       kind: GestureKind.volume,
       progress: 0.6,
       label: '60%',
-      icon: Icons.volume_up,
+      hudIcon: GestureHudIcon.volume,
     );
     const b = GestureFeedbackState(
       kind: GestureKind.volume,
       progress: 0.6,
       label: '60%',
-      icon: Icons.volume_up,
+      hudIcon: GestureHudIcon.volume,
     );
     const c = GestureFeedbackState(kind: GestureKind.volume, progress: 0.7);
     expect(a, equals(b));

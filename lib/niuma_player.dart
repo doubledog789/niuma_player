@@ -84,7 +84,11 @@ export 'package:niuma_player/src/player/niuma_gesture_controller.dart'
 export 'package:niuma_player/src/player/niuma_fullscreen_controller.dart'
     show NiumaFullscreenController;
 export 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
-    show NiumaFullscreenScope, webFullscreenRouteCount, webFullscreenRouteCountListenable;
+    show
+        NiumaFullscreenScope,
+        webFullscreenRouteCountListenable,
+        enterWebFullscreenRoute,
+        exitWebFullscreenRoute;
 
 // M15 投屏（Cast）抽象层——controller.connectCast / castSession + 事件模型依赖
 // 它，故留核。协议实现（DLNA / AirPlay）+ registry + cast UI 作为可选附加在

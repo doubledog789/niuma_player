@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 import 'package:niuma_player_example/niuma_ui/niuma_ui.dart';
-import 'package:niuma_player_example/niuma_ui/gesture/niuma_gesture_hud.dart';
 
 void main() {
-  testWidgets('volume HUD 显示 icon + label + 进度条', (tester) async {
+  testWidgets('volume HUD 显示 hudIcon + label + 进度条', (tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: Scaffold(
         body: NiumaGestureHud(
@@ -13,12 +12,17 @@ void main() {
             kind: GestureKind.volume,
             progress: 0.6,
             label: '60%',
-            icon: Icons.volume_up,
+            hudIcon: GestureHudIcon.volume,
           ),
         ),
       ),
     ));
-    expect(find.byIcon(Icons.volume_up), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is NiumaSdkIcon && w.asset == NiumaUiAssets.icVolume,
+      ),
+      findsOneWidget,
+    );
     expect(find.text('60%'), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
   });
@@ -35,7 +39,6 @@ void main() {
             kind: GestureKind.horizontalSeek,
             progress: 0.5,
             label: '+15s / 1:23 / 4:56',
-            icon: Icons.fast_forward,
           ),
         ),
       ),
@@ -57,7 +60,6 @@ void main() {
             kind: GestureKind.horizontalSeek,
             progress: 0.2,
             label: '-10s / 0:30 / 4:56',
-            icon: Icons.fast_rewind,
           ),
         ),
       ),

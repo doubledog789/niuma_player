@@ -185,7 +185,7 @@ class _DeviceTile extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              device.icon,
+              Icons.tv,
               size: 16,
               color: isConnected ? accent : Colors.white,
             ),

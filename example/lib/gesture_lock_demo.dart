@@ -197,7 +197,7 @@ class _GestureLockDemoPageState extends State<GestureLockDemoPage> {
                     body:
                         '完全替换默认 HUD 的视觉。签名 (BuildContext, '
                         'GestureFeedbackState) → Widget。state 字段：kind / progress '
-                        '/ label / icon / iconAsset，业务自由组合。',
+                        '/ label / hudIcon，业务自由组合。',
                   ),
                   SizedBox(height: 8),
                   _DocBlock(

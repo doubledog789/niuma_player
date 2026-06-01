@@ -54,7 +54,9 @@ class DanmakuBucketLoader {
         if (_generation == gen) _loaded.add(idx);
         return result;
       } catch (e, st) {
-        debugPrint('[DanmakuBucketLoader] bucket $idx 加载失败：$e\n$st');
+        if (kDebugMode) {
+          debugPrint('[DanmakuBucketLoader] bucket $idx 加载失败：$e\n$st');
+        }
         return const <DanmakuItem>[];
       } finally {
         if (_generation == gen) _inFlight.remove(idx);

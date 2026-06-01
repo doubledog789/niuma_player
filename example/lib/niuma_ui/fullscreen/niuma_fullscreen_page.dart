@@ -17,10 +17,11 @@ import '../core/niuma_player_theme.dart';
 import '../gesture/niuma_gesture_layer.dart';
 import '_root_bg_io.dart' if (dart.library.js_interop) '_root_bg_web.dart';
 
-// `webFullscreenRouteCount` / `webFullscreenRouteCountListenable` /
-// `NiumaFullscreenScope` 现由 headless 核（web_fullscreen_coordination.dart）
-// 定义，本参考皮通过 `package:niuma_player/niuma_player.dart` 复用——核里的
-// `NiumaPlayerView` 读它们决定 web `<video>` 单实例挂哪侧（inline / 全屏）。
+// `enterWebFullscreenRoute` / `exitWebFullscreenRoute` /
+// `webFullscreenRouteCountListenable` / `NiumaFullscreenScope` 现由 headless 核
+// （web_fullscreen_coordination.dart）定义，本参考皮通过
+// `package:niuma_player/niuma_player.dart` 复用——核里的 `NiumaPlayerView`
+// 读它们决定 web `<video>` 单实例挂哪侧（inline / 全屏）。
 
 /// 通过 [NiumaFullscreenPage.route] push 的全屏播放页。
 ///
@@ -301,7 +302,7 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
       setWebRootBackground('#000');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        webFullscreenRouteCount.value = webFullscreenRouteCount.value + 1;
+        enterWebFullscreenRoute();
         // 兜底：理论上 atomic appendChild move 不会 pause video，但
         // iOS Safari 在某些 build 阶段 reflow 时仍可能让 video 短暂卡住。
         // enter 时如果原来是 playing，再下一帧（counter 翻完 inline 已重建
@@ -350,10 +351,7 @@ class _NiumaFullscreenPageState extends State<NiumaFullscreenPage> {
       // 在 inline 与 fullscreen 容器之间 move 回 inline。enter 时 video
       // 处于 playing 的话，schedule 一次 play() 兜底——以防 unmount/mount
       // 顺序导致 wrapper 短暂 orphan 触发浏览器暂停。
-      if (webFullscreenRouteCount.value > 0) {
-        webFullscreenRouteCount.value =
-            webFullscreenRouteCount.value - 1;
-      }
+      exitWebFullscreenRoute();
       // 退出 fullscreen route 还原 root 背景——传 null 清空 inline style，
       // 回到 host 页面自家 CSS 设定的默认值。
       setWebRootBackground(null);

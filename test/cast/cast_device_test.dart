@@ -24,11 +24,6 @@ void main() {
       const b = CastDevice(id: 'b', name: 'B', protocolId: 'dlna');
       expect(a, isNot(equals(b)));
     });
-
-    test('默认 icon 为 null（headless 核不绑定 material Icons.tv，由参考皮兜底）', () {
-      const d = CastDevice(id: 'x', name: 'X', protocolId: 'dlna');
-      expect(d.icon, isNull);
-    });
   });
 
   group('CastConnectionState / CastEndReason', () {

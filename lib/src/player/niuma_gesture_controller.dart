@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show Offset, Size;
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:niuma_player/src/domain/gesture_feedback_state.dart';
 import 'package:niuma_player/src/domain/gesture_hud_icon.dart';
 import 'package:niuma_player/src/domain/gesture_kind.dart';
@@ -13,7 +14,7 @@ import 'package:niuma_player/src/player/video_time_format.dart';
 ///
 /// widget（参考皮里的 gesture layer）只负责：用 `GestureDetector` 把
 /// double-tap / long-press / pan 的本地坐标 + 容器尺寸透传给本类的对应方法；
-/// HUD 的渲染则监听 [NiumaPlayerController.gestureFeedback]。
+/// HUD 的渲染则监听本类的 [feedback]。
 ///
 /// 5 项手势（与原 `NiumaGestureLayer` 行为一致）：
 /// - 双击 → play / pause
@@ -34,6 +35,13 @@ class NiumaGestureController {
 
   /// 黑名单：不触发的手势类型。
   final Set<GestureKind> disabledGestures;
+
+  final ValueNotifier<GestureFeedbackState?> _feedback =
+      ValueNotifier<GestureFeedbackState?>(null);
+
+  /// 当前手势 HUD 状态。null = 无手势进行中。参考皮的 gesture layer
+  /// 监听本值渲染 HUD。
+  ValueListenable<GestureFeedbackState?> get feedback => _feedback;
 
   GestureKind? _lockedKind;
   Offset _panStart = Offset.zero;
@@ -56,13 +64,13 @@ class NiumaGestureController {
   }
 
   void _showHud(GestureFeedbackState state) {
-    player.setGestureFeedbackInternal(state);
+    _feedback.value = state;
     _hideTimer?.cancel();
   }
 
   void _scheduleHide() {
     _hideTimer = Timer(const Duration(milliseconds: 600), () {
-      player.setGestureFeedbackInternal(null);
+      _feedback.value = null;
     });
   }
 
@@ -213,7 +221,7 @@ class NiumaGestureController {
   /// pan 结束 → 水平 seek 时按当前 HUD 进度提交 seek。
   void onPanEnd() {
     if (_lockedKind == GestureKind.horizontalSeek) {
-      final hud = player.gestureFeedback.value;
+      final hud = _feedback.value;
       if (hud != null) {
         final duration = player.value.duration;
         final progress = hud.progress;
@@ -227,10 +235,12 @@ class NiumaGestureController {
     _scheduleHide();
   }
 
-  /// 释放：停 HUD 计时器，并把亮度恢复到 [initBrightness] 读到的初值。
+  /// 释放：停 HUD 计时器、释放 [feedback] notifier，并把亮度恢复到
+  /// [initBrightness] 读到的初值。
   void dispose() {
     _hideTimer?.cancel();
     restoreBrightness();
+    _feedback.dispose();
   }
 
   /// 把屏幕亮度恢复到进入手势区前的初值（fire-and-forget）。

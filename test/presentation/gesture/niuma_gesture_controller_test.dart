@@ -119,7 +119,7 @@ void main() {
     g.onPanStart(const Offset(200, 150));
     // dx = +width*0.5 = +200 → delta = 0.5 * 240000 * 0.5 = 60000ms = +60s
     await g.onPanUpdate(const Offset(400, 150), size);
-    expect(controller.gestureFeedback.value?.kind, GestureKind.horizontalSeek);
+    expect(g.feedback.value?.kind, GestureKind.horizontalSeek);
     g.onPanEnd();
     // seekStart 1min + 60s = 2min。
     expect(backend.lastSeek, const Duration(minutes: 2));
@@ -130,7 +130,7 @@ void main() {
     final (controller, backend, g) = await build();
     g.onPanStart(const Offset(50, 150)); // 左半屏
     await g.onPanUpdate(const Offset(50, 30), size); // 上滑 → 亮度增
-    expect(controller.gestureFeedback.value?.kind, GestureKind.brightness);
+    expect(g.feedback.value?.kind, GestureKind.brightness);
     expect(backend.brightnessSets, isNotEmpty);
     expect(backend.brightnessSets.last, greaterThan(0.3));
     await controller.dispose();
@@ -140,7 +140,7 @@ void main() {
     final (controller, backend, g) = await build();
     g.onPanStart(const Offset(350, 150)); // 右半屏
     await g.onPanUpdate(const Offset(350, 30), size); // 上滑 → 音量增
-    expect(controller.gestureFeedback.value?.kind, GestureKind.volume);
+    expect(g.feedback.value?.kind, GestureKind.volume);
     expect(backend.volumeSets, isNotEmpty);
     expect(backend.volumeSets.last, greaterThan(0.4));
     await controller.dispose();
@@ -149,11 +149,9 @@ void main() {
   test('双击播放中 → 暂停 + HUD 用语义 hudIcon 不引 material icon / 资源路径', () async {
     final (controller, backend, g) = await build();
     g.onDoubleTap();
-    final hud = controller.gestureFeedback.value;
+    final hud = g.feedback.value;
     expect(hud?.kind, GestureKind.doubleTap);
     expect(hud?.hudIcon, GestureHudIcon.pause);
-    expect(hud?.iconAsset, isNull); // headless：核不发资源路径
-    expect(hud?.icon, isNull); // headless：不设 material IconData
     await controller.dispose();
   });
 
@@ -170,7 +168,7 @@ void main() {
       disabledGestures: const {GestureKind.doubleTap},
     );
     g.onDoubleTap();
-    expect(controller.gestureFeedback.value, isNull);
+    expect(g.feedback.value, isNull);
     await controller.dispose();
   });
 }

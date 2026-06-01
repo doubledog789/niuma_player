@@ -23,7 +23,7 @@ class NiumaCastOverlay extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(session.device.icon,
+              const Icon(Icons.tv,
                   size: 48, color: Colors.lightBlueAccent),
               const SizedBox(height: 12),
               const Text(

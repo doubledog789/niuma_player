@@ -33,10 +33,10 @@ String? _assetForHudIcon(GestureHudIcon? icon) {
   }
 }
 
-/// 解析 HUD 该渲染哪个 SVG：优先显式 [GestureFeedbackState.iconAsset]
-/// （本皮 gesture_layer 直接填的资源路径），否则映射核手势的语义 hudIcon。
+/// 解析 HUD 该渲染哪个 SVG：把核手势产出的语义 [GestureFeedbackState.hudIcon]
+/// 映射到本皮的 SVG 资源。
 String? _resolveAsset(GestureFeedbackState state) =>
-    state.iconAsset ?? _assetForHudIcon(state.hudIcon);
+    _assetForHudIcon(state.hudIcon);
 
 /// 默认手势 HUD（B 站 / YouTube 风）。
 ///
@@ -224,9 +224,6 @@ class _ValueCard extends StatelessWidget {
           if (asset != null) ...[
             NiumaSdkIcon(asset: asset, color: accent, size: 36),
             const SizedBox(height: 10),
-          ] else if (state.icon != null) ...[
-            Icon(state.icon, color: accent, size: 36),
-            const SizedBox(height: 10),
           ],
           if (state.label != null) ...[
             Text(
@@ -266,9 +263,6 @@ class _SpeedPill extends StatelessWidget {
               color: _brandOrange,
               size: 18,
             ),
-            const SizedBox(width: 6),
-          ] else if (state.icon != null) ...[
-            Icon(state.icon, color: _brandOrange, size: 18),
             const SizedBox(width: 6),
           ],
           if (state.label != null)
@@ -316,9 +310,7 @@ class _IconFlash extends StatelessWidget {
                     size: 44,
                   ),
                 )
-              : (state.icon != null
-                  ? Icon(state.icon, color: _brandOrange, size: 44)
-                  : null),
+              : null,
         ),
         if (state.label != null) ...[
           const SizedBox(height: 8),

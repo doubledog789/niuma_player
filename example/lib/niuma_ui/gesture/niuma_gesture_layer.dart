@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
-import '../niuma_ui_assets.dart';
 import 'niuma_gesture_hud.dart';
 
 
@@ -17,6 +14,9 @@ typedef GestureHudBuilder = Widget Function(
 ///
 /// 默认仅在全屏页生效（通过 [enabled] 字段控制）；inline 场景由
 /// `NiumaPlayer.gesturesEnabledInline` 决定 enabled。
+///
+/// 手势逻辑全部委托给 headless 核的 [NiumaGestureController]——本 widget 只把
+/// `GestureDetector` 的回调透传过去、监听 controller 的 `feedback` 渲染 HUD。
 ///
 /// 5 项手势：
 /// - 双击 → controller.play/pause
@@ -59,220 +59,21 @@ class NiumaGestureLayer extends StatefulWidget {
 }
 
 class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
-  GestureKind? _lockedKind;
-  Offset _panStart = Offset.zero;
-  Duration _seekStart = Duration.zero;
-  double _origValue = 0.0;
-  double? _originalSpeed;
-  Timer? _hideTimer;
-  double? _initialBrightness;
-  DateTime? _lastChannelSet;
-
-  static const double _dragThreshold = 18;
-
-  bool _isDisabled(GestureKind kind) =>
-      widget.disabledGestures.contains(kind);
+  late final NiumaGestureController _gc;
 
   @override
   void initState() {
     super.initState();
-    // 异步读初始亮度，dispose 时恢复
-    widget.controller.backend?.getBrightness().then((v) {
-      if (mounted) _initialBrightness = v;
-    });
-  }
-
-  void _showHud(GestureFeedbackState state) {
-    widget.controller.setGestureFeedbackInternal(state);
-    _hideTimer?.cancel();
-  }
-
-  void _scheduleHide() {
-    _hideTimer = Timer(const Duration(milliseconds: 600), () {
-      if (mounted) {
-        widget.controller.setGestureFeedbackInternal(null);
-      }
-    });
-  }
-
-  void _onTap() {
-    widget.onTap?.call();
-  }
-
-  void _onDoubleTap() {
-    if (_isDisabled(GestureKind.doubleTap)) return;
-    final phase = widget.controller.value.phase;
-    if (phase == PlayerPhase.playing) {
-      widget.controller.pause();
-      _showHud(const GestureFeedbackState(
-        kind: GestureKind.doubleTap,
-        progress: 1.0,
-        label: '已暂停',
-        icon: Icons.pause,
-        iconAsset: NiumaUiAssets.icPause,
-      ));
-    } else {
-      widget.controller.play();
-      _showHud(const GestureFeedbackState(
-        kind: GestureKind.doubleTap,
-        progress: 1.0,
-        label: '播放中',
-        icon: Icons.play_arrow,
-        iconAsset: NiumaUiAssets.icPlay,
-      ));
-    }
-    _scheduleHide();
-  }
-
-  void _onLongPressStart(LongPressStartDetails _) {
-    if (_isDisabled(GestureKind.longPressSpeed)) return;
-    _originalSpeed = widget.controller.value.playbackSpeed;
-    widget.controller.setPlaybackSpeed(2.0);
-    _showHud(const GestureFeedbackState(
-      kind: GestureKind.longPressSpeed,
-      progress: 1.0,
-      label: '2x 倍速',
-      icon: Icons.fast_forward,
-      iconAsset: NiumaUiAssets.icSpeedAlt,
-    ));
-  }
-
-  void _onLongPressEnd(LongPressEndDetails _) {
-    final speed = _originalSpeed;
-    if (speed != null) {
-      widget.controller.setPlaybackSpeed(speed);
-    }
-    _originalSpeed = null;
-    _scheduleHide();
-  }
-
-  void _onPanStart(DragStartDetails details) {
-    _panStart = details.localPosition;
-    _seekStart = widget.controller.value.position;
-    _lockedKind = null;
-    _origValue = 0.0;
-  }
-
-  Future<void> _ensureOrigValue(GestureKind kind) async {
-    final backend = widget.controller.backend;
-    if (backend == null) return;
-    if (kind == GestureKind.brightness) {
-      _origValue = await backend.getBrightness();
-    } else if (kind == GestureKind.volume) {
-      _origValue = await backend.getSystemVolume();
-    }
-  }
-
-  Future<void> _onPanUpdate(DragUpdateDetails details) async {
-    final size = context.size;
-    if (size == null) return;
-
-    final dx = details.localPosition.dx - _panStart.dx;
-    final dy = details.localPosition.dy - _panStart.dy;
-
-    if (_lockedKind == null) {
-      if (dx.abs() < _dragThreshold && dy.abs() < _dragThreshold) return;
-      if (dx.abs() > dy.abs()) {
-        _lockedKind = GestureKind.horizontalSeek;
-      } else {
-        final isLeftHalf = _panStart.dx < size.width / 2;
-        _lockedKind = isLeftHalf ? GestureKind.brightness : GestureKind.volume;
-      }
-      if (_isDisabled(_lockedKind!)) {
-        _lockedKind = null;
-        return;
-      }
-      await _ensureOrigValue(_lockedKind!);
-    }
-
-    switch (_lockedKind!) {
-      case GestureKind.horizontalSeek:
-        final duration = widget.controller.value.duration;
-        if (duration == Duration.zero) return;
-        final seekDeltaMs =
-            (dx / size.width * duration.inMilliseconds * 0.5).round();
-        final target = _seekStart + Duration(milliseconds: seekDeltaMs);
-        final clamped = Duration(
-          milliseconds:
-              target.inMilliseconds.clamp(0, duration.inMilliseconds),
-        );
-        _showHud(GestureFeedbackState(
-          kind: GestureKind.horizontalSeek,
-          progress:
-              clamped.inMilliseconds / duration.inMilliseconds.clamp(1, 1 << 30),
-          label: '${seekDeltaMs >= 0 ? '+' : ''}${seekDeltaMs ~/ 1000}s '
-              '/ ${formatVideoTime(clamped)} / ${formatVideoTime(duration)}',
-          icon: Icons.fast_forward,
-          iconAsset: seekDeltaMs >= 0
-              ? NiumaUiAssets.icForward10
-              : NiumaUiAssets.icRewind10,
-        ));
-      case GestureKind.brightness:
-      case GestureKind.volume:
-        final newValue =
-            (_origValue - (dy / (size.height * 0.5))).clamp(0.0, 1.0);
-        // 节流 50ms
-        final now = DateTime.now();
-        final canSet = _lastChannelSet == null ||
-            now.difference(_lastChannelSet!) >=
-                const Duration(milliseconds: 50);
-        if (canSet) {
-          _lastChannelSet = now;
-          final backend = widget.controller.backend;
-          if (backend != null) {
-            if (_lockedKind == GestureKind.brightness) {
-              unawaited(backend.setBrightness(newValue));
-            } else {
-              unawaited(backend.setSystemVolume(newValue));
-            }
-          }
-        }
-        _showHud(GestureFeedbackState(
-          kind: _lockedKind!,
-          progress: newValue,
-          label: '${(newValue * 100).round()}%',
-          icon: _lockedKind == GestureKind.brightness
-              ? Icons.brightness_6
-              : Icons.volume_up,
-          // 资源包约定：ic_settings 是亮度图标；ic_volume / ic_volume_mute
-          // 是音量图标（音量为 0 走 mute 版本）。
-          iconAsset: _lockedKind == GestureKind.brightness
-              ? NiumaUiAssets.icSettings
-              : (newValue == 0
-                  ? NiumaUiAssets.icVolumeMute
-                  : NiumaUiAssets.icVolume),
-        ));
-      case GestureKind.doubleTap:
-      case GestureKind.longPressSpeed:
-        // pan 不会进这两个 case，吞掉避免 lint
-        break;
-    }
-  }
-
-  void _onPanEnd(DragEndDetails _) {
-    if (_lockedKind == GestureKind.horizontalSeek) {
-      final hud = widget.controller.gestureFeedback.value;
-      if (hud != null) {
-        final duration = widget.controller.value.duration;
-        final progress = hud.progress;
-        final target = Duration(
-          milliseconds: (duration.inMilliseconds * progress).round(),
-        );
-        widget.controller.seekTo(target);
-      }
-    }
-    _lockedKind = null;
-    _scheduleHide();
+    _gc = NiumaGestureController(
+      widget.controller,
+      disabledGestures: widget.disabledGestures,
+    );
+    _gc.initBrightness();
   }
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
-    final orig = _initialBrightness;
-    if (orig != null) {
-      // 退出时恢复亮度，fire-and-forget（dispose 不能 async）
-      widget.controller.backend?.setBrightness(orig);
-    }
+    _gc.dispose();
     super.dispose();
   }
 
@@ -283,23 +84,36 @@ class _NiumaGestureLayerState extends State<NiumaGestureLayer> {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: _onTap,
-            onDoubleTap: (widget.enabled && !_isDisabled(GestureKind.doubleTap))
-              ? _onDoubleTap
-              : null,
+            onTap: () => widget.onTap?.call(),
+            // doubleTap 被 disable 时传 null——让 GestureDetector 不再等双击
+            // 消歧，单击立即 fire onTap（短视频里靠这个拿到即时单击 toggle）。
+            onDoubleTap: (widget.enabled &&
+                    !widget.disabledGestures.contains(GestureKind.doubleTap))
+                ? _gc.onDoubleTap
+                : null,
             onLongPressStart:
-                widget.enabled ? _onLongPressStart : null,
-            onLongPressEnd: widget.enabled ? _onLongPressEnd : null,
-            onPanStart: widget.enabled ? _onPanStart : null,
-            onPanUpdate: widget.enabled ? _onPanUpdate : null,
-            onPanEnd: widget.enabled ? _onPanEnd : null,
+                widget.enabled ? (_) => _gc.onLongPressStart() : null,
+            onLongPressEnd:
+                widget.enabled ? (_) => _gc.onLongPressEnd() : null,
+            onPanStart: widget.enabled
+                ? (d) => _gc.onPanStart(d.localPosition)
+                : null,
+            onPanUpdate: widget.enabled
+                ? (d) {
+                    final size = context.size;
+                    if (size != null) {
+                      _gc.onPanUpdate(d.localPosition, size);
+                    }
+                  }
+                : null,
+            onPanEnd: widget.enabled ? (_) => _gc.onPanEnd() : null,
             child: widget.child,
           ),
         ),
         Positioned.fill(
           child: IgnorePointer(
             child: ValueListenableBuilder<GestureFeedbackState?>(
-              valueListenable: widget.controller.gestureFeedback,
+              valueListenable: _gc.feedback,
               builder: (ctx, state, _) {
                 if (state == null) return const SizedBox.shrink();
                 return Center(

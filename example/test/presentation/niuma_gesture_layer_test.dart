@@ -97,13 +97,15 @@ void main() {
         ),
       ),
     ));
-    c.debugSetGestureFeedback(const GestureFeedbackState(
-      kind: GestureKind.volume,
-      progress: 0.5,
-    ));
-    await tester.pump();
+    // 长按 → 触发倍速 HUD（同步 _showHud），走 hudBuilder 渲染。
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(NiumaGestureLayer)),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('CUSTOM HUD'), findsOneWidget);
     expect(builderCalled, greaterThan(0));
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 700));
   });
 
   testWidgets('onTap 透传不被 layer 自己消化', (tester) async {
