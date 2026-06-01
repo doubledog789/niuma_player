@@ -75,6 +75,19 @@ export 'ad/analytics_event.dart'
 export 'ad/analytics_emitter.dart' show AnalyticsEmitter;
 export 'ad/fake_analytics_emitter.dart' show FakeAnalyticsEmitter;
 
+// 续播（本地进度记忆）——原 headless 核编排组件，依赖 shared_preferences，
+// 下放到参考皮供需要本地续播的接入方按需引入。FakeResumeStorage 供 widget 测试。
+export 'resume/resume_position.dart'
+    show
+        ResumeStorage,
+        SharedPreferencesResumeStorage,
+        ResumePolicy,
+        ResumeBehaviour,
+        ResumeKeyOf,
+        defaultResumeKey,
+        ResumeOrchestrator;
+export 'resume/fake_resume_storage.dart' show FakeResumeStorage;
+
 // 弹幕引擎（模型 + bucket loader + 轨道分配 + headless controller）——原 headless
 // 核组件，随渲染 widget 一起作为可选模块下放到参考皮。
 export 'danmaku/danmaku_models.dart'

@@ -33,7 +33,6 @@ dependencies:
   # it under assets/hls/hls.min.js and lazy-inject the <script> only when an
   # HLS source actually plays on a non-Safari browser (see web_video_backend).
   # Nothing extra is loaded for mp4-only pages.
-  shared_preferences: ^2.2.0
   # 2.10.0 加入 VideoPlayerController.playerId getter，iOS PiP 桥需要它把
   # Flutter texture id 映射到原生 AVPlayer 实例（见 video_player_backend.dart）
   video_player: ">=2.10.0 <3.0.0"

@@ -1,6 +1,6 @@
 /// `niuma_player` —— **headless 视频播放内核**。
 ///
-/// 本包只导出播放内核：`NiumaPlayerController` + 编排逻辑（多线路 / 续播 /
+/// 本包只导出播放内核：`NiumaPlayerController` + 编排逻辑（多线路 /
 /// retry / source middleware / auto-failover）+ 手势 / 全屏的
 /// **headless controller**。所有 UI widget（一体化 `NiumaPlayer`、原子控件、
 /// 控件条、全屏页、反馈态、弹幕 / 广告 / 缩略图 / cast / 短视频 UI、主题）以及
@@ -50,15 +50,6 @@ export 'src/orchestration/source_middleware.dart'
         HeaderInjectionMiddleware,
         SignedUrlMiddleware,
         runSourceMiddlewares;
-export 'src/orchestration/resume_position.dart'
-    show
-        ResumeStorage,
-        SharedPreferencesResumeStorage,
-        ResumePolicy,
-        ResumeBehaviour,
-        ResumeKeyOf,
-        defaultResumeKey,
-        ResumeOrchestrator;
 export 'package:niuma_player/src/orchestration/retry_policy.dart' show RetryPolicy;
 export 'src/orchestration/auto_failover.dart' show AutoFailoverOrchestrator;
 
