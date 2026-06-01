@@ -71,7 +71,7 @@ android {
     dependencies {
         // Vendored via localmaven/ instead of fileTree to satisfy AGP 8's
         // prohibition on direct local .aar deps for library modules.
-        implementation("tv.danmaku.ijk:ijkplayer:0.8.9-beta-260402150035@aar")
+        implementation("tv.danmaku.ijk:ijkplayer:0.8.8-ff7.1.1-20260601@aar")
 
         // ExoPlayer (media3). Used as the hardware-decode fast path on
         // capable Android devices; IJK remains the software-decode fallback
