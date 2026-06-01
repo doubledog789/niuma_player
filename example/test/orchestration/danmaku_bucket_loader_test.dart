@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/orchestration/danmaku_bucket_loader.dart';
-import 'package:niuma_player/src/orchestration/danmaku_models.dart';
+import 'package:niuma_player_example/niuma_ui/danmaku/danmaku_bucket_loader.dart';
+import 'package:niuma_player_example/niuma_ui/danmaku/danmaku_models.dart';
 
 void main() {
   group('DanmakuBucketLoader', () {

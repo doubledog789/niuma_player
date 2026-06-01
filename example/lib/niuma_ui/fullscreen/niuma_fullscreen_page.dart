@@ -12,6 +12,7 @@ import '../ad/analytics_emitter.dart';
 import '../control_bar/button_override.dart';
 import '../control_bar/niuma_control_bar_config.dart';
 import '../control_bar/niuma_control_button.dart';
+import '../danmaku/niuma_danmaku_controller.dart';
 import '../core/niuma_player.dart';
 import '../core/niuma_player_theme.dart';
 import '../gesture/niuma_gesture_layer.dart';

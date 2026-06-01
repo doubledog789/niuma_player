@@ -2,8 +2,8 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:niuma_player/src/orchestration/danmaku_bucket_loader.dart';
-import 'package:niuma_player/src/orchestration/danmaku_models.dart';
+import 'danmaku_bucket_loader.dart';
+import 'danmaku_models.dart';
 
 /// 弹幕的核心持有者：items 列表 + DanmakuSettings + lazy loader 桥接。
 ///

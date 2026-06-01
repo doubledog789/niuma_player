@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
 import 'niuma_short_video_theme.dart';
+import '../danmaku/niuma_danmaku_controller.dart';
 import '../danmaku/niuma_danmaku_overlay.dart';
 import '../danmaku/niuma_danmaku_scope.dart';
 import '../gesture/niuma_gesture_layer.dart';

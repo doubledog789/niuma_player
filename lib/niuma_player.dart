@@ -1,7 +1,7 @@
 /// `niuma_player` —— **headless 视频播放内核**。
 ///
-/// 本包只导出播放内核：`NiumaPlayerController` + 全部编排逻辑（多线路 / 续播 /
-/// retry / source middleware / auto-failover / 弹幕引擎）+ 手势 / 全屏 / 弹幕的
+/// 本包只导出播放内核：`NiumaPlayerController` + 编排逻辑（多线路 / 续播 /
+/// retry / source middleware / auto-failover）+ 手势 / 全屏的
 /// **headless controller**。所有 UI widget（一体化 `NiumaPlayer`、原子控件、
 /// 控件条、全屏页、反馈态、弹幕 / 广告 / 缩略图 / cast / 短视频 UI、主题）以及
 /// 缩略图取帧逻辑作为**可拷贝参考皮**存放于 `example/lib/niuma_ui/`，不进 semver
@@ -61,14 +61,6 @@ export 'src/orchestration/resume_position.dart'
         ResumeOrchestrator;
 export 'package:niuma_player/src/orchestration/retry_policy.dart' show RetryPolicy;
 export 'src/orchestration/auto_failover.dart' show AutoFailoverOrchestrator;
-
-// M11 弹幕引擎（headless：模型 + controller + 轨道分配，渲染 widget 在参考皮）
-export 'src/orchestration/danmaku_models.dart'
-    show DanmakuItem, DanmakuMode, DanmakuSettings, DanmakuLoader;
-export 'src/orchestration/danmaku_track_allocator.dart'
-    show DanmakuTrackAllocator;
-export 'src/player/niuma_danmaku_controller.dart'
-    show NiumaDanmakuController;
 
 // 视频时长格式化纯函数——手势 / 短视频参考皮渲染 HUD / 进度 label 复用。
 export 'src/player/video_time_format.dart' show formatVideoTime;

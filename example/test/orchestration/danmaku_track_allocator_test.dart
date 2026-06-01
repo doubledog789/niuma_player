@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:niuma_player/src/orchestration/danmaku_track_allocator.dart';
+import 'package:niuma_player_example/niuma_ui/danmaku/danmaku_track_allocator.dart';
 
 void main() {
   late DanmakuTrackAllocator a;

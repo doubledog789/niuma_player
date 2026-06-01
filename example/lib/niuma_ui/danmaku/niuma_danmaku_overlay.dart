@@ -2,6 +2,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:niuma_player/niuma_player.dart';
+import 'niuma_danmaku_controller.dart';
 import 'niuma_danmaku_painter.dart';
 
 /// 弹幕渲染层。可作为独立积木件直接 Stack 进自定义布局，也由 [NiumaPlayer]

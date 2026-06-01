@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:niuma_player/niuma_player.dart';
 import '../niuma_ui_assets.dart';
+import '../danmaku/niuma_danmaku_controller.dart';
 import '../controls/niuma_sdk_icon.dart';
 import '../shared/glass_card.dart';
 import '../fullscreen/niuma_fullscreen_page.dart';

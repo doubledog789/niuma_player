@@ -75,6 +75,14 @@ export 'ad/analytics_event.dart'
 export 'ad/analytics_emitter.dart' show AnalyticsEmitter;
 export 'ad/fake_analytics_emitter.dart' show FakeAnalyticsEmitter;
 
+// 弹幕引擎（模型 + bucket loader + 轨道分配 + headless controller）——原 headless
+// 核组件，随渲染 widget 一起作为可选模块下放到参考皮。
+export 'danmaku/danmaku_models.dart'
+    show DanmakuItem, DanmakuMode, DanmakuSettings, DanmakuLoader;
+export 'danmaku/danmaku_bucket_loader.dart' show DanmakuBucketLoader;
+export 'danmaku/danmaku_track_allocator.dart' show DanmakuTrackAllocator;
+export 'danmaku/niuma_danmaku_controller.dart' show NiumaDanmakuController;
+
 // 弹幕渲染 widget + 设置面板
 export 'danmaku/niuma_danmaku_overlay.dart' show NiumaDanmakuOverlay;
 export 'danmaku/niuma_danmaku_scope.dart' show NiumaDanmakuScope;

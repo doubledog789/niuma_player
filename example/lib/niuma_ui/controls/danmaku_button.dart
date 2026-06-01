@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:niuma_player/niuma_player.dart';
 import '../niuma_ui_assets.dart';
+import '../danmaku/danmaku_models.dart';
+import '../danmaku/niuma_danmaku_controller.dart';
 import '../danmaku/niuma_danmaku_scope.dart';
 import '../core/niuma_player_theme.dart';
 import 'niuma_sdk_icon.dart';

@@ -19,6 +19,7 @@ import '../ad/niuma_ad_overlay.dart';
 import '../control_bar/niuma_control_bar.dart';
 import '../control_bar/niuma_control_bar_config.dart';
 import '../control_bar/niuma_control_button.dart';
+import '../danmaku/niuma_danmaku_controller.dart';
 import '../danmaku/niuma_danmaku_overlay.dart';
 import '../danmaku/niuma_danmaku_scope.dart';
 import '../controls/lock_button.dart';
