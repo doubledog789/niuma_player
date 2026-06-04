@@ -172,6 +172,9 @@ c.pause();
 c.seekTo(const Duration(seconds: 30));
 c.setPlaybackSpeed(1.5);
 c.setVolume(0.8);
+await c.load(newSource);      // 原地换源：复用当前 backend（web 复用同一 <video>，
+                              // 保住 iOS Safari 有声激活）；不支持换源的 backend 自动重建
+c.setWebNativeControls(true); // web-only：开底层 <video> 浏览器原生控件兜底
 await c.dispose();
 
 c.value;                  // 当前 NiumaPlayerValue（NiumaPlayerController extends ValueNotifier）
@@ -225,6 +228,21 @@ final gesture = NiumaGestureController(...);
 gesture.feedback;   // ValueListenable<GestureFeedbackState?>，监听它渲染你自家 HUD
 ```
 
+Web 全屏按浏览器分流（核给 `webFullscreenMode` 让你判定，不必碰 DOM）：
+
+```dart
+switch (webFullscreenMode) {
+  case NiumaWebFullscreenMode.nativeVideoElement: // iOS Safari：只能 <video> 系统全屏
+    controller.enterNativeFullscreen();
+  case NiumaWebFullscreenMode.browserElement:     // Chrome 等：画布真全屏 + 保留控件
+    requestBrowserFullscreen();                   // 对 documentElement 真全屏
+    Navigator.of(context).push(/* 你的全屏页：video + 控件铺满 */);
+  case NiumaWebFullscreenMode.notWeb:             // io：直接 push 全屏页
+    Navigator.of(context).push(/* ... */);
+}
+```
+
+退出 / ESC 同步：`exitBrowserFullscreen()` / `onBrowserFullscreenChange(cb)`。
 Web 单 `<video>` 在 inline / 全屏路由间搬迁的协调契约：`NiumaFullscreenScope` + `enterWebFullscreenRoute()` / `exitWebFullscreenRoute()` / `webFullscreenRouteCountListenable`。
 
 ### 投屏（Cast）
@@ -323,6 +341,8 @@ HLS 在 Chrome / Firefox / Edge 走核内置的 vendored `hls.js`（`assets/hls/
 - **`SystemChrome.setPreferredOrientations`**：web 平台 no-op，无法程序化锁方向。竖屏 viewport 放横屏视频时，建议自家 UI 浮一个"旋转屏幕"提示。
 - **iOS Safari `<video>.volume` setter 只读**：核同步设 `muted` 解决"按钮静音不生效"。
 - **iOS Safari `videoWidth/Height` 滞后**：`onLoadedMetadata` 时尺寸可能仍是 0，核在 `onPlaying` / `onTimeUpdate` 时 retry 同步 `value.size`。
+- **iOS Safari 有声自动播 = 单 `<video>` 复用 + 用户手势激活**：WebKit 要求带声音播放在用户手势同步栈内，且激活绑在同一个 `<video>` 元素上。feed 这类滑动自动播场景应**复用一个 controller**（`controller.load(newSource)` 换源、不每条新建），用户首次点击时 unmute 建立激活，之后换源持续有声；每条新建 `<video>` 会丢激活 → 只能静音（详见 `example/lib/feed_demo/`）。
+- **iOS Safari Flutter 控件被 `<video>` 吞**：叠在 `<video>` platform-view 上的 Flutter 控件，落在视频像素区的点击收不到。把关键按钮放视频画面外（如 AppBar），或用 `controller.setWebNativeControls(true)` 开浏览器原生控件兜底。
 
 ---
 

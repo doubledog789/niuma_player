@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
 
+import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
 
 /// 当前驱动 [NiumaPlayerController] 的 Dart 侧 backend 是哪个。
@@ -81,6 +82,17 @@ abstract class PlayerBackend {
   Future<void> setVolume(double volume);
 
   Future<void> setLooping(bool looping);
+
+  /// 是否支持原地换源——复用底层播放器 / `<video>` 元素、不重建。默认 false。
+  ///
+  /// web 后端为 true：换源时复用同一个 `<video>` 元素，**保住 iOS Safari 的
+  /// 「有声播放激活」**（新建 video 元素会丢激活，导致后续自动播只能静音）。
+  bool get supportsSourceSwap => false;
+
+  /// 原地换到新数据源 [source]，复用当前底层播放器。仅 [supportsSourceSwap]
+  /// 为 true 时有意义；默认抛 [UnsupportedError]，由上层改走 dispose + 重建。
+  Future<void> load(NiumaDataSource source) async =>
+      throw UnsupportedError('backend does not support in-place source swap');
 
   /// Web-only：开 / 关底层 `<video>` 的浏览器原生控件（`controls` 属性）。
   ///

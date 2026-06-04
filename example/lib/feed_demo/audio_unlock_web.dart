@@ -18,3 +18,14 @@ void onFirstUserGesture(void Function() callback) {
   }).toJS;
   web.document.addEventListener('pointerdown', listener, true.toJS);
 }
+
+/// web：监听 **每次** `pointerdown`（capture 阶段，同样为了穿过 platform-view
+/// 吞噬），返回反注册函数。iOS Safari 用：每次点屏幕都在手势同步栈内 unmute
+/// 当前页（WebKit 不发 sticky 激活，带声音播放每次都要现挣手势）。
+void Function() onEveryUserTap(void Function() callback) {
+  late final JSFunction listener;
+  listener = ((web.Event _) => callback()).toJS;
+  web.document.addEventListener('pointerdown', listener, true.toJS);
+  return () =>
+      web.document.removeEventListener('pointerdown', listener, true.toJS);
+}

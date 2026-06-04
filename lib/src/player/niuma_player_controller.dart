@@ -123,13 +123,14 @@ class NiumaPlayerOptions {
 ///    这套防御封装成助手函数，所有事件监听都过它。
 class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   NiumaPlayerController(
-    this.source, {
+    NiumaMediaSource source, {
     this.middlewares = const [],
     this.retryPolicy = const RetryPolicy.smart(),
     NiumaPlayerOptions? options,
     PlatformBridge? platform,
     BackendFactory? backendFactory,
-  })  : options = options ?? const NiumaPlayerOptions(),
+  })  : _source = source,
+        options = options ?? const NiumaPlayerOptions(),
         _platform = platform ?? const DefaultPlatformBridge(),
         _backendFactory = backendFactory ?? const DefaultBackendFactory(),
         super(NiumaPlayerValue.uninitialized()) {
@@ -162,10 +163,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         backendFactory: backendFactory,
       );
 
-  /// 描述本 controller 所有可用播放线路的 [NiumaMediaSource]。
+  /// 描述本 controller 当前播放线路的 [NiumaMediaSource]。
   /// 单 URL 播放传 [NiumaMediaSource.single]；画质 / CDN 切换传
-  /// [NiumaMediaSource.lines]。
-  final NiumaMediaSource source;
+  /// [NiumaMediaSource.lines]。[load] 原地换源后返回新源。
+  NiumaMediaSource get source => _source;
+  NiumaMediaSource _source;
 
   /// 可选的 middleware 流水线，在每次 backend 起飞前作用于数据源。
   /// 在每次 `initialize`、每次 `switchLine`（Task 25）、每次重试
@@ -269,6 +271,32 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       },
     );
     return completer.future;
+  }
+
+  /// 原地换到新源 [newSource]，复用当前 backend。
+  ///
+  /// web 上复用同一 `<video>` 元素换 src（**保住 iOS Safari 的有声播放激活**——
+  /// 用于「滑到才知道下一条 URL」的 feed：一个 controller 反复 [load] 不同源，
+  /// 而非每条新建 controller、每条丢激活变静音）。backend 不支持原地换源
+  /// （[PlayerBackend.supportsSourceSwap] 为 false，如 Android 原生）时自动
+  /// dispose + 重建。换源失败按 [initialize] 同样的方式经 future 抛出。
+  Future<void> load(NiumaMediaSource newSource) async {
+    if (_disposed) {
+      throw StateError('NiumaPlayerController has been disposed');
+    }
+    _source = newSource;
+    _activeLineId = newSource.defaultLineId;
+    final backend = _backend;
+    if (backend != null && backend.supportsSourceSwap) {
+      _resolvedSource =
+          await runSourceMiddlewares(newSource.currentLine.source, middlewares);
+      await backend.load(_resolvedSource!).timeout(options.initTimeout);
+    } else {
+      // backend 不支持换源（或还没 initialize 过）→ dispose 重建、重新初始化。
+      await _disposeCurrentBackend();
+      _initCompleter = null;
+      await initialize();
+    }
   }
 
   /// 把异常分类成 [PlayerErrorCategory] 以便决定是否重试。

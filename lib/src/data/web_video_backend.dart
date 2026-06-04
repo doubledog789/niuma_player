@@ -95,13 +95,15 @@ class WebVideoBackend extends PlayerBackend {
   /// HtmlElementView 在多 player 场景下复用同一 factory。
   static int _nextId = 0;
 
-  final NiumaDataSource _dataSource;
+  /// 当前数据源。换源（[load]）时更新——`<video>` 元素本身复用、不重建。
+  NiumaDataSource _dataSource;
   final String _viewType;
   late final web.HTMLVideoElement _video;
   late final web.HTMLDivElement _wrapper;
 
-  /// 构造时算出：true 表示该源需要 hls.js（HLS 源 + 浏览器原生不支持）。
-  late final bool _useHlsJs;
+  /// true 表示当前源需要 hls.js（HLS 源 + 浏览器原生不支持）。构造时算出，
+  /// [load] 换源时重算。
+  bool _useHlsJs = false;
 
   /// hls.js 实例（JS `Hls` object）——仅 [_useHlsJs] 时在 [initialize]
   /// 创建，[dispose] 销毁。
@@ -249,7 +251,9 @@ class WebVideoBackend extends PlayerBackend {
       // 意图仍在播，自动续播、不对外 emit paused，避免"全屏后 / 退出后卡停"。
       // 用户主动 pause() 已把 _intendedPlaying 置 false，走下面正常 paused 分支。
       // 系统原生全屏（iOS Safari）期间也不自愈——见 _inNativeFullscreen 注释。
-      if (_intendedPlaying && !_inNativeFullscreen) {
+      // 页面隐藏（home / 切后台）时也不自愈——否则后台被浏览器暂停的 video 会被
+      // 顶回播放；回前台由上层（feed lifecycle）续播。
+      if (_intendedPlaying && !_inNativeFullscreen && !web.document.hidden) {
         unawaited(_video.play().toDart.then((_) {}, onError: (_) {}));
         return;
       }
@@ -349,6 +353,40 @@ class WebVideoBackend extends PlayerBackend {
       // browser 接到 src 后异步加载 metadata——event listener 在
       // [_maybeMarkInitialized]（成功）/ onError（失败）里 complete completer，
       // 让 `await initialize()` 真正等到 load 结果。
+      _video.load();
+    }
+    return completer.future;
+  }
+
+  @override
+  bool get supportsSourceSwap => true;
+
+  @override
+  Future<void> load(NiumaDataSource source) async {
+    if (_disposed) return;
+    // **复用同一个 <video> 元素与 platform-view**（关键：保住 iOS Safari 的
+    // 「有声播放激活」——新建 video 元素会丢激活、滑动自动播又被静音），这里
+    // 只换 src / hls 源。
+    _intendedPlaying = false;
+    _initialized = false;
+    // 清旧 hls 实例（持有 MSE buffer / xhr）。
+    if (_hls != null) {
+      _hls!.callMethod('destroy'.toJS);
+      _hls = null;
+    }
+    _dataSource = source;
+    final headers = source.headers ?? const <String, String>{};
+    _video.crossOrigin = headers.isNotEmpty ? 'anonymous' : null;
+    _useHlsJs = isHlsUrl(source.uri) && !_isAppleWebKit() && _hasMse();
+    // 重置 value 到未初始化（position / duration / size 归零、清错误）。
+    _value = NiumaPlayerValue.uninitialized();
+    _emit(_value);
+    final completer = Completer<void>();
+    _initCompleter = completer;
+    if (_useHlsJs) {
+      await _initHlsJs();
+    } else {
+      _video.src = source.uri;
       _video.load();
     }
     return completer.future;

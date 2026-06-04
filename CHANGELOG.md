@@ -5,10 +5,16 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-06-05
 
 ### Added
 
+- **`NiumaPlayerController.load(NiumaMediaSource)`** 原地换源（+ `PlayerBackend`
+  的 `supportsSourceSwap` / `load`）：复用当前 backend 换到新源。web 后端复用
+  同一个 `<video>` 元素换 src（`supportsSourceSwap=true`），**保住 iOS Safari 的
+  有声播放激活**——"滑到才知道下一条 URL"的 feed 可用一个 controller 反复换源，
+  而非每条新建 controller、每条丢激活导致只能静音。backend 不支持换源时自动
+  dispose + 重建兜底。
 - **web 全屏分流原语**（`NiumaWebFullscreenMode` / `webFullscreenMode` /
   `requestBrowserFullscreen` / `exitBrowserFullscreen` / `onBrowserFullscreenChange`，
   自 `web_fullscreen_coordination`）：把「浏览器全屏能力检测（安全读
