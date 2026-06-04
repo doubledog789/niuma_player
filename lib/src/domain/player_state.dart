@@ -225,13 +225,11 @@ class NiumaPlayerValue {
       duration: duration ?? this.duration,
       size: size ?? this.size,
       bufferedPosition: bufferedPosition ?? this.bufferedPosition,
-      openingStage: clearOpeningStage
-          ? null
-          : (openingStage ?? this.openingStage),
+      openingStage:
+          clearOpeningStage ? null : (openingStage ?? this.openingStage),
       error: clearError ? null : (error ?? this.error),
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
-      isInPictureInPicture:
-          isInPictureInPicture ?? this.isInPictureInPicture,
+      isInPictureInPicture: isInPictureInPicture ?? this.isInPictureInPicture,
       isPictureInPictureSupported:
           isPictureInPictureSupported ?? this.isPictureInPictureSupported,
     );
@@ -303,8 +301,7 @@ final class BackendSelected extends NiumaPlayerEvent {
   final bool fromMemory;
 
   @override
-  String toString() =>
-      'BackendSelected(kind: $kind, fromMemory: $fromMemory)';
+  String toString() => 'BackendSelected(kind: $kind, fromMemory: $fromMemory)';
 }
 
 /// controller 因错误或 timeout 不得不拆掉 video_player 启动 IJK 时

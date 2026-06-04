@@ -59,9 +59,8 @@ class DeviceMemory {
     Duration? ttl,
   }) async {
     final hasTtl = ttl != null && ttl > Duration.zero;
-    final expiresAt = hasTtl
-        ? _now().millisecondsSinceEpoch + ttl.inMilliseconds
-        : null;
+    final expiresAt =
+        hasTtl ? _now().millisecondsSinceEpoch + ttl.inMilliseconds : null;
     await _channel.invokeMethod<void>(
       'deviceMemory.set',
       <String, dynamic>{

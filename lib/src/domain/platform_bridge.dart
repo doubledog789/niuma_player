@@ -11,4 +11,14 @@ abstract class PlatformBridge {
   /// 当前设备的 SHA-1 指纹。硬件 / 软件形态完全一致的设备返回相同的
   /// 指纹，可作为 `DeviceMemoryStore` 的 key。
   Future<String> deviceFingerprint();
+
+  /// 当前**进程级**堆上限，单位 MB（不是设备物理 RAM）。
+  ///
+  /// 即使在 12GB RAM 的设备上，单个 app 进程仍被系统 cap 在一个远小于
+  /// 物理内存的堆上限（Android 上即 `ActivityManager.memoryClass`，常见
+  /// 128 / 192 / 256 / 512MB）。同时存活的播放器 / 解码 buffer 都吃这块
+  /// 堆——所以 [NiumaPlayerPool] 按这个值（而非 RAM）算容量才不会 OOM。
+  ///
+  /// iOS / Web 没有等价概念，返回合理默认值。
+  Future<int> processHeapLimitMb();
 }

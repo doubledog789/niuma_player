@@ -32,4 +32,12 @@ class DefaultPlatformBridge implements PlatformBridge {
     final fp = await NativeBackend.fetchDeviceFingerprint();
     return fp ?? 'unknown';
   }
+
+  @override
+  Future<int> processHeapLimitMb() async {
+    // iOS / Web 没有"进程堆上限"这个 Android ActivityManager.memoryClass
+    // 概念——返回一个保守默认值，让 computeCapacityForHeap 落在中档容量。
+    if (kIsWeb || Platform.isIOS) return 256;
+    return await NativeBackend.fetchProcessHeapLimitMb() ?? 256;
+  }
 }

@@ -39,7 +39,8 @@ void main() {
     });
 
     test('setBrightness 传 value 参数', () async {
-      final r = await channel.invokeMethod<bool>('setBrightness', {'value': 0.8});
+      final r =
+          await channel.invokeMethod<bool>('setBrightness', {'value': 0.8});
       expect(r, isTrue);
       expect(calls.first.arguments['value'], 0.8);
     });

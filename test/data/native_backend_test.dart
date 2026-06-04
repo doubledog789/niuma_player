@@ -50,7 +50,8 @@ void main() {
     });
 
     test('queryPictureInPictureSupport 不传参数', () async {
-      final r = await channel.invokeMethod<bool>('queryPictureInPictureSupport');
+      final r =
+          await channel.invokeMethod<bool>('queryPictureInPictureSupport');
       expect(r, isTrue);
       expect(calls.first.method, 'queryPictureInPictureSupport');
     });

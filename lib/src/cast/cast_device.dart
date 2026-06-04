@@ -20,8 +20,7 @@ class CastDevice {
   final String protocolId;
 
   @override
-  bool operator ==(Object other) =>
-      other is CastDevice && other.id == id;
+  bool operator ==(Object other) => other is CastDevice && other.id == id;
 
   @override
   int get hashCode => id.hashCode;

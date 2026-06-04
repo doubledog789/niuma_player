@@ -25,8 +25,8 @@ void main() {
       lines: lines,
       policy: const MultiSourcePolicy.autoFailover(maxAttempts: 1),
     );
-    expect(orch.nextLine(currentId: 'a',
-        category: PlayerErrorCategory.network), 'b');
+    expect(orch.nextLine(currentId: 'a', category: PlayerErrorCategory.network),
+        'b');
   });
 
   test('does NOT switch on codecUnsupported', () {
@@ -38,8 +38,10 @@ void main() {
       lines: lines,
       policy: const MultiSourcePolicy.autoFailover(),
     );
-    expect(orch.nextLine(currentId: 'a',
-        category: PlayerErrorCategory.codecUnsupported), isNull);
+    expect(
+        orch.nextLine(
+            currentId: 'a', category: PlayerErrorCategory.codecUnsupported),
+        isNull);
   });
 
   test('returns null after maxAttempts reached', () {
@@ -52,7 +54,7 @@ void main() {
       policy: const MultiSourcePolicy.autoFailover(maxAttempts: 1),
     );
     orch.recordFailover();
-    expect(orch.nextLine(currentId: 'a',
-        category: PlayerErrorCategory.network), isNull);
+    expect(orch.nextLine(currentId: 'a', category: PlayerErrorCategory.network),
+        isNull);
   });
 }

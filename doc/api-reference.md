@@ -3,8 +3,8 @@
 `niuma_player`（headless 播放内核）公开符号速查。所有内容通过单一 barrel
 `package:niuma_player/niuma_player.dart` 暴露——`import` 它即可访问全部。
 
-> 本包零 UI widget（除无样式渲染面 `NiumaPlayerView`）。控件由你监听
-> `controller.value` 自己拼。复杂控件参考实现在 git 历史的 niuma_ui 参考皮里。
+> 本包不提供播放器控件皮肤，只提供无样式渲染面 `NiumaPlayerView`。控件由你
+> 监听 `controller.value` 自己拼。复杂控件参考实现在 git 历史的 niuma_ui 参考皮里。
 
 ---
 
@@ -18,6 +18,7 @@
 - [NiumaPlayerEvent](#niumaplayerevent)
 - [手势 / 全屏 headless controller](#手势--全屏-headless-controller)
 - [投屏（Cast）](#投屏cast)
+- [播放器池](#播放器池)
 - [工具函数](#工具函数)
 
 ---
@@ -291,6 +292,29 @@ enum CastEndReason { userCancelled, networkError, deviceLost, timeout }
 
 ---
 
+## 播放器池
+
+短视频 / 短剧 feed 可以用 `NiumaPlayerPool` 控制同时存活的 controller 数：
+
+```dart
+final pool = NiumaPlayerPool(
+  capacity: NiumaPlayerPool.computeCapacityForHeap(heapMb),
+  controllerFactory: (source) => NiumaPlayerController(source),
+);
+
+final controller = await pool.acquire(source);
+await pool.preload(nextSource);
+pool.release(NiumaPlayerPool.keyFor(source));
+await pool.evict(NiumaPlayerPool.keyFor(source)); // 需要立即释放 native decoder 时使用
+await pool.dispose();
+```
+
+池只会回收 inactive 条目；正在播放或已 acquire 未 release 的 active controller 不会被
+preload 挤掉。preload 在容量满且没有 inactive 可回收时会跳过。Android feed 这类
+MediaCodec 资源敏感场景可以在离屏后调用 `evict`，不要只依赖 stale timer 延迟回收。
+
+---
+
 ## 工具函数
 
 ```dart
@@ -303,6 +327,6 @@ NiumaSdkAssets.hlsJsUrl;     // web 后端 hls.js 资源路径常量
 ## 进一步阅读
 
 - [`doc/getting-started.md`](getting-started.md) — 接入步骤
-- [`example/lib/main.dart`](../example/lib/main.dart) — 最小 demo 源码
+- [`example/lib/minimal_player/minimal_player.dart`](../example/lib/minimal_player/minimal_player.dart) — 最小 demo 源码
 - [`CHANGELOG.md`](../CHANGELOG.md) — 版本变更记录
 - [`README.md`](../README.md) — 项目主页

@@ -35,7 +35,8 @@ class _RecBackend extends PlayerBackend {
   @override
   Stream<NiumaPlayerEvent> get eventStream => _ec.stream;
   @override
-  Future<void> initialize() async => emit(_v.copyWith(phase: PlayerPhase.ready));
+  Future<void> initialize() async =>
+      emit(_v.copyWith(phase: PlayerPhase.ready));
   @override
   Future<void> play() async {}
   @override
@@ -90,6 +91,8 @@ class _NoopBridge implements PlatformBridge {
   bool get isWeb => false;
   @override
   Future<String> deviceFingerprint() async => 'test';
+  @override
+  Future<int> processHeapLimitMb() async => 256;
 }
 
 void main() {

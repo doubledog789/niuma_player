@@ -1,5 +1,10 @@
 import 'package:flutter/foundation.dart'
-    show ValueListenable, ValueNotifier, defaultTargetPlatform, kIsWeb, TargetPlatform;
+    show
+        ValueListenable,
+        ValueNotifier,
+        defaultTargetPlatform,
+        kIsWeb,
+        TargetPlatform;
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/services.dart'
     show DeviceOrientation, SystemChrome, SystemUiMode;

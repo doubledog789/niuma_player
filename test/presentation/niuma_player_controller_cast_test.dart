@@ -104,7 +104,8 @@ void main() {
 
 class _FakeSession implements CastSession {
   @override
-  CastDevice get device => const CastDevice(id: 'x', name: 'X', protocolId: 'dlna');
+  CastDevice get device =>
+      const CastDevice(id: 'x', name: 'X', protocolId: 'dlna');
   @override
   ValueListenable<CastConnectionState> get state =>
       ValueNotifier(CastConnectionState.connected);
@@ -128,7 +129,8 @@ class _CountingFakeSession implements CastSession {
   Duration currentPosition = Duration.zero;
 
   @override
-  CastDevice get device => const CastDevice(id: 'x', name: 'X', protocolId: 'dlna');
+  CastDevice get device =>
+      const CastDevice(id: 'x', name: 'X', protocolId: 'dlna');
   @override
   ValueListenable<CastConnectionState> get state =>
       ValueNotifier(CastConnectionState.connected);

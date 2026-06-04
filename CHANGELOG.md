@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **web 全屏分流原语**（`NiumaWebFullscreenMode` / `webFullscreenMode` /
+  `requestBrowserFullscreen` / `exitBrowserFullscreen` / `onBrowserFullscreenChange`，
+  自 `web_fullscreen_coordination`）：把「浏览器全屏能力检测（安全读
+  `fullscreenEnabled`、绕开 iOS Safari `undefined` 抛 `TypeError`）+ 画布真全屏
+  进出 + 全屏状态监听」收进核，接入方据 `webFullscreenMode` 分流即可、不必碰
+  DOM：`nativeVideoElement`（iOS Safari，走系统 player 全屏）/ `browserElement`
+  （Chrome 等，走画布真全屏 + 自家全屏页）/ `notWeb`。
+- **`NiumaPlayerController.setWebNativeControls(bool)`**（+ `PlayerBackend` 同名
+  方法）：web-only，开 / 关底层 `<video>` 的浏览器原生控件。iOS Safari 上 Flutter
+  自定义控件叠在 `<video>` 上会被浏览器吞、点不动，接入方可开原生控件兜底
+  （播放 / 进度 / 全屏交给浏览器）。非 web backend 为空操作。
+
+### Fixed
+
+- **web video 被 DOM reparent 后自动续播**：`WebVideoBackend` 维护「播放意图」，
+  video 因全屏搬迁等被浏览器自发暂停时，只要意图仍在播就自动续播——修复
+  「Chrome 进全屏 / 退全屏后视频卡停」。用户主动 `pause()` 不受影响。
+- **iOS Safari 退出原生全屏后自动恢复播放**：`WebVideoBackend.enterNativeFullscreen()`
+  走 `webkitEnterFullscreen` 时记住进全屏前的播放态，监听 `webkitendfullscreen`，
+  退出系统 player 后自动 `play()`（iOS 退出系统 player 默认会把 video 暂停）。
+- **web `enterNativeFullscreen` 回归「浏览器原生全屏」语义**：`WebVideoBackend`
+  此前把 `enterNativeFullscreen()` 实现成只翻一个 `NiumaPlayerView` 并不读取的
+  内部 flag（等于 web 上调用它没有任何可见效果）；现在按 `PlayerBackend` 接口
+  文档契约真正调用 `<video>.webkitEnterFullscreen()`（iOS Safari，进系统原生
+  video player UI）/ `requestFullscreen()`（桌面 Safari / Chrome / Firefox /
+  Android Chrome）。`exitNativeFullscreen()` 同步走 `webkitExitFullscreen` /
+  `document.exitFullscreen()`。
+
 ## [0.1.0]
 
 ### BREAKING CHANGE: 重定位为 headless 播放内核

@@ -82,6 +82,14 @@ abstract class PlayerBackend {
 
   Future<void> setLooping(bool looping);
 
+  /// Web-only：开 / 关底层 `<video>` 的浏览器原生控件（`controls` 属性）。
+  ///
+  /// iOS Safari 上 Flutter 控件叠在 `<video>` platform-view 之上时，落在视频
+  /// 像素区的点击会被浏览器吞掉、到不了 Flutter——自定义控件几乎全失效。
+  /// 这种场景下接入方可开启浏览器原生控件（播放 / 进度 / 全屏由 Safari 接管）
+  /// 作为兜底。非 web backend 为空操作。
+  Future<void> setWebNativeControls(bool show) async {}
+
   /// 读当前亮度（窗口级 0..1，未支持返 0）。
   Future<double> getBrightness() async => 0.0;
 
@@ -111,7 +119,8 @@ abstract class PlayerBackend {
     required int aspectNum,
     required int aspectDen,
     bool unsafeAutoBackground = false,
-  }) async => false;
+  }) async =>
+      false;
 
   /// 退出 PiP。不在 PiP 是 no-op，返回 false。默认实现返 false。
   Future<bool> exitPictureInPicture() async => false;

@@ -1,5 +1,52 @@
-import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, ValueNotifier, kIsWeb;
 import 'package:flutter/widgets.dart';
+
+import '_web_fullscreen_dom.dart'
+    if (dart.library.js_interop) '_web_fullscreen_dom_web.dart' as dom;
+
+/// 当前 web 浏览器的全屏策略——接入方据此分流全屏 UI。
+enum NiumaWebFullscreenMode {
+  /// 非 web 平台（Android / iOS 原生 App）。
+  notWeb,
+
+  /// iOS Safari（WebKit）等：只支持 `<video>` 元素级全屏
+  /// （`webkitEnterFullscreen` 进系统原生 player、**不保留 Flutter 控件**）。
+  /// 走 `NiumaPlayerController.enterNativeFullscreen()`。
+  nativeVideoElement,
+
+  /// Chrome / Firefox / 桌面 Safari / Android Chrome：支持对画布 Element 全屏，
+  /// 可保留 Flutter 控件。走 [requestBrowserFullscreen] + 自己的全屏 UI。
+  browserElement,
+}
+
+/// 当前 web 浏览器的全屏策略（见 [NiumaWebFullscreenMode]）。
+///
+/// 检测逻辑（`document.fullscreenEnabled` 的安全读，绕开 iOS Safari 的
+/// `undefined` 抛 `TypeError`）收在核里——接入方不必碰 DOM、直接据此分流：
+/// `nativeVideoElement` 走系统 player 全屏，`browserElement` 走画布真全屏 +
+/// 自家全屏页。
+NiumaWebFullscreenMode get webFullscreenMode {
+  if (!kIsWeb) return NiumaWebFullscreenMode.notWeb;
+  return dom.supportsElementFullscreen()
+      ? NiumaWebFullscreenMode.browserElement
+      : NiumaWebFullscreenMode.nativeVideoElement;
+}
+
+/// 对整个 Flutter 画布（`documentElement`）进入浏览器真全屏（仅 web）。
+///
+/// **必须在用户手势栈内同步调用**（点全屏按钮的同步路径里），否则浏览器以
+/// 「缺少用户激活」拒绝。配合 push 一个铺满的全屏页使用：画面 + Flutter 控件
+/// 一起进浏览器真全屏。
+Future<void> requestBrowserFullscreen() => dom.requestBrowserFullscreen();
+
+/// 退出浏览器真全屏（仅 web）。
+Future<void> exitBrowserFullscreen() => dom.exitBrowserFullscreen();
+
+/// 监听浏览器全屏状态变化（含用户按 ESC 退出），返回反注册函数；调用方在
+/// dispose 时务必调用它反注册。仅 web 有意义。
+void Function() onBrowserFullscreenChange(void Function(bool isFullscreen) cb) =>
+    dom.onBrowserFullscreenChange(cb);
 
 /// Web 全屏路由计数——有 N 个全屏页处于活跃路由栈时为 N。
 ///
@@ -56,8 +103,7 @@ class NiumaFullscreenScope extends InheritedWidget {
 
   /// 找最近的 [NiumaFullscreenScope]——存在即返回非空 marker。
   static NiumaFullscreenScope? maybeOf(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<NiumaFullscreenScope>();
+    return context.dependOnInheritedWidgetOfExactType<NiumaFullscreenScope>();
   }
 
   @override

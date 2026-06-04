@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show TargetPlatform, debugDefaultTargetPlatformOverride;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/src/player/niuma_fullscreen_controller.dart';
@@ -9,8 +10,7 @@ void main() {
   final calls = <MethodCall>[];
   setUp(() {
     calls.clear();
-    TestDefaultBinaryMessengerBinding
-        .instance.defaultBinaryMessenger
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, (call) async {
       calls.add(call);
       return null;

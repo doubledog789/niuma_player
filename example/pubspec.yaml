@@ -1,5 +1,5 @@
 name: niuma_player_example
-description: "niuma_player headless 核的最小用法示例。"
+description: "niuma_player headless 核的最小接入与参考播放器示例。"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -7,7 +7,8 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  # package:web 1.1.0 需要 Dart 3.4+（与 niuma_player 本体一致）。
+  sdk: '>=3.4.0 <4.0.0'
   flutter: '>=3.10.0'
 
 dependencies:
@@ -17,6 +18,9 @@ dependencies:
   niuma_player:
     # 示例 app 随插件一起分发，所以用对父目录的 path 依赖跑当前插件版本。
     path: ../
+  cupertino_icons: ^1.0.8
+  # feed demo web 端「首次手势解锁音频」用 document 级 pointerdown 监听。
+  web: ^1.1.0
 
 dev_dependencies:
   integration_test:

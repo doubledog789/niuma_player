@@ -1,18 +1,18 @@
 # niuma_player_example
 
-niuma_player（headless 视频播放内核）的**最小用法 demo**。
+niuma_player（headless 视频播放内核）的接入示例。
 
-`lib/main.dart` 约 100 行，演示接入 headless 核的最小闭环：
+入口在 `lib/main.dart`，包含三种场景：
 
-- `NiumaPlayerController.dataSource(NiumaDataSource.network(url))..initialize()` 驱动播放
-- `AspectRatio(16/9, child: NiumaPlayerView(c))` 渲染画面
-- `ValueListenableBuilder<NiumaPlayerValue>` 监听状态，自己拼播放/暂停按钮 +
-  进度 Slider + 时间 label
+- `minimal_player/`：最小接入，只有 `NiumaPlayerController`、`NiumaPlayerView`
+  和一组基础播放控件。
+- `standard_player/`：完整参考播放器皮，演示顶栏、底栏、手势、错误/结束态和全屏。
+- `feed_demo/`：短视频/短剧列表，演示 `NiumaPlayerPool` 的 acquire / release
+  生命周期；非 Android 平台额外演示 preload，Android 上保守保持单 native
+  decoder，避免 MediaCodec buffer 压力。
 
-niuma_player **不含任何 UI widget**——控件都由接入方监听 `controller.value` 自
-己写。复杂控件（长视频壳 / 短视频 / 弹幕 overlay / 投屏面板 / 缩略图预览）的参考
-实现保留在 git 历史的 niuma_ui 参考皮里，需要时 `git log` / `git show` 捞，或让
-AI 按需生成。
+SDK 不提供播放器控件皮肤，只提供无样式视频渲染面 `NiumaPlayerView` 和 headless
+controller。业务控件监听 `controller.value` 自己拼。
 
 ## 运行
 

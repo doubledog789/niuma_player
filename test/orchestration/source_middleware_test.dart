@@ -3,7 +3,8 @@ import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/orchestration/source_middleware.dart';
 
 void main() {
-  test('HeaderInjectionMiddleware merges headers into network source', () async {
+  test('HeaderInjectionMiddleware merges headers into network source',
+      () async {
     const m = HeaderInjectionMiddleware({'Referer': 'https://app.example.com'});
     final input = NiumaDataSource.network('https://cdn/x.mp4',
         headers: {'X-Token': 'abc'});

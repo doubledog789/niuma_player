@@ -34,9 +34,9 @@ Stream<dynamic> pipEventBus() {
   final ctrl = StreamController<dynamic>.broadcast();
   _pipEventBusCtrl = ctrl;
   _pipEventBusRoot = _rawPipEventChannel.receiveBroadcastStream().listen(
-    ctrl.add,
-    onError: (Object error, StackTrace stack) =>
-        ctrl.addError(error, stack),
-  );
+        ctrl.add,
+        onError: (Object error, StackTrace stack) =>
+            ctrl.addError(error, stack),
+      );
   return ctrl.stream;
 }

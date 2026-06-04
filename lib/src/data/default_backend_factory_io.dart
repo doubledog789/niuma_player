@@ -9,8 +9,7 @@ class DefaultBackendFactory implements BackendFactory {
   const DefaultBackendFactory();
 
   @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) =>
-      VideoPlayerBackend(ds);
+  PlayerBackend createVideoPlayer(NiumaDataSource ds) => VideoPlayerBackend(ds);
 
   @override
   PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) =>

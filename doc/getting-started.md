@@ -2,9 +2,9 @@
 
 把 niuma_player（headless 视频播放内核）接入到自家 Flutter app。
 
-> niuma_player 不含任何 UI widget。你用 `NiumaPlayerView` 渲染画面、监听
-> `controller.value` 自己拼控件。需要现成的复杂控件参考实现，看 git 历史里的
-> niuma_ui 参考皮，或让 AI 按你的 design token 生成。
+> niuma_player 不提供播放器控件皮肤。你用无样式渲染面 `NiumaPlayerView`
+> 渲染画面、监听 `controller.value` 自己拼控件。需要现成的复杂控件参考实现，
+> 看 git 历史里的 niuma_ui 参考皮，或让 AI 按你的 design token 生成。
 
 ---
 
@@ -176,7 +176,7 @@ class _VideoPageState extends State<VideoPage> {
 }
 ```
 
-可运行版本就是 [`example/lib/main.dart`](../example/lib/main.dart)。
+可运行版本见 [`example/lib/minimal_player/minimal_player.dart`](../example/lib/minimal_player/minimal_player.dart)。
 
 ---
 
@@ -253,5 +253,5 @@ git show <sha>:example/lib/niuma_ui/core/niuma_player.dart   # 取文件
 ## 下一步
 
 - 完整公开符号速查：[`doc/api-reference.md`](api-reference.md)
-- 最小 demo 源码：[`example/lib/main.dart`](../example/lib/main.dart)
+- 最小 demo 源码：[`example/lib/minimal_player/minimal_player.dart`](../example/lib/minimal_player/minimal_player.dart)
 - 版本变更：[`CHANGELOG.md`](../CHANGELOG.md)

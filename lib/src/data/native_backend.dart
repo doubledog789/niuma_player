@@ -190,7 +190,8 @@ class NativeBackend extends PlayerBackend {
     });
   }
 
-  static const Map<String, PlayerPhase> _phaseFromString = <String, PlayerPhase>{
+  static const Map<String, PlayerPhase> _phaseFromString =
+      <String, PlayerPhase>{
     'idle': PlayerPhase.idle,
     'opening': PlayerPhase.opening,
     'ready': PlayerPhase.ready,
@@ -280,9 +281,7 @@ class NativeBackend extends PlayerBackend {
       _eventController.add(
         FallbackTriggered(
           FallbackReason.error,
-          errorCode: errorCode == null
-              ? null
-              : '$errorCode@${positionMs}ms',
+          errorCode: errorCode == null ? null : '$errorCode@${positionMs}ms',
           errorCategory: playerError?.category,
         ),
       );
@@ -449,7 +448,8 @@ class NativeBackend extends PlayerBackend {
   @override
   Future<bool> exitPictureInPicture() async {
     try {
-      final result = await _pipChannel.invokeMethod<bool>('exitPictureInPicture');
+      final result =
+          await _pipChannel.invokeMethod<bool>('exitPictureInPicture');
       return result ?? false;
     } on PlatformException {
       return false;
@@ -516,5 +516,12 @@ class NativeBackend extends PlayerBackend {
       'deviceFingerprint',
     );
     return result?['fingerprint'] as String?;
+  }
+
+  /// 便捷 helper，供 [DefaultPlatformBridge] 查询 Android 进程堆上限
+  /// （`ActivityManager.memoryClass`，单位 MB）。原生不可用时返回 null，
+  /// 由调用方兜默认值。
+  static Future<int?> fetchProcessHeapLimitMb() async {
+    return _globalChannel.invokeMethod<int>('getProcessHeapLimitMb');
   }
 }

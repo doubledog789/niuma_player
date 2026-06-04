@@ -2,7 +2,8 @@
 ///
 /// This package's web support is implemented entirely in pure Dart via
 /// conditional imports — see `lib/src/data/default_backend_factory_web.dart`,
-/// which uses `dart:html` directly without going through a platform channel.
+/// which uses `package:web` + `dart:ui_web` without going through a platform
+/// channel.
 ///
 /// This file exists solely so that the `flutter_web_plugins` plugin discovery
 /// machinery can satisfy the `pubspec.yaml` `flutter.plugin.platforms.web`

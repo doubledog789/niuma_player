@@ -30,7 +30,8 @@ void main() {
           .setMockMethodCallHandler(channel, null);
     });
 
-    test('enterPictureInPicture 调 channel 带 textureId / aspectNum / aspectDen', () async {
+    test('enterPictureInPicture 调 channel 带 textureId / aspectNum / aspectDen',
+        () async {
       final r = await channel.invokeMethod<bool>('enterPictureInPicture', {
         'textureId': 7,
         'aspectNum': 16,
@@ -52,7 +53,8 @@ void main() {
     });
 
     test('queryPictureInPictureSupport 不传参数', () async {
-      final r = await channel.invokeMethod<bool>('queryPictureInPictureSupport');
+      final r =
+          await channel.invokeMethod<bool>('queryPictureInPictureSupport');
       expect(r, isTrue);
       expect(calls.first.method, 'queryPictureInPictureSupport');
     });

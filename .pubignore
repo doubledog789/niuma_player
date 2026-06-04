@@ -1,3 +1,27 @@
-# 内部规划文档（headless 迁移计划等），不随包发布到 pub.dev。
-# 正式文档在 doc/（pub 单数目录约定）。
+# Internal agent / planning files.
+AGENTS.md
+CLAUDE.md
+.claude/
+.superpowers/
+.vscode/
+
+# Internal planning / design drafts. Public docs stay under doc/.
 docs/
+design/
+doc/plans/
+doc/CHANGELOG_zh_internal_preview.md
+
+# Local build outputs and tool caches.
+build/
+example/build/
+example/.dart_tool/
+example/.flutter-plugins
+example/.flutter-plugins-dependencies
+example/ios/Pods/
+example/ios/Flutter/Generated.xcconfig
+example/ios/Flutter/flutter_export_environment.sh
+
+# IDE / local metadata.
+*.iml
+.DS_Store
+example/ios/.DS_Store

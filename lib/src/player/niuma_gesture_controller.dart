@@ -168,13 +168,12 @@ class NiumaGestureController {
             (dx / size.width * duration.inMilliseconds * 0.5).round();
         final target = _seekStart + Duration(milliseconds: seekDeltaMs);
         final clamped = Duration(
-          milliseconds:
-              target.inMilliseconds.clamp(0, duration.inMilliseconds),
+          milliseconds: target.inMilliseconds.clamp(0, duration.inMilliseconds),
         );
         _showHud(GestureFeedbackState(
           kind: GestureKind.horizontalSeek,
-          progress:
-              clamped.inMilliseconds / duration.inMilliseconds.clamp(1, 1 << 30),
+          progress: clamped.inMilliseconds /
+              duration.inMilliseconds.clamp(1, 1 << 30),
           label: '${seekDeltaMs >= 0 ? '+' : ''}${seekDeltaMs ~/ 1000}s '
               '/ ${formatVideoTime(clamped)} / ${formatVideoTime(duration)}',
           hudIcon: seekDeltaMs >= 0

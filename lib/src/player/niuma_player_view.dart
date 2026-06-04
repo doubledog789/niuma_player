@@ -80,9 +80,7 @@ class NiumaPlayerView extends StatelessWidget {
   }
 
   double _ratioFromValue(NiumaPlayerValue value) {
-    if (value.initialized &&
-        value.size.width > 0 &&
-        value.size.height > 0) {
+    if (value.initialized && value.size.width > 0 && value.size.height > 0) {
       return value.size.width / value.size.height;
     }
     return 16 / 9;

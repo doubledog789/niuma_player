@@ -4,7 +4,8 @@ import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/orchestration/retry_policy.dart';
 
 void main() {
-  test('RetryPolicy.smart retries network + transient, skips codec/terminal', () {
+  test('RetryPolicy.smart retries network + transient, skips codec/terminal',
+      () {
     const p = RetryPolicy.smart();
     expect(p.shouldRetry(PlayerErrorCategory.network, attempt: 1), isTrue);
     expect(p.shouldRetry(PlayerErrorCategory.transient, attempt: 1), isTrue);

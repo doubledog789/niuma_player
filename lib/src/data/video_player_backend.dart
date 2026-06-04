@@ -123,8 +123,7 @@ class VideoPlayerBackend extends PlayerBackend {
     // video_player 把已缓冲段以 DurationRange 列表形式上报；UI 关心的是
     // "已预加载到哪儿"，也就是最后一段的尾端。空列表 → 还没有 buffer
     // 信息。
-    final buffered =
-        v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
+    final buffered = v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
     final phase = _derivePhase(v);
     // video_player 只给出自由格式的 `errorDescription`——没有错误码，
     // 没有分类。包成 `unknown` 让消费方仍能拿到结构化的 [PlayerError]

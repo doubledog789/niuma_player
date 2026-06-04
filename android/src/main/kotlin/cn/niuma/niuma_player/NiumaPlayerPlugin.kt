@@ -1,6 +1,7 @@
 package cn.niuma.niuma_player
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
@@ -27,8 +28,6 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.view.TextureRegistry
 import java.security.MessageDigest
 
-import cn.niuma.niuma_player.dlna.NiumaDlnaPlugin
-
 /** NiumaPlayerPlugin */
 class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
@@ -46,10 +45,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private val players: MutableMap<Long, PlayerSession> = mutableMapOf()
 
     private var deviceMemory: DeviceMemoryStore? = null
-
-    /// 投屏 DLNA 子 plugin（multicast lock 用）。SDK 自带不需要 host app
-    /// 单独注册——onAttachedToEngine 时一起 attach。
-    private val dlnaPlugin: NiumaDlnaPlugin = NiumaDlnaPlugin()
 
     companion object {
         const val ACTION_PIP_PLAY_PAUSE = "cn.niuma.niuma_player.ACTION_PIP_PLAY_PAUSE"
@@ -96,9 +91,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 pipEventSink = null
             }
         })
-
-        // 投屏 DLNA 子 plugin attach——SDK 内置无需 host app 单独注册。
-        dlnaPlugin.onAttachedToEngine(flutterPluginBinding)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -165,6 +157,13 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             "deviceFingerprint" -> {
                 result.success(mapOf("fingerprint" to deviceFingerprint()))
             }
+            "getProcessHeapLimitMb" -> {
+                // ActivityManager.memoryClass = 本进程标准堆上限（MB），
+                // 即使大 RAM 设备也被系统 cap。NiumaPlayerPool 按它定容量。
+                val am = applicationContext
+                    ?.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                result.success(am?.memoryClass ?: 256)
+            }
             "deviceMemory.get" -> handleDeviceMemoryGet(call, result)
             "deviceMemory.set" -> handleDeviceMemorySet(call, result)
             "deviceMemory.unset" -> handleDeviceMemoryUnset(call, result)
@@ -181,9 +180,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             pipEventChannel.setStreamHandler(null)
         }
         pipEventSink = null
-
-        // 投屏 DLNA 子 plugin detach——释放 multicast lock 等资源。
-        dlnaPlugin.onDetachedFromEngine(binding)
 
         // Release every active player instance.
         val snapshot = players.values.toList()

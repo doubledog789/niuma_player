@@ -133,8 +133,7 @@ void main() {
       await c.dispose();
     });
 
-    test('PipModeChanged(false) + playing → 自动暂停（B 站/YouTube 行为）',
-        () async {
+    test('PipModeChanged(false) + playing → 自动暂停（B 站/YouTube 行为）', () async {
       final backend = _PipEmittingFakeBackend();
       final c = _makeController(backend);
       await c.initialize();

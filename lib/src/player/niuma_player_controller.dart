@@ -239,7 +239,10 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 驱动平台特定的选择，并在 [backend] 上留下结果。
   /// 多次调用是安全的；后续调用返回同一个 future。
   ///
-  /// 错误通过缓存 completer 的 future 传播，而非 rethrow：缓存的 future
+  /// 成功后缓存 completer，后续调用返回同一个 future；失败后清掉缓存，让
+  /// UI 的"重试"按钮能重新跑 middleware、重建 backend、再次 initialize。
+  ///
+  /// 错误通过 completer 的 future 传播，而非 rethrow：缓存的 future
   /// 是*唯一*订阅者，这里 `rethrow` 反而会让错误以 unhandled 形式冒出
   /// 来——因为 completer 的 future 永远不会再获得第二个订阅者。
   Future<void> initialize() {
@@ -259,6 +262,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         if (!completer.isCompleted) completer.complete();
       },
       onError: (Object e, StackTrace st) {
+        if (_initCompleter == completer) {
+          _initCompleter = null;
+        }
         if (!completer.isCompleted) completer.completeError(e, st);
       },
     );
@@ -309,10 +315,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // - 单线路 / flag=false → 只试 defaultLine
       // 失败的线路 emit [LineSwitchFailed]，全失败 rethrow 最后一条错误（让
       // 上层 phase=error → errorBuilder 兜住）。
-      final candidates = (options.autoFailoverOnInitialError &&
-              source.lines.length > 1)
-          ? ([...source.lines]..sort((a, b) => a.priority.compareTo(b.priority)))
-          : <MediaLine>[source.currentLine];
+      final candidates =
+          (options.autoFailoverOnInitialError && source.lines.length > 1)
+              ? ([...source.lines]
+                ..sort((a, b) => a.priority.compareTo(b.priority)))
+              : <MediaLine>[source.currentLine];
 
       Object? lastError;
       StackTrace? lastStack;
@@ -564,6 +571,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Future<void> setVolume(double volume) async => _backend?.setVolume(volume);
   Future<void> setLooping(bool looping) async => _backend?.setLooping(looping);
 
+  /// Web-only：开 / 关底层 `<video>` 的浏览器原生控件。iOS Safari 上 Flutter
+  /// 自定义控件被 platform-view 吞、点不动时的兜底。详见
+  /// [PlayerBackend.setWebNativeControls]。非 web 平台为空操作。
+  Future<void> setWebNativeControls(bool show) async =>
+      _backend?.setWebNativeControls(show);
+
   /// 切换到 [lineId] 标识的线路。
   ///
   /// 保存当前播放 position 和 `isPlaying` 状态，拆掉当前 backend，
@@ -604,8 +617,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // 走 PlayerPhase.error 路径。
       if (options.rollbackOnSwitchFailure && fromId != lineId) {
         try {
-          await _doSwitchTo(fromId,
-              savedPos: savedPos, wasPlaying: wasPlaying);
+          await _doSwitchTo(fromId, savedPos: savedPos, wasPlaying: wasPlaying);
           // 回滚成功——发一次 LineSwitchFailed 让业务侧能记日志/上报，
           // **但不 rethrow**（业务方调 await switchLine() 不会抛错，体感
           // "切失败但播放器自我恢复了"）。

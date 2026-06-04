@@ -144,7 +144,8 @@ class FakePlayerBackend extends PlayerBackend {
     required int aspectNum,
     required int aspectDen,
     bool unsafeAutoBackground = false,
-  }) async => false;
+  }) async =>
+      false;
 
   @override
   Future<bool> exitPictureInPicture() async => false;
@@ -246,6 +247,9 @@ class FakePlatformBridge implements PlatformBridge {
 
   @override
   Future<String> deviceFingerprint() async => fingerprint;
+
+  @override
+  Future<int> processHeapLimitMb() async => 256;
 }
 
 void main() {
@@ -322,7 +326,8 @@ void main() {
       await controller.dispose();
     });
 
-    test('C. Android + forceIjkOnAndroid: true goes straight to native(forceIjk=true)',
+    test(
+        'C. Android + forceIjkOnAndroid: true goes straight to native(forceIjk=true)',
         () async {
       final factory = FakeBackendFactory(
         makeVideoPlayer: (_) =>
@@ -434,8 +439,7 @@ void main() {
       await controller.dispose();
     });
 
-    test(
-        'F. Android default + native errors twice → initialize() throws',
+    test('F. Android default + native errors twice → initialize() throws',
         () async {
       final factory = FakeBackendFactory(
         makeVideoPlayer: (_) =>
@@ -461,8 +465,40 @@ void main() {
       await controller.dispose();
     });
 
-    test(
-        'G. Android default + native init wall-clock timeout → retry kicks in',
+    test('F2. initialize() 失败后允许再次调用并重新创建 backend', () async {
+      var attempt = 0;
+      final factory = FakeBackendFactory(
+        makeVideoPlayer: (_) {
+          final current = attempt++;
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.videoPlayer,
+            initBlock: current == 0
+                ? () async => throw StateError('first init failed')
+                : null,
+          );
+        },
+      );
+
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        retryPolicy: const RetryPolicy.none(),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: factory,
+      );
+
+      await expectLater(controller.initialize(), throwsStateError);
+
+      await controller.initialize();
+      expect(factory.videoPlayers.length, 2);
+      expect(factory.videoPlayers[0].disposed, isTrue,
+          reason: 'retry initialize must dispose the failed backend first');
+      expect(factory.videoPlayers[1].disposed, isFalse);
+      expect(controller.value.phase, PlayerPhase.ready);
+
+      await controller.dispose();
+    });
+
+    test('G. Android default + native init wall-clock timeout → retry kicks in',
         () async {
       // The first native attempt never resolves; the controller should hit
       // its wall-clock timeout and retry by rebuilding the backend.
@@ -600,7 +636,8 @@ void main() {
       ctrl.dispose();
     });
 
-    test('RetryPolicy retries network errors and eventually succeeds', () async {
+    test('RetryPolicy retries network errors and eventually succeeds',
+        () async {
       var initCount = 0;
       final fake = FakeBackendFactory(
         makeNative: (_, __) {
@@ -1003,15 +1040,13 @@ void main() {
   // 不再延后到 fetch 时静默吞。
   group('non-http(s) thumbnailVtt 立即拒（TG8 / R2-I3）', () {
     // F5: 形如未闭合 IPv6 的 URL 解析期抛 FormatException → 包成 ArgumentError。
-    test('NiumaMediaSource.single 非法 thumbnailVtt 立即抛 ArgumentError（F5）',
-        () {
+    test('NiumaMediaSource.single 非法 thumbnailVtt 立即抛 ArgumentError（F5）', () {
       expect(
         () => NiumaMediaSource.single(ds, thumbnailVtt: 'http://[bad-ipv6'),
         throwsA(isA<ArgumentError>()),
       );
     });
-    test('NiumaMediaSource.lines 非法 thumbnailVtt 立即抛 ArgumentError（F5）',
-        () {
+    test('NiumaMediaSource.lines 非法 thumbnailVtt 立即抛 ArgumentError（F5）', () {
       expect(
         () => NiumaMediaSource.lines(
           lines: [

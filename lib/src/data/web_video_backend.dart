@@ -35,8 +35,7 @@ import 'package:niuma_player/src/niuma_sdk_assets.dart';
 /// 实现基于 `package:web` + `dart:js_interop`（不用已废弃的 `dart:html`），
 /// 因此可随 `flutter build web --wasm` 一起编译。
 class WebVideoBackend extends PlayerBackend {
-  WebVideoBackend(this._dataSource)
-      : _viewType = 'niuma-video-${_nextId++}' {
+  WebVideoBackend(this._dataSource) : _viewType = 'niuma-video-${_nextId++}' {
     final headers = _dataSource.headers ?? const <String, String>{};
     _video = web.document.createElement('video') as web.HTMLVideoElement
       ..autoplay = false
@@ -111,6 +110,16 @@ class WebVideoBackend extends PlayerBackend {
   bool _disposed = false;
   bool _initialized = false;
 
+  /// 用户 / 业务的播放意图：[play] 置 true、[pause] 置 false。video 被 DOM
+  /// reparent（如 web 全屏搬迁）时浏览器会自发暂停它——此时若意图仍在播，
+  /// pause 事件处理里自动续播，避免"全屏后 / 退出后卡停"。
+  bool _intendedPlaying = false;
+
+  /// iOS Safari `webkitEnterFullscreen` 系统 player 期间为 true。期间用户用系统
+  /// UI 暂停也是 video pause 事件、且意图仍在播，但**不该被自愈顶回播放**——
+  /// 自愈只服务 Chrome overlay 全屏的 reparent 自发暂停。webkitendfullscreen 复位。
+  bool _inNativeFullscreen = false;
+
   /// [initialize] 等待的 completer——load 成功（onLoadedMetadata 等）
   /// complete()，load 失败（onError）completeError()。让上层 `await
   /// backend.initialize()` 能真正得知 load 结果，而不是 fire-and-forget
@@ -169,7 +178,8 @@ class WebVideoBackend extends PlayerBackend {
     _valueController.add(v);
   }
 
-  void _setPhase(PlayerPhase phase, {PlayerError? error, bool clearError = false}) {
+  void _setPhase(PlayerPhase phase,
+      {PlayerError? error, bool clearError = false}) {
     final next = _value.copyWith(
       phase: phase,
       error: error,
@@ -235,6 +245,14 @@ class WebVideoBackend extends PlayerBackend {
       if (_disposed) return;
       // ended 状态下 pause 事件也会触发——避免覆盖 ended phase
       if (_value.phase == PlayerPhase.ended) return;
+      // video 被 DOM reparent（web 全屏搬迁等）时浏览器会自发暂停——若用户
+      // 意图仍在播，自动续播、不对外 emit paused，避免"全屏后 / 退出后卡停"。
+      // 用户主动 pause() 已把 _intendedPlaying 置 false，走下面正常 paused 分支。
+      // 系统原生全屏（iOS Safari）期间也不自愈——见 _inNativeFullscreen 注释。
+      if (_intendedPlaying && !_inNativeFullscreen) {
+        unawaited(_video.play().toDart.then((_) {}, onError: (_) {}));
+        return;
+      }
       _setPhase(PlayerPhase.paused);
     });
     _on('waiting', () {
@@ -395,6 +413,7 @@ class WebVideoBackend extends PlayerBackend {
   @override
   Future<void> play() async {
     if (_disposed) return;
+    _intendedPlaying = true;
     try {
       await _video.play().toDart;
     } catch (e) {
@@ -426,6 +445,7 @@ class WebVideoBackend extends PlayerBackend {
   @override
   Future<void> pause() async {
     if (_disposed) return;
+    _intendedPlaying = false;
     _video.pause();
   }
 
@@ -461,37 +481,68 @@ class WebVideoBackend extends PlayerBackend {
   }
 
   @override
+  Future<void> setWebNativeControls(bool show) async {
+    if (_disposed) return;
+    _video.controls = show;
+  }
+
+  @override
   Future<bool> enterNativeFullscreen() async {
     if (_disposed) return false;
-    if (_isWebFullscreen.value) return true;
-    _isWebFullscreen.value = true;
-    return true;
+    // 浏览器原生全屏：iOS Safari 不支持 Element.requestFullscreen()，只能走
+    // <video>.webkitEnterFullscreen()（进 iOS 系统原生 video player UI——业务
+    // 的 Flutter 控件不会跟着进全屏）；桌面 Safari / Chrome / Firefox /
+    // Android Chrome 走标准 requestFullscreen()。
+    try {
+      final v = _video as JSObject;
+      if (v.has('webkitEnterFullscreen')) {
+        // iOS Safari：进系统 player 前记住播放态；退出（webkitendfullscreen）后
+        // video 常被系统暂停，自动恢复播放，省得用户手动再点一次。
+        final wasPlaying = !_video.paused;
+        _inNativeFullscreen = true;
+        _listenWebkitEndFullscreenOnce(resumePlay: wasPlaying);
+        v.callMethod('webkitEnterFullscreen'.toJS);
+        return true;
+      }
+    } catch (_) {/* 落到标准 API */}
+    try {
+      await _video.requestFullscreen().toDart;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// iOS Safari 专用：监听一次 `webkitendfullscreen`（退出系统 player），退出后
+  /// 若进全屏前在播放则恢复播放——iOS 退出系统 player 默认会把 video 暂停。
+  void _listenWebkitEndFullscreenOnce({required bool resumePlay}) {
+    late final JSFunction cb;
+    cb = ((web.Event _) {
+      _video.removeEventListener('webkitendfullscreen', cb);
+      _inNativeFullscreen = false;
+      if (_disposed || !resumePlay) return;
+      unawaited(play());
+    }).toJS;
+    _video.addEventListener('webkitendfullscreen', cb);
   }
 
   @override
   Future<bool> exitNativeFullscreen() async {
     if (_disposed) return false;
-    if (!_isWebFullscreen.value) return false;
-    _isWebFullscreen.value = false;
-    return true;
-  }
-
-  /// 业务可选：进浏览器原生 video player fullscreen——iOS Safari 走
-  /// webkitEnterFullscreen（系统 UI，**Flutter 控件不可见**），桌面 / Android
-  /// 走标准 requestFullscreen。**绝大多数业务推荐用 enterNativeFullscreen
-  /// 走 Flutter Overlay 假全屏路径保留控件**——本方法仅给"我就要原生 video
-  /// player UI"的业务用。
-  Future<bool> enterBrowserVideoFullscreen() async {
-    if (_disposed) return false;
+    // iOS Safari 的 webkitEnterFullscreen 进系统 player，用户在系统 UI 内自行
+    // 退出（webkitExitFullscreen 尽力而为）；桌面 / Chrome 走
+    // document.exitFullscreen()。
     try {
       final v = _video as JSObject;
-      if (v.has('webkitEnterFullscreen')) {
-        v.callMethod('webkitEnterFullscreen'.toJS);
+      if (v.has('webkitExitFullscreen')) {
+        v.callMethod('webkitExitFullscreen'.toJS);
         return true;
       }
-    } catch (_) {/* fallback */}
+    } catch (_) {/* 落到标准 API */}
     try {
-      await _video.requestFullscreen().toDart;
+      if (web.document.fullscreenElement != null) {
+        await web.document.exitFullscreen().toDart;
+      }
       return true;
     } catch (_) {
       return false;

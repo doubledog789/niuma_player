@@ -11,6 +11,5 @@ class NiumaSdkAssets {
   /// 注意不是 `rootBundle` 的 asset key（那个是 `packages/$_pkg/...`），
   /// 而是 flutter web 构建后 package asset 对外暴露的 `assets/packages/...`
   /// 路径，供 [WebVideoBackend] 动态注入 `<script src>` 用。
-  static const String hlsJsUrl =
-      'assets/packages/$_pkg/assets/hls/hls.min.js';
+  static const String hlsJsUrl = 'assets/packages/$_pkg/assets/hls/hls.min.js';
 }
