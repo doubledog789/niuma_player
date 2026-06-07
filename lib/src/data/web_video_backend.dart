@@ -415,7 +415,7 @@ class WebVideoBackend extends PlayerBackend {
       ));
       return;
     }
-    final hls = hlsCtor.callAsConstructor<JSObject>(JSObject());
+    final hls = hlsCtor.callAsConstructor<JSObject>(_buildHlsConfig());
     _hls = hls;
     // 只处理 fatal error 映射进 PlayerError；非 fatal 交给 hls.js 自愈，
     // fatal 上抛后由 orchestration 层 auto-failover / 换线接管（与既有架构
@@ -423,6 +423,42 @@ class WebVideoBackend extends PlayerBackend {
     hls.callMethod('on'.toJS, 'hlsError'.toJS, _onHlsError.toJS);
     hls.callMethod('attachMedia'.toJS, _video as JSObject);
     hls.callMethod('loadSource'.toJS, _dataSource.uri.toJS);
+  }
+
+  /// 浏览器禁止 JS 通过 `setRequestHeader` 设置的 forbidden request headers——
+  /// 设它们会抛 `Refused to set unsafe header`（并可能中断 HLS 加载）。这些由
+  /// 浏览器自己管（如 referer 用页面 URL、user-agent 用浏览器标识）。
+  static const Set<String> _forbiddenRequestHeaders = <String>{
+    'accept-charset', 'accept-encoding', 'access-control-request-headers',
+    'access-control-request-method', 'connection', 'content-length', 'cookie',
+    'cookie2', 'date', 'dnt', 'expect', 'host', 'keep-alive', 'origin',
+    'referer', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'user-agent',
+    'via',
+  };
+
+  /// 构造 hls.js 配置：把 [_dataSource.headers] 里**安全**的请求头通过 xhrSetup
+  /// 带上（鉴权 token 等），但跳过浏览器 forbidden headers（referer/host/
+  /// user-agent…）——否则 hls.js 设 referer 会抛 "Refused to set unsafe header"。
+  ///
+  /// **referer / cookie 这类在 web 上无法用 JS 设置**：referer 由浏览器按页面
+  /// URL 自动带（可用 `<meta name="referrer">` / Referrer-Policy 调整策略，但不能
+  /// 指定任意值）。鉴权请改用可放在普通 header 的 token，或 URL 签名。
+  JSObject _buildHlsConfig() {
+    final config = JSObject();
+    final headers = _dataSource.headers;
+    if (headers == null || headers.isEmpty) return config;
+    config.setProperty(
+      'xhrSetup'.toJS,
+      ((JSObject xhr, JSString _) {
+        headers.forEach((k, v) {
+          if (_forbiddenRequestHeaders.contains(k.toLowerCase())) return;
+          try {
+            xhr.callMethod('setRequestHeader'.toJS, k.toJS, v.toJS);
+          } catch (_) {/* 个别 header 仍被浏览器拒，忽略不中断加载 */}
+        });
+      }).toJS,
+    );
+    return config;
   }
 
   void _onHlsError(JSAny _, JSObject data) {

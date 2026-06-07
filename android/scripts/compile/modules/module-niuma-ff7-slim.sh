@@ -9,9 +9,9 @@
 # Goal: smallest possible libijkplayer.so that still plays VOD mp4 / HLS.
 # Container / codec policy:
 #   - demuxers: mov mp4 hls mpegts aac mp3 ac3   (ac3 required by hls_demuxer in ff7)
-#   - decoders: h264 hevc aac aac_latm mp3* + mediacodec h264/hevc
-#   - parsers:  h264 hevc aac aac_latm mpegaudio ac3
-#   - bsf:      aac_adtstoasc h264_mp4toannexb hevc_mp4toannexb
+#   - decoders: h264 aac aac_latm mp3* + mediacodec h264 (HEVC 自 0.2.1 砍掉)
+#   - parsers:  h264 aac aac_latm mpegaudio ac3
+#   - bsf:      aac_adtstoasc h264_mp4toannexb
 #   - protocols: file http https httpproxy tcp tls crypto data cache hls + ijk*
 #   - no GPL, OpenSSL TLS backend (force-flagged nonfree by the fork's
 #     do-compile when extra/openssl is built — matches fijk's ff7.1.1 binary)
@@ -79,13 +79,13 @@ export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --disable-muxers"
 
 # Decoders
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=h264"
-export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=hevc"
+# [niuma slim 砍 HEVC 0.2.1] export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=hevc"
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=aac"
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=aac_latm"
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=mp3*"
 # MediaCodec HW decoders (zero-copy on Android >= 5)
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=h264_mediacodec"
-export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=hevc_mediacodec"
+# [niuma slim 砍 HEVC 0.2.1] export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-decoder=hevc_mediacodec"
 
 # Demuxers
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-demuxer=mov"
@@ -98,7 +98,7 @@ export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-demuxer=ac3"
 
 # Parsers
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-parser=h264"
-export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-parser=hevc"
+# [niuma slim 砍 HEVC 0.2.1] export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-parser=hevc"
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-parser=aac"
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-parser=aac_latm"
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-parser=mpegaudio"
@@ -107,7 +107,7 @@ export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-parser=ac3"
 # Bitstream filters
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-bsf=aac_adtstoasc"
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-bsf=h264_mp4toannexb"
-export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-bsf=hevc_mp4toannexb"
+# [niuma slim 砍 HEVC 0.2.1] export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-bsf=hevc_mp4toannexb"
 
 # Filters — only what ijkplayer's ffplay graph actually wires up
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-filter=aresample"

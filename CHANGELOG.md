@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-06-07
+
+### Fixed
+
+- **web HLS：hls.js xhrSetup 跳过浏览器 forbidden request headers**：
+  `WebVideoBackend` 给 hls.js 配 `xhrSetup` 时把 `dataSource.headers` 里的
+  `referer` / `host` / `origin` / `user-agent` / `cookie` 等浏览器禁止 JS 设置
+  的请求头跳过，避免 hls.js 抛 `Refused to set unsafe header "referer"`
+  并中断 HLS 加载。鉴权 token 等正常 header 仍透传。
+
+### Changed
+
+- **Android ijkplayer aar 砍掉 HEVC（H.265）软解兜底**，进一步精简：
+  `libijkplayer.so` arm64 6.9→6.5 MiB / armv7 5.5→5.1 MiB，aar 7.6→7.0 MiB，
+  对应 APK 单 arm64 ABI 省 ~400KB。decoder 仅留 `h264 / aac / aac_latm / mp3* +
+  h264_mediacodec / mp3_mediacodec`；HEVC 解封装/parser/bsf 同步移除。
+  **影响**：IJK 软解兜底路径不再支持 H.265；Android ExoPlayer 主路径仍可硬解
+  H.265，仅在「ExoPlayer 翻车 + 视频是 H.265」双重场景才会播不了。点播
+  mp4+HLS（主流 H.264 编码）不受影响。编译配置见
+  `android/scripts/compile/modules/module-niuma-ff7-slim.sh`。
+
 ## [0.2.0] - 2026-06-05
 
 ### Added
