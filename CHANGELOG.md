@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-06-07
+
+### Fixed
+
+- **web rapid seek 卡 buffering**（Chrome/Firefox/Edge + hls.js）：`WebVideoBackend.seekTo`
+  改为合并模式（latest-wins）——已有 seek 在路上时新调用只更新目标，待 `'seeked'`
+  事件后再 fire 最新值，避免反复 seek 把 hls.js 的 `SourceBuffer` 卡进
+  `updating=true` 永不释放、`'playing'` 永不来。配 3s 安全 timer 兜底（极端 case
+  浏览器漏发 `'seeked'` 时也能解锁）。
+- **Safari + hls.js 在已 buffered 区间 seek 后 phase 卡 buffering**：新增
+  `'seeked'` 事件监听，按 video 真值兜底校准 phase（仅当 phase 为 buffering
+  时纠正，playing/paused/ended/error 等明确状态保持不动）。修复多次快进快退
+  后 UI spinner 不消失、底栏图标错乱、点击屏幕才恢复的 quirk。
+- **`load()` 换源时残留 seek 状态**：换源即作废 `_isSeeking`/`_pendingSeek`/
+  `_seekSafetyTimer`，避免锁跨源残留导致换源后第一次 seek 被吞。
+
 ## [0.2.1] - 2026-06-07
 
 ### Fixed

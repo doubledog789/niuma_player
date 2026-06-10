@@ -122,6 +122,13 @@ class WebVideoBackend extends PlayerBackend {
   /// 自愈只服务 Chrome overlay 全屏的 reparent 自发暂停。webkitendfullscreen 复位。
   bool _inNativeFullscreen = false;
 
+  /// Rapid seek 合并（latest-wins）：已有 seek 在路上时，新的 [seekTo] 只更新
+  /// [_pendingSeek] 目标，待 `'seeked'` 事件后再 fire 最新值。防止反复 seek 把
+  /// hls.js 的 `SourceBuffer` 卡进 `updating=true` 永不释放（`'playing'` 永不来）。
+  bool _isSeeking = false;
+  Duration? _pendingSeek;
+  Timer? _seekSafetyTimer;
+
   /// [initialize] 等待的 completer——load 成功（onLoadedMetadata 等）
   /// complete()，load 失败（onError）completeError()。让上层 `await
   /// backend.initialize()` 能真正得知 load 结果，而不是 fire-and-forget
@@ -270,6 +277,32 @@ class WebVideoBackend extends PlayerBackend {
       // 这时再 retry 一次同步到 value.size。
       _maybeUpdateSize();
     });
+    _on('seeked', () {
+      if (_disposed) return;
+      _seekSafetyTimer?.cancel();
+      _isSeeking = false;
+      final next = _pendingSeek;
+      _pendingSeek = null;
+      if (next != null) {
+        // 还有排队目标 → 立刻 fire 最新值（latest-wins coalescing）。
+        seekTo(next);
+        return;
+      }
+      // Safari + hls.js quirk：seek 到已 buffered 范围内时，<video> 只发 'seeked'，
+      // 不发 'playing'/'waiting'（readyState 没掉过、video 没断过）→ phase 卡在上
+      // 一次 seek 触发的 buffering。'seeked' 是 seek 完成必触发事件，在此按 video
+      // 真值兜底校准 phase；仅当当前为 buffering 时纠正，playing/paused/ended/
+      // error 等明确状态保持不动，避免误覆盖用户意图。
+      if (_value.phase == PlayerPhase.buffering) {
+        if (_video.paused) {
+          _setPhase(PlayerPhase.paused);
+        } else if (_video.readyState >= 3) {
+          // HAVE_FUTURE_DATA：浏览器认为足够推进当前播放头。
+          _setPhase(PlayerPhase.playing);
+        }
+        // readyState < 3 && !paused → 真的还在缓冲，phase 保持，等 'playing' 自然驱动。
+      }
+    });
     _on('timeupdate', () {
       if (_disposed) return;
       _emit(_value.copyWith(
@@ -369,6 +402,11 @@ class WebVideoBackend extends PlayerBackend {
     // 只换 src / hls 源。
     _intendedPlaying = false;
     _initialized = false;
+    // 换源即作废旧 seek 上下文（避免锁跨源残留导致换源后第一次 seek 被吞）。
+    _seekSafetyTimer?.cancel();
+    _seekSafetyTimer = null;
+    _isSeeking = false;
+    _pendingSeek = null;
     // 清旧 hls 实例（持有 MSE buffer / xhr）。
     if (_hls != null) {
       _hls!.callMethod('destroy'.toJS);
@@ -526,7 +564,23 @@ class WebVideoBackend extends PlayerBackend {
   @override
   Future<void> seekTo(Duration position) async {
     if (_disposed) return;
+    // 已有 seek 在路上 → 只更新目标，等 'seeked' 后再 fire 最新值（latest-wins）。
+    if (_isSeeking) {
+      _pendingSeek = position;
+      return;
+    }
+    _isSeeking = true;
     _video.currentTime = position.inMilliseconds / 1000.0;
+    // 兜底：'seeked' 通常几百 ms 内触发，但 hls.js 卡死等极端 case 可能不触发。
+    // 3s 没等到就强制 release，把排队 target 应用，保证 seek 不会永久停摆。
+    _seekSafetyTimer?.cancel();
+    _seekSafetyTimer = Timer(const Duration(seconds: 3), () {
+      if (_disposed) return;
+      _isSeeking = false;
+      final next = _pendingSeek;
+      _pendingSeek = null;
+      if (next != null) seekTo(next);
+    });
   }
 
   @override
@@ -636,6 +690,8 @@ class WebVideoBackend extends PlayerBackend {
       remove();
     }
     _listenerRemovers.clear();
+    _seekSafetyTimer?.cancel();
+    _seekSafetyTimer = null;
     await _pipEventSub?.cancel();
     _pipEventSub = null;
     _video.pause();
