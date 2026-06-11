@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-06-07
+
+### Changed
+
+- **Android Texture 路径默认提一档画质**：`NiumaPlayerView` 新增
+  `filterQuality` 参数，**默认 `FilterQuality.medium`**（双三次插值），替代
+  Flutter `Texture` 硬编码的默认 `FilterQuality.low`（双线性）。修复反馈
+  「视频有点花、不够高清」（多见于小米15 等大屏 / 高 DPI 现代机型，原默认 low
+  在拉伸时糊感明显）。medium 在 2020+ 中端机以上无可感性能开销。极致性能场景
+  （feed 多实例 + 低端机）可显式传 `FilterQuality.low` 降回旧默认。
+  iOS 不受影响（`VideoPlayer` widget 内走 AVPlayer 原生 scaling）；web
+  同样不受影响（浏览器直接缩放）。
+- **下一步预告**：长期方案是把 Android 渲染改为 PlatformView（SurfaceView
+  原生缩放），从根上去掉 Texture 路径的每帧 filterQuality 开销。已起
+  `feat/android-platform-view` 分支，待真机回归后发 0.3.0。
+
 ## [0.2.2] - 2026-06-07
 
 ### Fixed

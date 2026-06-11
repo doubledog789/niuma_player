@@ -14,13 +14,34 @@ import 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
 /// backend 切换（例如回退到 IJK）时自动 rebuild，调用方直接把它丢
 /// 进 widget tree 即可。
 class NiumaPlayerView extends StatelessWidget {
-  const NiumaPlayerView(this.controller, {super.key, this.aspectRatio});
+  const NiumaPlayerView(
+    this.controller, {
+    super.key,
+    this.aspectRatio,
+    this.filterQuality = FilterQuality.medium,
+  });
 
   final NiumaPlayerController controller;
 
   /// 为 null 时回落到 `controller.value.size`。两者都不可用时渲染
   /// 16:9 占位框以保持布局稳定。
   final double? aspectRatio;
+
+  /// **Android Native** Texture 路径下视频纹理的缩放过滤等级。
+  ///
+  /// 默认 [FilterQuality.medium]——比 Flutter `Texture` 的硬编码默认
+  /// [FilterQuality.low]（双线性）画质明显提升一档，尤其在大屏 / 高 DPI
+  /// 手机上拉伸视频不再糊；medium 用双三次插值，开销在 2020+ 中端机以上
+  /// 完全无感。
+  ///
+  /// 仅 Android Native（ExoPlayer / IJK 通过 Flutter Texture 渲染）路径
+  /// 生效。iOS 由 `VideoPlayer` widget 内部走 AVPlayer 原生 scaling，本
+  /// 参数无关；web `<video>` 由浏览器直接缩放，本参数同样无关。
+  ///
+  /// 极致性能场景（feed 多实例 + 低端机）可显式传 [FilterQuality.low]
+  /// 降回旧默认；追求极致画质可传 [FilterQuality.high]，但每帧 GPU 开销
+  /// 显著增加，不建议常规使用。
+  final FilterQuality filterQuality;
 
   @override
   Widget build(BuildContext context) {
@@ -63,11 +84,16 @@ class NiumaPlayerView extends StatelessWidget {
             },
           );
         } else if (backend is VideoPlayerBackend) {
+          // iOS 路径：VideoPlayer widget 内部走 AVPlayer 原生 scaling，无需上层
+          // 控制 filterQuality（且本版 video_player 也未暴露该参数）。
           child = VideoPlayer(backend.innerController);
         } else if (backend != null &&
             backend.kind == PlayerBackendKind.native &&
             controller.textureId != null) {
-          child = Texture(textureId: controller.textureId!);
+          child = Texture(
+            textureId: controller.textureId!,
+            filterQuality: filterQuality,
+          );
         } else {
           child = const SizedBox.shrink();
         }
