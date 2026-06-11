@@ -62,16 +62,11 @@ internal abstract class PlayerSession(
         )
 
     /// In texture mode, eagerly wired from `entry.surfaceTexture()`. In
-    /// platform-view mode, set later by [setSurface] when the SurfaceView's
-    /// `surfaceCreated` fires.
+    /// platform-view mode, set later by [pushSurface] when a SurfaceView's
+    /// `surfaceCreated` fires — possibly AFTER prepare has already started
+    /// (prepare does NOT wait for a surface; see [bringUp]).
     @Volatile
     private var _surface: Surface? = entry?.surfaceTexture()?.let { Surface(it) }
-
-    /// Set true by [bringUp] when invoked before `_surface` is ready (platform-
-    /// view mode). [setSurface] consults it to know whether to run the deferred
-    /// `bindUnderlyingSurface + applyDataSource + startPrepare` sequence.
-    @Volatile
-    private var bringUpAwaitingSurface: Boolean = false
 
     private val methodChannel: MethodChannel =
         MethodChannel(messenger, "cn.niuma/player/$instanceId")
@@ -186,28 +181,19 @@ internal abstract class PlayerSession(
 
     /// Subclass calls this from its `init {}` block AFTER constructing the
     /// underlying native player and any subclass-specific state. Performs
-    /// configure → listeners → surface → data source → prepare.
+    /// configure → listeners → (surface if available) → data source → prepare.
     ///
-    /// In platform-view mode, `_surface` may not be ready yet (Android won't
-    /// create the SurfaceView's Surface until composition). In that case we
-    /// run the surface-agnostic parts (configure + listeners) immediately and
-    /// defer the rest until [setSurface] fires.
+    /// **Prepare does NOT wait for a surface.** In platform-view mode the
+    /// SurfaceView's Surface only exists after the AndroidView is composited,
+    /// and common UI patterns (feed: `initialize → play → setState(渲染激活
+    /// 页)`) mount the view AFTER awaiting initialize — gating prepare on the
+    /// surface would deadlock until initTimeout. ExoPlayer and IJK both
+    /// support surface-less prepare/playback (audio + state machine advance
+    /// normally); [pushSurface] late-binds the picture when the view arrives.
     protected fun bringUp() {
         configurePlayerOptions()
         attachUnderlyingListeners()
-        val s = _surface
-        if (s == null) {
-            // Platform-view mode, waiting for surfaceCreated.
-            bringUpAwaitingSurface = true
-            phase = PHASE_OPENING
-            emitState()
-            return
-        }
-        bringUpWithSurface(s)
-    }
-
-    private fun bringUpWithSurface(s: Surface) {
-        bindUnderlyingSurface(s)
+        _surface?.let { bindUnderlyingSurface(it) }
         applyUnderlyingDataSource(dataSource)
         phase = PHASE_OPENING
         startUnderlyingPrepare()
@@ -228,24 +214,16 @@ internal abstract class PlayerSession(
     // push order, latest = active.
     private val surfaceStack = mutableListOf<Pair<Any, Surface>>()
 
-    /// Called by [PlayerSurfaceView] from `SurfaceHolder.surfaceCreated`. In
-    /// platform-view mode this is what kicks the deferred prepare flow; later
-    /// pushes (e.g. a fullscreen route's second SurfaceView) re-bind the
-    /// underlying player to the newest surface.
+    /// Called by [PlayerSurfaceView] from `SurfaceHolder.surfaceCreated`.
+    /// Prepare 早已在 [bringUp] 启动（不等 surface）——这里只是把（可能迟到的）
+    /// 画面输出口绑上去；后到的 push（如全屏路由的第二个 SurfaceView）重绑到
+    /// 最新 surface。ExoPlayer / IJK 都接受 mid-flight setSurface，幂等。
     fun pushSurface(owner: Any, surface: Surface) {
         if (released) return
         surfaceStack.removeAll { it.first === owner }
         surfaceStack.add(owner to surface)
         _surface = surface
-        if (bringUpAwaitingSurface) {
-            bringUpAwaitingSurface = false
-            bringUpWithSurface(surface)
-        } else {
-            // Underlying player already prepared (fullscreen push / Surface
-            // recreated mid-playback). ExoPlayer / IJK both accept setSurface
-            // mid-flight idempotently.
-            try { bindUnderlyingSurface(surface) } catch (_: Throwable) {}
-        }
+        try { bindUnderlyingSurface(surface) } catch (_: Throwable) {}
     }
 
     /// Called by [PlayerSurfaceView] from `surfaceDestroyed` / `dispose`. If

@@ -48,8 +48,13 @@ class _FeedPageState extends State<FeedPage> with WidgetsBindingObserver {
 
   /// 全程复用一个 controller（一个 `<video>`）——切视频靠 [NiumaPlayerController.load]
   /// 换源，不重建。这是 iOS Safari 能持续有声的关键。
-  late final NiumaPlayerController _controller =
-      NiumaPlayerController(_sources[0]);
+  late final NiumaPlayerController _controller = NiumaPlayerController(
+    _sources[0],
+    // 真机回归 feed + PlatformView：验证「initialize 不等 surface」（feed 是
+    // initialize → play → 才渲染激活页，prepare 若死等 surface 会卡到超时）
+    // 以及换页 AndroidView 重建的黑闪程度。验证完按需保留或撤掉。
+    options: const NiumaPlayerOptions(useAndroidPlatformView: true),
+  );
 
   /// 换源序号——快滑时 await load 期间用户又滑走，靠它作废过期的激活。
   int _activateSeq = 0;
