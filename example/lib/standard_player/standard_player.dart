@@ -91,12 +91,19 @@ class _StandardPlayerState extends State<StandardPlayer> {
       case NiumaWebFullscreenMode.notWeb:
         break;
     }
+    // 全屏切换用「快速淡入」而非 MaterialPageRoute 默认 slide：slide 动画期间
+    // 第二个 SurfaceView 创建 + surface 重绑（Android PlatformView 路径）会
+    // 掉帧，视觉上「卡一下」。视频 app 全屏切换惯例就是瞬切/快淡。
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FullscreenPage(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 120),
+        reverseTransitionDuration: const Duration(milliseconds: 120),
+        pageBuilder: (_, __, ___) => FullscreenPage(
           controller: widget.controller,
           title: widget.title,
         ),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
       ),
     );
   }
@@ -114,8 +121,11 @@ class _StandardPlayerState extends State<StandardPlayer> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // 1. 画面。
-              NiumaPlayerView(widget.controller),
+              // 1. 画面。Center 把 Stack(expand) 的 tight 约束放松，让
+              // NiumaPlayerView 内部的 AspectRatio 真正生效——否则全屏页里
+              // AndroidView/SurfaceView 被拉满屏幕，原生缩放直接把画面拉变形
+              // （Texture 路径同样受益：非 16:9 视频不再被拉伸）。
+              Center(child: NiumaPlayerView(widget.controller)),
 
               // 2. 封面（首帧前）。
               if (showCover) const CoverLayer(),

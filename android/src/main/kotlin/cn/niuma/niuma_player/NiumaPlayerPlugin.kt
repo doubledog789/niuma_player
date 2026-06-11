@@ -46,6 +46,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private var deviceMemory: DeviceMemoryStore? = null
 
+    /// Monotonic id allocator for platform-view mode sessions (texture mode
+    /// borrows id from SurfaceTextureEntry).
+    private val platformViewInstanceCounter = java.util.concurrent.atomic.AtomicLong(1)
+
     companion object {
         const val ACTION_PIP_PLAY_PAUSE = "cn.niuma.niuma_player.ACTION_PIP_PLAY_PAUSE"
         const val PIP_EVENT_CHANNEL = "niuma_player/pip/events"
@@ -91,6 +95,15 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 pipEventSink = null
             }
         })
+
+        // Register the PlatformView factory used when consumer opts into
+        // `NiumaPlayerOptions.useAndroidPlatformView = true`. The Dart side
+        // hands AndroidView({creationParams: {instanceId: <textureId>}}) and
+        // the factory looks up the already-created PlayerSession by id.
+        flutterPluginBinding.platformViewRegistry.registerViewFactory(
+            "cn.niuma/player_surface",
+            PlayerSurfaceViewFactory { id -> players[id] },
+        )
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -387,6 +400,8 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             @Suppress("UNCHECKED_CAST")
             val headers = call.argument<Map<String, String>>("headers")
             val forceIjk = call.argument<Boolean>("forceIjk") ?: false
+            val useAndroidPlatformView =
+                call.argument<Boolean>("useAndroidPlatformView") ?: false
 
             val dataSource = mapOf<String, Any?>(
                 "uri" to uri,
@@ -398,8 +413,15 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             val memoryHit = !forceIjk && isMarkedForIjk(fingerprint)
             val useIjk = forceIjk || memoryHit
 
+            // In platform-view mode we don't own a SurfaceTextureEntry; pass
+            // null registry + an allocated instanceId. PlayerSurfaceView later
+            // calls session.setSurface() when SurfaceHolder.surfaceCreated fires.
+            val pvInstanceId: Long? = if (useAndroidPlatformView)
+                platformViewInstanceCounter.getAndIncrement() else null
+            val sessionRegistry = if (useAndroidPlatformView) null else registry
+
             val player: PlayerSession = if (useIjk) {
-                IjkSession(registry, msg, ctx, dataSource)
+                IjkSession(sessionRegistry, msg, ctx, dataSource, pvInstanceId)
             } else {
                 // ExoPlayer is our default fast path. If a codec failure
                 // surfaces *before the first frame*, that almost always
@@ -409,7 +431,7 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 // immediately on init failure; native marking the memory
                 // here means that retry hits the IJK branch.
                 ExoPlayerSession(
-                    registry, msg, ctx, dataSource,
+                    sessionRegistry, msg, ctx, dataSource, pvInstanceId,
                     onCodecFailureBeforeFirstFrame = {
                         deviceMemory?.set(fingerprint, DeviceMemoryStore.NO_EXPIRY)
                     },
@@ -423,6 +445,7 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     "fingerprint" to fingerprint,
                     "selectedVariant" to (if (useIjk) "ijk" else "exo"),
                     "fromMemory" to memoryHit,
+                    "isPlatformView" to useAndroidPlatformView,
                 )
             )
         } catch (e: Throwable) {

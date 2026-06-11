@@ -30,6 +30,7 @@ class NiumaPlayerOptions {
     this.unsafePipAutoBackgroundOnEnter = false,
     this.rollbackOnSwitchFailure = true,
     this.autoFailoverOnInitialError = true,
+    this.useAndroidPlatformView = false,
   });
 
   /// 若底层 backend 在该窗口内还没到 "initialized"，视作失败，
@@ -43,6 +44,29 @@ class NiumaPlayerOptions {
   /// 用于紧急覆盖或 A/B 测试兜底路径。iOS 和 Web 忽略本标志
   /// （永远走 video_player）。
   final bool forceIjkOnAndroid;
+
+  /// Android 上把视频渲染从 Flutter Texture 切换到 PlatformView
+  /// （`SurfaceView`）—— 由 SurfaceView 直接原生缩放，画质上限
+  /// 比 Texture 路径明显更高，且不吃 [NiumaPlayerView.filterQuality]
+  /// 每帧 GPU 开销。
+  ///
+  /// **默认 false（opt-in）**。Texture 路径在多数场景下足够（配合 0.2.3
+  /// 起的默认 `FilterQuality.medium` 已能解决多数 "画面有点花" 反馈），
+  /// PlatformView 是高画质需求或 4K / 高 DPI 大屏机型的进阶选项。
+  ///
+  /// **副作用 / 注意事项**：
+  /// - **首帧延迟**：`SurfaceView` 的 `Surface` 由系统异步创建，prepare 链
+  ///   会等 `surfaceCreated` 回调才真正开始，比 Texture 路径首帧晚一点。
+  /// - **控件叠层**：Flutter widget 叠在 PlatformView 之上由
+  ///   Hybrid Composition 合成。Android 10+ 上效果稳定；个别 ROM /
+  ///   旧机型可能出现叠层 bug，需真机回归。
+  /// - **PiP / 全屏路由切换**：PlatformView 路由切换合成路径与 Texture
+  ///   不同，需要在目标场景真机验证。
+  /// - **iOS / Web 完全忽略本标志**。
+  ///
+  /// 推荐先在 staging 真机回归各厂商（小米 / 华为 / OPPO / Vivo / 三星）
+  /// 再切给生产。
+  final bool useAndroidPlatformView;
 
   /// **⚠️ App Store 不兼容**——启用后 host app **无法过 App Store 审核**。
   /// 仅适合 Ad Hoc / Enterprise / 越狱设备等内部分发场景。
@@ -427,6 +451,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         final native = _backendFactory.createNative(
           _resolvedSource!,
           forceIjk: forceIjk,
+          useAndroidPlatformView: options.useAndroidPlatformView,
         );
         lastBackend = native;
         await _attachBackend(native);

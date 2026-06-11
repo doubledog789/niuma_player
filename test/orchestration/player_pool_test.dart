@@ -108,7 +108,7 @@ class _FakeFactory implements BackendFactory {
   }
 
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) {
+  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) {
     final b = makeBackend?.call() ?? _FakeBackend();
     created.add(b);
     return b;

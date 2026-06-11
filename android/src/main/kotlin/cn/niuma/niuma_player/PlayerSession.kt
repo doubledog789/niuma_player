@@ -35,20 +35,48 @@ import io.flutter.view.TextureRegistry
  * methods aren't safe to invoke before the subclass's own initializers run.
  */
 internal abstract class PlayerSession(
-    textureRegistry: TextureRegistry,
+    textureRegistry: TextureRegistry?,
     messenger: BinaryMessenger,
     protected val context: Context,
-    private val dataSource: Map<String, Any?>
+    private val dataSource: Map<String, Any?>,
+    private val platformViewInstanceId: Long? = null,
 ) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
-    protected val entry: TextureRegistry.SurfaceTextureEntry =
-        textureRegistry.createSurfaceTexture()
-    protected val surface: Surface = Surface(entry.surfaceTexture())
+    /// Two rendering modes:
+    ///  - **Texture (legacy)**: `textureRegistry` is non-null,
+    ///    `platformViewInstanceId` is null. We own a `SurfaceTextureEntry`
+    ///    whose id is exposed as [textureId] and used to construct method/event
+    ///    channels. `surface` is wired synchronously in `init`.
+    ///  - **PlatformView (high quality)**: `textureRegistry` is null,
+    ///    `platformViewInstanceId` is non-null and supplied by the plugin.
+    ///    `surface` is `null` until [PlayerSurfaceView] receives
+    ///    `surfaceCreated` and calls [setSurface]; the session caches `bringUp`
+    ///    until then. Method/event channels are keyed by `platformViewInstanceId`.
+    protected val entry: TextureRegistry.SurfaceTextureEntry? =
+        textureRegistry?.createSurfaceTexture()
+
+    private val instanceId: Long = entry?.id() ?: platformViewInstanceId
+        ?: throw IllegalArgumentException(
+            "PlayerSession needs either a TextureRegistry (texture mode) " +
+            "or a platformViewInstanceId (platform-view mode)"
+        )
+
+    /// In texture mode, eagerly wired from `entry.surfaceTexture()`. In
+    /// platform-view mode, set later by [setSurface] when the SurfaceView's
+    /// `surfaceCreated` fires.
+    @Volatile
+    private var _surface: Surface? = entry?.surfaceTexture()?.let { Surface(it) }
+
+    /// Set true by [bringUp] when invoked before `_surface` is ready (platform-
+    /// view mode). [setSurface] consults it to know whether to run the deferred
+    /// `bindUnderlyingSurface + applyDataSource + startPrepare` sequence.
+    @Volatile
+    private var bringUpAwaitingSurface: Boolean = false
 
     private val methodChannel: MethodChannel =
-        MethodChannel(messenger, "cn.niuma/player/${entry.id()}")
+        MethodChannel(messenger, "cn.niuma/player/$instanceId")
     private val eventChannel: EventChannel =
-        EventChannel(messenger, "cn.niuma/player/events/${entry.id()}")
+        EventChannel(messenger, "cn.niuma/player/events/$instanceId")
 
     protected val mainHandler = Handler(Looper.getMainLooper())
 
@@ -56,7 +84,8 @@ internal abstract class PlayerSession(
     private var eventSink: EventChannel.EventSink? = null
 
     @Volatile
-    protected var released: Boolean = false
+    var released: Boolean = false
+        protected set
 
     /// Mirrors the Dart-side `setLooping` flag. We consult it ourselves
     /// inside [notifyCompletion] instead of forwarding to a native looping
@@ -143,7 +172,12 @@ internal abstract class PlayerSession(
         bufferedMs = ms.coerceAtLeast(0L)
     }
 
-    val textureId: Long get() = entry.id()
+    /// In texture mode this is the Flutter texture id (consumed by
+    /// `Texture(textureId: ...)` widget). In platform-view mode this is the
+    /// session's identity used by [PlayerSurfaceViewFactory] to look up the
+    /// session when its [AndroidView] is constructed. Plugin uses it as the
+    /// key in the global `players` map either way.
+    val textureId: Long get() = instanceId
 
     init {
         methodChannel.setMethodCallHandler(this)
@@ -153,13 +187,86 @@ internal abstract class PlayerSession(
     /// Subclass calls this from its `init {}` block AFTER constructing the
     /// underlying native player and any subclass-specific state. Performs
     /// configure → listeners → surface → data source → prepare.
+    ///
+    /// In platform-view mode, `_surface` may not be ready yet (Android won't
+    /// create the SurfaceView's Surface until composition). In that case we
+    /// run the surface-agnostic parts (configure + listeners) immediately and
+    /// defer the rest until [setSurface] fires.
     protected fun bringUp() {
         configurePlayerOptions()
         attachUnderlyingListeners()
-        bindUnderlyingSurface(surface)
+        val s = _surface
+        if (s == null) {
+            // Platform-view mode, waiting for surfaceCreated.
+            bringUpAwaitingSurface = true
+            phase = PHASE_OPENING
+            emitState()
+            return
+        }
+        bringUpWithSurface(s)
+    }
+
+    private fun bringUpWithSurface(s: Surface) {
+        bindUnderlyingSurface(s)
         applyUnderlyingDataSource(dataSource)
         phase = PHASE_OPENING
         startUnderlyingPrepare()
+        emitState()
+    }
+
+    // ── Platform-view surface stack ──────────────────────────────────────
+    // A single session can momentarily have MULTIPLE PlayerSurfaceViews alive:
+    // pushing a fullscreen route keeps the inline AndroidView mounted while a
+    // second AndroidView (same instanceId) is created in the fullscreen route.
+    // Whichever SurfaceView's surface was created LAST owns the binding; when
+    // it is destroyed (route popped) we must FALL BACK to the previous
+    // still-alive surface — otherwise the underlying player keeps rendering
+    // into a dead Surface and MediaCodec errors out (observed on OPPO
+    // Android 16: exit-fullscreen → codec error → phase=error).
+    //
+    // Owner identity is the PlayerSurfaceView instance; surfaces are kept in
+    // push order, latest = active.
+    private val surfaceStack = mutableListOf<Pair<Any, Surface>>()
+
+    /// Called by [PlayerSurfaceView] from `SurfaceHolder.surfaceCreated`. In
+    /// platform-view mode this is what kicks the deferred prepare flow; later
+    /// pushes (e.g. a fullscreen route's second SurfaceView) re-bind the
+    /// underlying player to the newest surface.
+    fun pushSurface(owner: Any, surface: Surface) {
+        if (released) return
+        surfaceStack.removeAll { it.first === owner }
+        surfaceStack.add(owner to surface)
+        _surface = surface
+        if (bringUpAwaitingSurface) {
+            bringUpAwaitingSurface = false
+            bringUpWithSurface(surface)
+        } else {
+            // Underlying player already prepared (fullscreen push / Surface
+            // recreated mid-playback). ExoPlayer / IJK both accept setSurface
+            // mid-flight idempotently.
+            try { bindUnderlyingSurface(surface) } catch (_: Throwable) {}
+        }
+    }
+
+    /// Called by [PlayerSurfaceView] from `surfaceDestroyed` / `dispose`. If
+    /// the destroyed surface owned the binding, fall back to the most recent
+    /// still-alive surface (e.g. the inline view after a fullscreen route is
+    /// popped). With no survivor, detach the output surface entirely so the
+    /// underlying player doesn't render into a dead Surface.
+    fun popSurface(owner: Any) {
+        if (released) return
+        val wasActive = surfaceStack.lastOrNull()?.first === owner
+        surfaceStack.removeAll { it.first === owner }
+        if (!wasActive) return
+        val prev = surfaceStack.lastOrNull()?.second
+        _surface = prev
+        try {
+            if (prev != null) {
+                bindUnderlyingSurface(prev)
+            } else {
+                clearUnderlyingSurface()
+            }
+        } catch (_: Throwable) {}
     }
 
     // ── Subclass hooks ────────────────────────────────────────────────────
@@ -174,6 +281,12 @@ internal abstract class PlayerSession(
 
     /// Bind the Flutter [Surface] to the underlying player.
     protected abstract fun bindUnderlyingSurface(surface: Surface)
+
+    /// Detach the output surface from the underlying player（platform-view
+    /// 模式下所有 SurfaceView 都没了时调，防止继续渲染到 dead Surface）。
+    /// 默认 no-op；子类按各自 API 实现（Exo `setVideoSurface(null)`、IJK
+    /// `setSurface(null)`）。
+    protected open fun clearUnderlyingSurface() {}
 
     /// Set the data source on the underlying player.
     protected abstract fun applyUnderlyingDataSource(dataSource: Map<String, Any?>)
@@ -433,8 +546,12 @@ internal abstract class PlayerSession(
         released = true
         stopHeartbeat()
         try { underlyingRelease() } catch (_: Throwable) {}
-        surface.release()
-        entry.release()
+        // Only release Surface in texture mode (we own it: Surface(entry.surfaceTexture())).
+        // In platform-view mode the Surface comes from the SurfaceView's
+        // SurfaceHolder; releasing it would crash the host SurfaceView.
+        if (entry != null) _surface?.release()
+        _surface = null
+        entry?.release()
         eventChannel.setStreamHandler(null)
         methodChannel.setMethodCallHandler(null)
         eventSink = null

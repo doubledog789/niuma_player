@@ -80,6 +80,9 @@ class _StandardPlayerPageState extends State<StandardPlayerPage> {
       NiumaDataSource.network(
         'https://artplayer.org/assets/sample/bbb-video.mp4',
       ),
+      // 真机回归 PlatformView（SurfaceView 原生渲染）路径用——验证画质 /
+      // 控件叠层 / 首帧 / 路由切换。验证完按需保留或撤掉。
+      options: const NiumaPlayerOptions(useAndroidPlatformView: true),
     );
     // 等 initialize 完成再 play —— 直接 ..initialize() 后立刻 play() 会在
     // 后端就绪前调用,自动播放不生效（竞态）。

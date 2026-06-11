@@ -220,7 +220,7 @@ class FakeBackendFactory implements BackendFactory {
   }
 
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) {
+  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) {
     lastSourceFromMiddleware = ds;
     final b = makeNative(ds, forceIjk);
     nativePlayers.add(b);

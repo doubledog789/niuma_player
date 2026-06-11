@@ -25,7 +25,11 @@ const MethodChannel _globalChannel = MethodChannel('cn.niuma/player');
 ///   - `cn.niuma/player/<textureId>`           （每个实例：play/pause/...）
 ///   - `cn.niuma/player/events/<textureId>`    （每个实例的状态流）
 class NativeBackend extends PlayerBackend {
-  NativeBackend(this._dataSource, {this.forceIjk = false});
+  NativeBackend(
+    this._dataSource, {
+    this.forceIjk = false,
+    this.useAndroidPlatformView = false,
+  });
 
   final NiumaDataSource _dataSource;
 
@@ -33,7 +37,16 @@ class NativeBackend extends PlayerBackend {
   /// Dart 侧 controller 在 Exo 失败后的重试中会传 true。
   final bool forceIjk;
 
+  /// 为 true 时 native 侧不分配 SurfaceTexture，改走 PlatformView
+  /// （`SurfaceView`）渲染路径。见
+  /// `NiumaPlayerOptions.useAndroidPlatformView`。
+  final bool useAndroidPlatformView;
+
   int? _textureId;
+  bool _isPlatformView = false;
+
+  @override
+  int? get androidPlatformViewId => _isPlatformView ? _textureId : null;
   String? _fingerprint;
 
   /// native 侧本次会话实际实例化的变体（`"exo"` 或 `"ijk"`）。
@@ -105,6 +118,7 @@ class NativeBackend extends PlayerBackend {
         'uri': _dataSource.uri,
         'type': _dataSource.type.name,
         'forceIjk': forceIjk,
+        'useAndroidPlatformView': useAndroidPlatformView,
         if (_dataSource.headers != null) 'headers': _dataSource.headers,
       },
     );
@@ -125,6 +139,7 @@ class NativeBackend extends PlayerBackend {
     _fingerprint = result['fingerprint'] as String?;
     _selectedVariant = result['selectedVariant'] as String?;
     _fromMemory = result['fromMemory'] == true;
+    _isPlatformView = result['isPlatformView'] == true;
 
     _instanceChannel = MethodChannel('cn.niuma/player/$tid');
     _eventChannel = EventChannel('cn.niuma/player/events/$tid');

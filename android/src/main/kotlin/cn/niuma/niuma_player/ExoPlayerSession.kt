@@ -26,16 +26,17 @@ import io.flutter.view.TextureRegistry
  * native takes over selection from Dart.
  */
 internal class ExoPlayerSession(
-    textureRegistry: TextureRegistry,
+    textureRegistry: TextureRegistry?,
     messenger: BinaryMessenger,
     context: Context,
     dataSource: Map<String, Any?>,
+    platformViewInstanceId: Long? = null,
     /// Invoked when [PlaybackException] surfaces with a `codecUnsupported`
     /// category before [hadFirstFrame] is set. The plugin uses this to
     /// persist "this device needs IJK" so the next create call routes to
     /// IjkSession directly without paying the Exo prepare cost again.
     private val onCodecFailureBeforeFirstFrame: () -> Unit = {},
-) : PlayerSession(textureRegistry, messenger, context, dataSource) {
+) : PlayerSession(textureRegistry, messenger, context, dataSource, platformViewInstanceId) {
 
     private val player: ExoPlayer = buildPlayer(context, dataSource)
 
@@ -140,6 +141,10 @@ internal class ExoPlayerSession(
                 notifyVideoSize(size.width, size.height)
             }
         })
+    }
+
+    override fun clearUnderlyingSurface() {
+        player.setVideoSurface(null)
     }
 
     override fun bindUnderlyingSurface(surface: Surface) {

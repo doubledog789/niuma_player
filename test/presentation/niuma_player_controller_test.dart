@@ -124,7 +124,7 @@ class _PipFakeFactory implements BackendFactory {
   @override
   PlayerBackend createVideoPlayer(NiumaDataSource ds) => backend;
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) =>
+  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) =>
       backend;
 }
 

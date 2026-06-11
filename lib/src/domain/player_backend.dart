@@ -30,6 +30,12 @@ abstract class PlayerBackend {
   /// video_player 用自己的 widget）则为 null。
   int? get textureId;
 
+  /// Android PlatformView 模式下的 session instance id（注册到
+  /// `AndroidView` 的 `creationParams` 里供 native factory 查 session）。
+  /// 默认 null——只有 Android Native backend 在 `useAndroidPlatformView`
+  /// 时返非 null。`NiumaPlayerView` 检测到非 null 时用 `AndroidView` 渲染。
+  int? get androidPlatformViewId => null;
+
   /// Web-only：HtmlElementView 注册的 viewType。io 平台 / 非 web backend
   /// 返 null（默认实现）。`NiumaPlayerView` 检测到非 null 时用
   /// `HtmlElementView(viewType)` 渲染——backend 内部用

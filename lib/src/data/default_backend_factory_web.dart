@@ -19,6 +19,10 @@ class DefaultBackendFactory implements BackendFactory {
   /// [WebVideoBackend] 兜底（实际 controller 选择路径在 web 永远走
   /// `createVideoPlayer`，这条不会被调，但保接口完整性）。
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) =>
+  PlayerBackend createNative(
+    NiumaDataSource ds, {
+    required bool forceIjk,
+    bool useAndroidPlatformView = false,
+  }) =>
       WebVideoBackend(ds);
 }

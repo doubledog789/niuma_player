@@ -16,11 +16,12 @@ import tv.danmaku.ijk.media.player.IjkMediaPlayer
  * ExoPlayer fast path but crash-free on Huawei / low-end MTK SoCs etc.
  */
 internal class IjkSession(
-    textureRegistry: TextureRegistry,
+    textureRegistry: TextureRegistry?,
     messenger: BinaryMessenger,
     context: Context,
-    dataSource: Map<String, Any?>
-) : PlayerSession(textureRegistry, messenger, context, dataSource) {
+    dataSource: Map<String, Any?>,
+    platformViewInstanceId: Long? = null,
+) : PlayerSession(textureRegistry, messenger, context, dataSource, platformViewInstanceId) {
 
     private val player: IjkMediaPlayer = IjkMediaPlayer()
 
@@ -172,6 +173,10 @@ internal class IjkSession(
         player.setOnVideoSizeChangedListener { _, w, h, _, _ ->
             notifyVideoSize(w, h)
         }
+    }
+
+    override fun clearUnderlyingSurface() {
+        player.setSurface(null)
     }
 
     override fun bindUnderlyingSurface(surface: Surface) {

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show StandardMessageCodec;
 import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 
@@ -87,6 +88,22 @@ class NiumaPlayerView extends StatelessWidget {
           // iOS 路径：VideoPlayer widget 内部走 AVPlayer 原生 scaling，无需上层
           // 控制 filterQuality（且本版 video_player 也未暴露该参数）。
           child = VideoPlayer(backend.innerController);
+        } else if (backend != null &&
+            backend.androidPlatformViewId != null) {
+          // Android PlatformView 路径（NiumaPlayerOptions.useAndroidPlatformView
+          // = true）：让 SurfaceView 原生缩放，不吃 Texture 每帧 filterQuality
+          // 开销，画质上限更高。Hybrid Composition 模式让 Flutter widget 仍可
+          // 叠层（loading / 控件浮在 video 上）。
+          //
+          // 创建参数 `instanceId` 让 native PlayerSurfaceViewFactory 找到对应
+          // 的 PlayerSession。
+          child = AndroidView(
+            viewType: 'cn.niuma/player_surface',
+            creationParams: <String, dynamic>{
+              'instanceId': backend.androidPlatformViewId,
+            },
+            creationParamsCodec: const StandardMessageCodec(),
+          );
         } else if (backend != null &&
             backend.kind == PlayerBackendKind.native &&
             controller.textureId != null) {

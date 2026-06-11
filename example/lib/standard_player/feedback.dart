@@ -54,23 +54,28 @@ class ErrorLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: Colors.black54,
+      // 错误信息可能很长（codec 报错带完整原生堆栈），小尺寸播放区里 Column
+      // 会竖向溢出——SingleChildScrollView 兜住任意长度。
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 40),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 40),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
-          ],
+              const SizedBox(height: 12),
+              FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
+            ],
+          ),
         ),
       ),
     );

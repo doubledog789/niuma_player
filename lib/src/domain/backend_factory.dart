@@ -12,5 +12,13 @@ abstract class BackendFactory {
   /// 构造一个 niuma_player native 会话（仅 Android）。[forceIjk] 为
   /// true 时要求 native 侧直接用 IJK，不先尝试 ExoPlayer；否则 native
   /// 自查 `DeviceMemoryStore` 并落到 ExoPlayer。
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk});
+  ///
+  /// [useAndroidPlatformView] 为 true 时 native 侧不分配 SurfaceTexture，
+  /// 改走 PlatformView（`SurfaceView`）路径——见
+  /// `NiumaPlayerOptions.useAndroidPlatformView`。
+  PlayerBackend createNative(
+    NiumaDataSource ds, {
+    required bool forceIjk,
+    bool useAndroidPlatformView = false,
+  });
 }

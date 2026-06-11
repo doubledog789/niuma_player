@@ -12,6 +12,12 @@ class DefaultBackendFactory implements BackendFactory {
   PlayerBackend createVideoPlayer(NiumaDataSource ds) => VideoPlayerBackend(ds);
 
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk}) =>
-      NativeBackend(ds, forceIjk: forceIjk);
+  PlayerBackend createNative(
+    NiumaDataSource ds, {
+    required bool forceIjk,
+    bool useAndroidPlatformView = false,
+  }) =>
+      NativeBackend(ds,
+          forceIjk: forceIjk,
+          useAndroidPlatformView: useAndroidPlatformView);
 }
