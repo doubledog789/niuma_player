@@ -52,6 +52,12 @@ import UIKit
                 .first
             slider?.value = Float(max(0, min(1, value)))
             result(true)
+        case "setKeepScreenOn":
+            // 播放中防自动锁屏：isIdleTimerDisabled。app 退后台时该 flag
+            // 不阻止系统锁屏，无副作用。
+            let on = (call.arguments as? [String: Any])?["on"] as? Bool ?? false
+            UIApplication.shared.isIdleTimerDisabled = on
+            result(true)
         default:
             result(FlutterMethodNotImplemented)
         }

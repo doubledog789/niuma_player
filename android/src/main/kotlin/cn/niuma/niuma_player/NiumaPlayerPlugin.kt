@@ -117,6 +117,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 handleSetBrightness(call, result)
                 return
             }
+            "setKeepScreenOn" -> {
+                handleSetKeepScreenOn(call, result)
+                return
+            }
             "getSystemVolume" -> {
                 handleGetSystemVolume(result)
                 return
@@ -613,6 +617,27 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         val lp = activity.window.attributes
         lp.screenBrightness = value.toFloat()
         activity.window.attributes = lp
+        result.success(true)
+    }
+
+    /// 播放中保持屏幕常亮（FLAG_KEEP_SCREEN_ON）。窗口级 flag，无需权限；
+    /// app 退后台时系统自动忽略，不会真正阻止熄屏待机。
+    private fun handleSetKeepScreenOn(call: MethodCall, result: Result) {
+        val activity = activityBinding?.activity
+        if (activity == null) {
+            result.success(false)
+            return
+        }
+        val on = call.argument<Boolean>("on") ?: false
+        if (on) {
+            activity.window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        } else {
+            activity.window.clearFlags(
+                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        }
         result.success(true)
     }
 

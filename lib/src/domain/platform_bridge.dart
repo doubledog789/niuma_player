@@ -21,4 +21,13 @@ abstract class PlatformBridge {
   ///
   /// iOS / Web 没有等价概念，返回合理默认值。
   Future<int> processHeapLimitMb();
+
+  /// 保持 / 释放「屏幕常亮」（wakelock），防播放中自动熄屏。
+  ///
+  /// Android 走 Activity window 的 `FLAG_KEEP_SCREEN_ON`，iOS 走
+  /// `UIApplication.isIdleTimerDisabled`，web no-op（浏览器播 `<video>`
+  /// 有声时自身防熄屏）。[NiumaPlayerController] 在 playing 边沿自动调用
+  /// （见 `NiumaPlayerOptions.manageScreenWakelock`），多实例以进程级计数
+  /// 归并——业务方一般无需手动调用。
+  Future<void> setKeepScreenOn(bool on);
 }

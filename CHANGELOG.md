@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-06-12
+
+### Added
+
+- **播放中自动保持屏幕常亮（wakelock）**：修复「播到一半自动熄屏」。
+  `NiumaPlayerController` 在 playing 边沿自动保持 / 释放亮屏（暂停、结束、
+  出错、dispose 都会释放），多实例（feed / 池）以进程级计数归并——任一在播
+  即亮屏，全部停了才释放。Android 走 `FLAG_KEEP_SCREEN_ON`（窗口级、无需
+  权限、退后台自动失效），iOS 走 `isIdleTimerDisabled`，web 无操作（浏览器
+  播 `<video>` 自身防熄屏）。
+  - 新增 `NiumaPlayerOptions.manageScreenWakelock`（默认 `true`；音频类
+    业务想允许熄屏可置 `false`）
+  - `PlatformBridge` 接口新增 `setKeepScreenOn(bool)`——**自定义
+    `PlatformBridge` 实现方需补该方法**（0.x 下随 minor 发布）
+
 ## [0.3.0] - 2026-06-12
 
 ### Added

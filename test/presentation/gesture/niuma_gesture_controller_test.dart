@@ -93,6 +93,8 @@ class _NoopBridge implements PlatformBridge {
   Future<String> deviceFingerprint() async => 'test';
   @override
   Future<int> processHeapLimitMb() async => 256;
+  @override
+  Future<void> setKeepScreenOn(bool on) async {}
 }
 
 void main() {

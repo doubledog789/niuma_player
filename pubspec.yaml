@@ -2,7 +2,7 @@ name: niuma_player
 description: >-
   Flutter video player SDK with unified API across iOS / Android / Web, plus
   automatic ExoPlayer to IJK fallback on Android.
-version: 0.3.0
+version: 0.3.1
 homepage: https://github.com/axin789/niuma_player
 repository: https://github.com/axin789/niuma_player
 issue_tracker: https://github.com/axin789/niuma_player/issues

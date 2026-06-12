@@ -250,6 +250,14 @@ class FakePlatformBridge implements PlatformBridge {
 
   @override
   Future<int> processHeapLimitMb() async => 256;
+
+  /// 记录 setKeepScreenOn 调用序列，供 wakelock 边沿断言。
+  final List<bool> keepScreenOnCalls = <bool>[];
+
+  @override
+  Future<void> setKeepScreenOn(bool on) async {
+    keepScreenOnCalls.add(on);
+  }
 }
 
 void main() {

@@ -20,6 +20,10 @@ import 'package:niuma_player/src/cast/cast_session.dart';
 import 'package:niuma_player/src/cast/cast_state.dart';
 import 'package:niuma_player/src/player/pip_lifecycle_observer.dart';
 
+/// 进程级「正在播放且要求亮屏的 controller 数」。>0 时屏幕保持常亮，
+/// 归并多实例（feed / 池 / 多页面），见 `_syncWakelock`。
+int _wakelockHolderCount = 0;
+
 /// 调整 [NiumaPlayerController] 行为的选项。所有字段都有合理默认值，
 /// 大多数调用方无需触碰。
 @immutable
@@ -31,6 +35,7 @@ class NiumaPlayerOptions {
     this.rollbackOnSwitchFailure = true,
     this.autoFailoverOnInitialError = true,
     this.useAndroidPlatformView = false,
+    this.manageScreenWakelock = true,
   });
 
   /// 若底层 backend 在该窗口内还没到 "initialized"，视作失败，
@@ -67,6 +72,15 @@ class NiumaPlayerOptions {
   /// 推荐先在 staging 真机回归各厂商（小米 / 华为 / OPPO / Vivo / 三星）
   /// 再切给生产。
   final bool useAndroidPlatformView;
+
+  /// 播放中自动保持屏幕常亮（wakelock），暂停 / 结束 / 出错 / dispose 时
+  /// 自动释放。多 controller（feed / 池）以进程级计数归并：任一实例在播
+  /// 即亮屏，全部停了才释放。
+  ///
+  /// 默认 `true`。业务想自己管亮屏策略（比如音频场景允许熄屏）置 `false`。
+  /// Android 走 `FLAG_KEEP_SCREEN_ON`，iOS 走 `isIdleTimerDisabled`，web
+  /// 无操作（浏览器自身防熄屏）。
+  final bool manageScreenWakelock;
 
   /// **⚠️ App Store 不兼容**——启用后 host app **无法过 App Store 审核**。
   /// 仅适合 Ad Hoc / Enterprise / 越狱设备等内部分发场景。
@@ -475,6 +489,29 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   /// 重复发 method channel 调用，只在 playing↔paused 边沿同步。
   bool? _lastPipActionsIsPlaying;
 
+  /// 本实例当前是否计入进程级 wakelock 计数（见 [_syncWakelock]）。
+  bool _holdsWakelock = false;
+
+  /// playing 边沿同步屏幕常亮：任一 controller 在播 → 保持亮屏；全部停了
+  /// → 释放。进程级计数（[_wakelockHolderCount]）归并多实例（feed / 池 /
+  /// 多页面），避免「A 在播、B 暂停时把 A 的亮屏关掉」。
+  void _syncWakelock(bool playing) {
+    if (!options.manageScreenWakelock) return;
+    if (playing == _holdsWakelock) return;
+    _holdsWakelock = playing;
+    if (playing) {
+      _wakelockHolderCount++;
+      if (_wakelockHolderCount == 1) {
+        unawaited(_platform.setKeepScreenOn(true));
+      }
+    } else {
+      _wakelockHolderCount--;
+      if (_wakelockHolderCount == 0) {
+        unawaited(_platform.setKeepScreenOn(false));
+      }
+    }
+  }
+
   @override
   set value(NiumaPlayerValue newValue) {
     final wasPlaying = value.isPlaying;
@@ -482,6 +519,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     super.value = newValue;
     final inPip = newValue.isInPictureInPicture;
     final isPlaying = newValue.isPlaying;
+    if (isPlaying != wasPlaying) _syncWakelock(isPlaying);
     if (!wasInPip && inPip) {
       // 刚乐观 set isInPictureInPicture=true（[enterPictureInPicture] 内）——
       // 此时 Activity 还没真的进 PiP，紧接着 native enterPictureInPictureMode
@@ -903,6 +941,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    // 仍在播时直接销毁（feed 滑走等）也要退出亮屏计数，不留泄漏。
+    _syncWakelock(false);
     if (_pipObserver != null) {
       WidgetsBinding.instance.removeObserver(_pipObserver!);
       _pipObserver = null;
