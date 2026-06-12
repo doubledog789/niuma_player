@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-12
+
+### Added
+
+- **Android PlatformView（SurfaceView）渲染路径（opt-in）**：
+  `NiumaPlayerOptions.useAndroidPlatformView = true` 时，Android 视频改由
+  PlatformView（SurfaceView **原生缩放**）渲染，替代 Flutter Texture——从根
+  上解决 Texture 路径的画质模糊，且不吃 `filterQuality` 的每帧采样开销。
+  默认 `false`（行为与 0.2.x 完全一致），iOS / web 忽略此选项。
+  - 原生侧新增 `PlayerSurfaceView` / `PlayerSurfaceViewFactory`（viewType
+    `cn.niuma/player_surface`）；`NiumaPlayerView` 自动按 backend 选
+    `AndroidView` 渲染分支
+  - **surface 栈**：全屏路由 push 时第二个 SurfaceView 抢绑定、销毁时自动
+    回退绑定到 inline 仍存活的 surface——退全屏不再输出到 dead Surface
+    导致 codec 报错（OPPO Android 16 真机验证）
+  - **prepare 不等 surface**：ExoPlayer / IJK 无 surface 即可 prepare
+    （音频与状态机照常推进），surface 何时到画面何时出——feed 类
+    「initialize → play → 才渲染激活页」的 mount 顺序不会死锁
+  - 接入建议：详情页 / 单播放器开启收益最大；feed 每滑一条重建
+    SurfaceView 有黑闪，建议维持默认 Texture。`NiumaPlayerView` 外请保持
+    松约束（如包 `Center`），全屏路由建议快淡/瞬切（参考 example）
+- `PlayerBackend.androidPlatformViewId` getter（默认 `null`）。
+
+### Changed
+
+- **`BackendFactory.createNative` 增加 `useAndroidPlatformView` 可选参数**——
+  自定义 `BackendFactory` 实现方需同步该签名（0.x 下随 minor 发布）。
+
 ## [0.2.3] - 2026-06-07
 
 ### Changed
