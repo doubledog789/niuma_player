@@ -74,11 +74,17 @@ internal class IjkSession(
         // produce a visible catch-up burst.
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 50)
 
-        // Don't drop frames. framedrop>0 compounds with the pre-decode
-        // catch-up problem on slow devices (Redmi 9A class) and looks jerky
-        // without actually helping sustained sync — audio master clock
-        // handles sync on its own.
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 0)
+        // Drop late frames to stay in A/V sync. The audio master clock only
+        // sets the *target* timeline; on devices that can't software-decode in
+        // real time (Redmi 9A class, high-bitrate/4K, or under 2x/3x speed),
+        // framedrop is the ONLY mechanism that lets the lagging video catch up
+        // to that target. framedrop=0 → video drifts progressively behind audio
+        // (lips out of sync, worse the longer you watch). framedrop=1 → an
+        // occasional skipped frame when decoding can't keep up, but playback
+        // stays synced. Sync beats smoothness for drama/movie content. The
+        // earlier min-frames=50 cap already tames the tap-to-play catch-up
+        // burst, so framedrop no longer compounds it.
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1)
 
         // Shorter demuxer probe: we only target mp4 / m3u8 in this build so
         // FFmpeg doesn't need to scan megabytes of source to figure out the

@@ -56,6 +56,14 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         const val PIP_METHOD_CHANNEL = "niuma_player/pip"
         const val TAG = "NiumaPlayerPlugin"
 
+        /// codec-fail-before-first-frame 记忆的有效期（ms）。过去写
+        /// [DeviceMemoryStore.NO_EXPIRY]（永久），导致一次坏 codec 就把整机所有
+        /// 视频永久钉死走 IJK 软解——哪怕那只是单条视频/单次 codec 抽风。改成 7 天
+        /// TTL：仍能让近期重试直接走 IJK（避免反复撞同一个坏 codec），但到期后
+        /// 自动回 ExoPlayer 硬解重试，能硬解的视频回到硬解路径（更清晰、不发热、
+        /// 不音画失步）。Dart 侧到期判定与清理已就绪（device_memory.dart）。
+        const val CODEC_FAIL_MEMORY_TTL_MS: Long = 7L * 24 * 60 * 60 * 1000
+
         /// EventSink 静态字段——PipBroadcastReceiver 静态访问，
         /// host Activity 的 onPictureInPictureModeChanged 也通过这个推。
         @JvmStatic
@@ -437,7 +445,12 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 ExoPlayerSession(
                     sessionRegistry, msg, ctx, dataSource, pvInstanceId,
                     onCodecFailureBeforeFirstFrame = {
-                        deviceMemory?.set(fingerprint, DeviceMemoryStore.NO_EXPIRY)
+                        // 7 天 TTL 而非永久：近期重试直接走 IJK 避免反复撞坏 codec，
+                        // 到期后回 ExoPlayer 硬解重试（见 CODEC_FAIL_MEMORY_TTL_MS）。
+                        deviceMemory?.set(
+                            fingerprint,
+                            System.currentTimeMillis() + CODEC_FAIL_MEMORY_TTL_MS,
+                        )
                     },
                 )
             }

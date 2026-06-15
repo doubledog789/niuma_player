@@ -9,6 +9,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import io.flutter.plugin.common.BinaryMessenger
@@ -65,7 +66,12 @@ internal class ExoPlayerSession(
         }
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpFactory)
-        return ExoPlayer.Builder(context)
+        // 开启解码器回退：硬解 codec 初始化/查询失败时，ExoPlayer 在**同一会话内**
+        // 自动尝试下一个（含软件）解码器，而不是直接抛 PlaybackException 让 Dart
+        // 绕一圈重试 → IJK（用户会先看到一下错误闪）。覆盖更多边缘 codec 机型。
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setEnableDecoderFallback(true)
+        return ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .build()
     }

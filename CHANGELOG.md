@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-06-14
+
+### Fixed
+
+- **Android IJK 软解音画失步**：`framedrop` 由 `0` 改为 `1`。被钉死走 IJK 软解
+  的机型上，高码率 / 高帧率 / 倍速视频解不过实时，`framedrop=0` 让落后的视频
+  帧一帧不丢 → 相对音频主钟渐进失步（画面比声音慢、对不上嘴，越看越脱节）。
+  改为允许丢晚帧让视频追上音频主钟（解不动时偶尔跳帧，但保持同步）。
+- **Android ExoPlayer 开启解码器回退**：`DefaultRenderersFactory
+  .setEnableDecoderFallback(true)`。硬解 codec 初始化失败时同会话内自动尝试
+  下一个（含软件）解码器，而非直接抛错绕 Dart 重试 → IJK（少一次错误闪）。
+
+### Changed
+
+- **codec 失败记忆 `NO_EXPIRY` → 7 天 TTL**：此前首帧前硬解 codec 失败会把该
+  设备**永久**钉死走 IJK 软解（哪怕只是单条视频 / 单次 codec 抽风），导致本可
+  硬解的视频长期走软解（卡 / 发热 / 音画失步）。改为 7 天有效期：近期重试仍直
+  接走 IJK 避免反复撞坏 codec，到期后回 ExoPlayer 硬解重试。读取判定与到期清理
+  Dart 侧早已就绪。
+
 ## [0.3.1] - 2026-06-12
 
 ### Added
