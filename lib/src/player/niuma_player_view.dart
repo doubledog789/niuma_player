@@ -1,5 +1,8 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/services.dart' show StandardMessageCodec;
+import 'package:flutter/foundation.dart' show Factory, kIsWeb;
+import 'package:flutter/gestures.dart' show OneSequenceGestureRecognizer;
+import 'package:flutter/rendering.dart' show PlatformViewHitTestBehavior;
+import 'package:flutter/services.dart'
+    show AndroidViewController, PlatformViewsService, StandardMessageCodec;
 import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 
@@ -92,17 +95,47 @@ class NiumaPlayerView extends StatelessWidget {
             backend.androidPlatformViewId != null) {
           // Android PlatformView 路径（NiumaPlayerOptions.useAndroidPlatformView
           // = true）：让 SurfaceView 原生缩放，不吃 Texture 每帧 filterQuality
-          // 开销，画质上限更高。Hybrid Composition 模式让 Flutter widget 仍可
-          // 叠层（loading / 控件浮在 video 上）。
+          // 开销，画质上限更高。
+          //
+          // **必须用真正的 Hybrid Composition**（PlatformViewLink +
+          // initExpensiveAndroidView），不能用裸 AndroidView。裸 AndroidView 走
+          // TLHC/Virtual Display——靠把原生 view 内容拷进 Flutter 纹理再合成，而
+          // SurfaceView 的像素画在独立 Surface/窗口上，纹理拷贝抓不到 → 合成出来
+          // 是黑的（「有声黑屏」，进/退全屏、锁屏解锁、切后台最易触发；Flutter
+          // #128920 / #172641 / #144219）。HC 把 SurfaceView 插进原生视图层级
+          // 直接渲染，像素真正显示，原生缩放 / HDR 保留，Flutter 控件仍可叠层。
+          //
+          // 关键：用 initExpensiveAndroidView（纯 HC，不回退 VD）。
+          // initAndroidView / initSurfaceAndroidView 在不兼容场景会回退 Virtual
+          // Display（flutter#107313）→ 又黑回去。
           //
           // 创建参数 `instanceId` 让 native PlayerSurfaceViewFactory 找到对应
-          // 的 PlayerSession。
-          child = AndroidView(
+          // 的 PlayerSession。视频面不吃手势，全部透传给上层皮肤。
+          child = PlatformViewLink(
             viewType: 'cn.niuma/player_surface',
-            creationParams: <String, dynamic>{
-              'instanceId': backend.androidPlatformViewId,
+            surfaceFactory: (context, controller) => AndroidViewSurface(
+              controller: controller as AndroidViewController,
+              gestureRecognizers:
+                  const <Factory<OneSequenceGestureRecognizer>>{},
+              hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+            ),
+            onCreatePlatformView: (params) {
+              final controller = PlatformViewsService.initExpensiveAndroidView(
+                id: params.id,
+                viewType: 'cn.niuma/player_surface',
+                layoutDirection: TextDirection.ltr,
+                creationParams: <String, dynamic>{
+                  'instanceId': backend.androidPlatformViewId,
+                },
+                creationParamsCodec: const StandardMessageCodec(),
+                onFocus: () => params.onFocusChanged(true),
+              );
+              controller.addOnPlatformViewCreatedListener(
+                params.onPlatformViewCreated,
+              );
+              controller.create();
+              return controller;
             },
-            creationParamsCodec: const StandardMessageCodec(),
           );
         } else if (backend != null &&
             backend.kind == PlayerBackendKind.native &&

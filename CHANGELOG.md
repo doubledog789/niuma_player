@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-06-16
+
+### Fixed
+
+- **Android PlatformView「有声黑屏」根治**（`useAndroidPlatformView = true`）：
+  渲染从裸 `AndroidView` 改为真正的 **Hybrid Composition**（`PlatformViewLink`
+  + `PlatformViewsService.initExpensiveAndroidView`）。裸 `AndroidView` 走
+  TLHC / Virtual Display——靠把原生 view 拷进 Flutter 纹理再合成，而
+  SurfaceView 的像素画在独立 Surface 上、纹理拷贝抓不到 → 合成出来是黑的
+  （声音/状态机正常但画面全黑，进/退全屏、锁屏解锁、切后台最易触发；
+  flutter#128920 / #172641 / #144219）。HC 把 SurfaceView 插进原生视图层级
+  直接渲染，画面正常显示，原生缩放 / HDR 保留，Flutter 控件仍可叠层。
+  - 用 `initExpensiveAndroidView`（纯 HC，**不回退 VD**），不用
+    `initAndroidView` / `initSurfaceAndroidView`（不兼容场景会回退 Virtual
+    Display 又黑回去，flutter#107313）
+  - Kotlin 侧零改动；surface 栈 / `PlayerSurfaceView` / `PlayerSession` 全部
+    保留（它们管退全屏 codec error，与黑屏正交）
+  - OPPO Android 16 真机验证：进 / 退全屏画面正常
+  - 注：Hybrid Composition 在多实例 + 频繁创建销毁（feed）下开销大于单
+    播放器；feed 等场景如性能吃紧可继续用默认 Texture 路径
+
 ## [0.3.2] - 2026-06-14
 
 ### Fixed
