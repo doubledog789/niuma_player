@@ -48,6 +48,9 @@ export 'package:niuma_player/src/player/niuma_player_view.dart';
 // 运行时资源常量（仅 web 后端 hls.js 路径；UI 资源已移出核）
 export 'src/niuma_sdk_assets.dart' show NiumaSdkAssets;
 
+// 设备媒体能力探测（源协商用，业务据此决定请求何种编码的源）
+export 'src/capabilities/niuma_capabilities.dart' show NiumaCapabilities;
+
 // 编排
 export 'src/orchestration/multi_source.dart'
     show MediaQuality, MediaLine, NiumaMediaSource, MultiSourcePolicy;

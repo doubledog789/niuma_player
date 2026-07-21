@@ -1171,4 +1171,34 @@ void main() {
       expect(e.message, isNull);
     });
   });
+
+  group('R. initialize 失败必须落到 value（phase=error）', () {
+    // 复现:IJK prepare 卡死 → Dart initTimeout 抛 TimeoutException,错误只进
+    // initialize() 的 future;调用方没 catch 时,靠 value 驱动的 UI 永远停在
+    // buffering 无限转圈,无任何失败提示(OPPO 真机实测)。修复后失败必须同步
+    // 打进 value.phase=error,错误层自然显示。
+    test('initialize 抛错后 value.phase 进 error、error 字段有内容', () async {
+      final ds = NiumaDataSource.network('https://example.com/a.mp4');
+      final factory = FakeBackendFactory(
+        makeVideoPlayer: (_) => FakePlayerBackend(
+          kind: PlayerBackendKind.videoPlayer,
+          initBlock: () async => throw TimeoutException('prepare 卡死', const Duration(seconds: 30)),
+        ),
+      );
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        retryPolicy: const RetryPolicy.none(),
+        platform: FakePlatformBridge(isIOS: true),
+        backendFactory: factory,
+      );
+
+      await expectLater(controller.initialize(), throwsA(isA<TimeoutException>()));
+      expect(controller.value.phase, PlayerPhase.error,
+          reason: '失败必须落到 value,UI 错误层才能显示');
+      expect(controller.value.error, isNotNull);
+      expect(controller.value.error!.category, PlayerErrorCategory.network,
+          reason: 'TimeoutException 按现有分类映射到 network');
+      await controller.dispose();
+    });
+  });
 }

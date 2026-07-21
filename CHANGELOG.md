@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-07-21
+
+### Fixed
+
+- **初始化失败「无限转圈、无失败提示」**：`initialize()` 失败（如 IJK
+  prepare 卡死触发 30s `initTimeout`）时，错误此前只经 `initialize()` 返回的
+  future 传播，`value.phase` **从不进入 error 态**——调用方若未 catch future，
+  靠 `value` 驱动的错误层永远收不到失败，用户只见无限 buffering（真机实测）。
+  现失败同步落入 `value`（`phase=error` + `value.error` 按既有规则分类），
+  错误 UI 自然显示，接入方零改动受益。
+
+### Added
+
+- **H.265 / HEVC 全链路支持**：
+  - **新增 `NiumaCapabilities.supportsHevc()`** 能力检测——Android 查
+    `MediaCodecList` 是否存在 `video/hevc` **硬件**解码器（纯软解不算），
+    iOS 恒 `true`（系统级支持），web 走 `MediaSource.isTypeSupported` +
+    `canPlayType` 双探测。典型用途：源协商——业务据此决定向服务端请求
+    H.265 还是 H.264 源（协议字段业务自定，SDK 不自动附加任何请求头）。
+    结果进程内缓存。
+  - **IJK 软解兜底重新支持 HEVC**（撤销 0.2.1 的裁剪）：重编 ijkplayer aar
+    加回 `hevc` decoder / parser / `hevc_mp4toannexb` bsf / `hevc_mediacodec`。
+    此前兜底链对 H.265 是断的——硬解失败切 IJK 后彻底播不了；现在闭环。
+    体积代价：aar 7.37 → 7.67 MB（arm64 `libijkplayer.so` 6.5 → 6.9 MiB）。
+  - 播放侧无需任何配置：流是 h264 还是 h265 由解封装自动识别。
+  - **vendored hls.js 1.5.20 → 1.6.16**：补齐 web（Chrome / Edge 等 MSE
+    浏览器）的 HLS H.265——TS 分片里的 HEVC 是 hls.js 1.6.0 才支持的，
+    1.5.x 下即使浏览器能解也播不了。升级后
+    `NiumaCapabilities.supportsHevc()` 的检测结果与实际播放链路对齐。
+    已回归：h264 TS-HLS（mux 测试流）正常；HEVC fmp4 HLS（bitmovin
+    测试流）Chrome 实测出画。API 面（`isSupported` / `attachMedia` /
+    `loadSource` / `destroy` / `xhrSetup` / `hlsError`）1.6 全兼容。
+
 ## [0.3.3] - 2026-06-16
 
 ### Fixed

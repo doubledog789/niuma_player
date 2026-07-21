@@ -129,6 +129,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 handleSetKeepScreenOn(call, result)
                 return
             }
+            "supportsHevcDecoder" -> {
+                result.success(hasHardwareHevcDecoder())
+                return
+            }
             "getSystemVolume" -> {
                 handleGetSystemVolume(result)
                 return
@@ -631,6 +635,29 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         lp.screenBrightness = value.toFloat()
         activity.window.attributes = lp
         result.success(true)
+    }
+
+    /// 是否存在 video/hevc 的**硬件**解码器（纯软解不算——低端机软解 H.265
+    /// 卡顿，供源协商用的能力检测应只认硬解）。API 29+ 用 isSoftwareOnly；
+    /// 低版本按解码器名前缀识别 Google 软解实现。
+    private fun hasHardwareHevcDecoder(): Boolean {
+        return try {
+            android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+                .codecInfos.any { info ->
+                    !info.isEncoder &&
+                        info.supportedTypes.any {
+                            it.equals("video/hevc", ignoreCase = true)
+                        } &&
+                        if (android.os.Build.VERSION.SDK_INT >= 29) {
+                            !info.isSoftwareOnly
+                        } else {
+                            !info.name.startsWith("OMX.google.") &&
+                                !info.name.startsWith("c2.android.")
+                        }
+                }
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     /// 播放中保持屏幕常亮（FLAG_KEEP_SCREEN_ON）。窗口级 flag，无需权限；

@@ -305,6 +305,19 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         if (_initCompleter == completer) {
           _initCompleter = null;
         }
+        // 失败必须同步落到 value（phase=error）：错误只走 future 一条路时，
+        // 靠 value 驱动的 UI（错误层 / errorBuilder）永远等不到 error 态——
+        // 调用方若没 catch future，用户只会看到无限转圈、无任何失败提示
+        // （实测：IJK prepare 卡死 30s 超时后 UI 仍永远 buffering）。
+        if (!_disposed) {
+          value = value.copyWith(
+            phase: PlayerPhase.error,
+            error: PlayerError(
+              category: _categorize(e),
+              message: e.toString(),
+            ),
+          );
+        }
         if (!completer.isCompleted) completer.completeError(e, st);
       },
     );
