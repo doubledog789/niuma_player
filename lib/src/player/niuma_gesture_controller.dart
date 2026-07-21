@@ -9,23 +9,9 @@ import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/player/niuma_player_controller.dart';
 import 'package:niuma_player/src/player/video_time_format.dart';
 
-/// 视频手势的 **headless 编排器**——把"原始手势几何量 → 播放意图 + HUD 反馈"
-/// 的纯逻辑从 widget 里剥出来，不持有任何 `BuildContext` / widget tree 概念。
-///
-/// widget（参考皮里的 gesture layer）只负责：用 `GestureDetector` 把
-/// double-tap / long-press / pan 的本地坐标 + 容器尺寸透传给本类的对应方法；
-/// HUD 的渲染则监听本类的 [feedback]。
-///
-/// 5 项手势（与原 `NiumaGestureLayer` 行为一致）：
-/// - 双击 → play / pause
-/// - 长按 → 临时 2x 倍速，松手恢复
-/// - 水平 pan → seek（松手才提交）
-/// - 左半屏垂直 pan → 亮度（立即生效，节流 50ms）
-/// - 右半屏垂直 pan → 音量（同上）
-///
-/// HUD 反馈只产出语义 [GestureFeedbackState.hudIcon]（[GestureHudIcon] 枚举），
-/// 不引 material `Icons`、也不绑定任何资源路径——核里零 material、零 UI 资源
-/// 依赖；消费方 HUD widget 把 [GestureHudIcon] 映射到自家 icon 资源即可。
+/// 视频手势的 headless 编排器：把手势几何量映射成播放意图 + HUD 反馈状态，
+/// 不持有任何 widget 概念；接入方透传手势坐标、监听 [feedback] 渲染 HUD。
+/// 手势：双击播放暂停、长按 2x 倍速、水平 pan seek、左/右半屏垂直 pan 亮度/音量。
 class NiumaGestureController {
   /// 构造一个手势编排器，驱动给定 [player]。
   NiumaGestureController(this.player, {this.disabledGestures = const {}});
@@ -39,8 +25,7 @@ class NiumaGestureController {
   final ValueNotifier<GestureFeedbackState?> _feedback =
       ValueNotifier<GestureFeedbackState?>(null);
 
-  /// 当前手势 HUD 状态。null = 无手势进行中。参考皮的 gesture layer
-  /// 监听本值渲染 HUD。
+  /// 当前手势 HUD 状态。null = 无手势进行中。
   ValueListenable<GestureFeedbackState?> get feedback => _feedback;
 
   GestureKind? _lockedKind;
@@ -139,8 +124,8 @@ class NiumaGestureController {
     }
   }
 
-  /// pan 更新 → 首次过阈值时锁定方向（水平 seek / 左亮度 / 右音量），之后按锁定
-  /// 方向更新。[size] 为视频区尺寸（用于左右半屏判定与位移归一）。
+  /// pan 更新 → 首次过阈值时锁定方向（水平 seek / 左亮度 / 右音量），
+  /// 之后按锁定方向更新。[size] 为视频区尺寸。
   Future<void> onPanUpdate(Offset localPosition, Size size) async {
     final dx = localPosition.dx - _panStart.dx;
     final dy = localPosition.dy - _panStart.dy;
@@ -212,7 +197,6 @@ class NiumaGestureController {
         ));
       case GestureKind.doubleTap:
       case GestureKind.longPressSpeed:
-        // pan 不会进这两个 case，吞掉避免 lint
         break;
     }
   }

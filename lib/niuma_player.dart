@@ -1,13 +1,9 @@
 /// `niuma_player` —— **headless 视频播放内核**。
 ///
-/// 本包只导出播放内核：`NiumaPlayerController` + 编排逻辑（多线路 /
-/// retry / source middleware / auto-failover）+ 手势 / 全屏的
-/// **headless controller**。本包不提供播放器控件皮肤，只提供无样式视频渲染面
-/// `NiumaPlayerView`——曾经的整套参考皮（一体化播放器壳、原子控件、控件条、
-/// 全屏页、反馈态、弹幕引擎 + overlay、广告、缩略图取帧、cast 协议、短视频、
-/// 主题）保留在 **git 历史**里，需要时
-/// `git log --all -- 'example/lib/niuma_ui/**'` 捞取，或喂给 AI 当参考。
-/// 接入方用 `NiumaPlayerView` + 监听 `controller.value` 自己拼控件。
+/// 只导出内核：`NiumaPlayerController` + 编排逻辑 + 手势 / 全屏 headless
+/// controller + 无样式渲染面 `NiumaPlayerView`；不含任何控件皮肤，接入方
+/// 监听 `controller.value` 自拼 UI。曾经的参考皮在 git 历史
+/// （`git log --all -- 'example/lib/niuma_ui/**'`）。
 library;
 
 // 内核
@@ -15,7 +11,6 @@ export 'package:niuma_player/src/data/default_backend_factory.dart'
     show DefaultBackendFactory;
 export 'package:niuma_player/src/data/default_platform_bridge.dart'
     show DefaultPlatformBridge;
-export 'package:niuma_player/src/data/device_memory.dart';
 export 'package:niuma_player/src/domain/backend_factory.dart'
     show BackendFactory;
 export 'package:niuma_player/src/domain/data_source.dart';
@@ -28,6 +23,7 @@ export 'src/domain/player_state.dart'
         NiumaPlayerValue,
         PlayerPhase,
         PlayerError,
+        EngineFallbackFailure,
         PlayerErrorCategory,
         NiumaPlayerEvent,
         BackendSelected,
@@ -42,7 +38,8 @@ export 'src/domain/player_state.dart'
         CastEnded,
         CastError;
 export 'src/player/niuma_player_controller.dart'
-    show NiumaPlayerController, NiumaPlayerOptions;
+    show NiumaPlayerController;
+export 'src/player/niuma_player_options.dart' show NiumaPlayerOptions;
 export 'package:niuma_player/src/player/niuma_player_view.dart';
 
 // 运行时资源常量（仅 web 后端 hls.js 路径；UI 资源已移出核）
@@ -93,9 +90,8 @@ export 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
         exitBrowserFullscreen,
         onBrowserFullscreenChange;
 
-// M15 投屏（Cast）抽象层——controller.connectCast / castSession + 事件模型依赖
-// 它，故留核。协议实现（DLNA / AirPlay）+ registry + cast UI 作为可选附加在
-// 参考皮里，接入方自维护。
+// M15 投屏（Cast）值类型——controller.connectCast / 事件模型依赖，故留核；
+// 协议实现 + UI 在参考皮。
 export 'package:niuma_player/src/cast/cast_device.dart' show CastDevice;
 export 'package:niuma_player/src/cast/cast_state.dart'
     show CastConnectionState, CastEndReason;

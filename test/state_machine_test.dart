@@ -4,7 +4,6 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:niuma_player/niuma_player.dart';
 
-import 'helpers/fake_device_memory_channel.dart';
 
 /// Test helper that carries a [PlayerErrorCategory] so [_categorize] in
 /// [NiumaPlayerController] can classify it correctly via duck-typing.
@@ -261,17 +260,9 @@ class FakePlatformBridge implements PlatformBridge {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final ds = NiumaDataSource.network('https://example.com/sample.mp4');
-
-  late FakeDeviceMemoryChannel fakeChannel;
-
-  setUp(() {
-    fakeChannel = FakeDeviceMemoryChannel.install();
-  });
-
-  tearDown(() {
-    fakeChannel.uninstall();
-  });
 
   group('NiumaPlayerController state machine', () {
     test('A. iOS always selects VideoPlayerBackend without touching native',
@@ -466,9 +457,20 @@ void main() {
         backendFactory: factory,
       );
 
-      await expectLater(controller.initialize(), throwsStateError);
+      // 双内核都失败 → 抛组合异常，两段原始错误都可见（修「fallback 错误
+      // 掩盖」：只报 IJK 错会把 Exo 的根因如 HTTP 403 吞掉）。
+      await expectLater(
+        controller.initialize(),
+        throwsA(isA<EngineFallbackFailure>()
+            .having((e) => e.primary.toString(), 'primary', contains('hard failure'))
+            .having((e) => e.fallback.toString(), 'fallback', contains('hard failure'))),
+      );
       // Both attempts ran (default, then forceIjk).
       expect(factory.nativeForceIjkArgs, <bool>[false, true]);
+      // value 也进 error 态且信息带双段
+      expect(controller.value.phase, PlayerPhase.error);
+      expect(controller.value.error!.message, contains('ExoPlayer'));
+      expect(controller.value.error!.message, contains('IJK fallback'));
 
       await controller.dispose();
     });

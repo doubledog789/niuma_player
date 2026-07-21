@@ -7,9 +7,8 @@ class NiumaSdkAssets {
 
   static const String _pkg = 'niuma_player';
 
-  /// Web-only：vendored hls.js（HLS-in-Chrome）的 **HTTP 运行时 URL**——
-  /// 注意不是 `rootBundle` 的 asset key（那个是 `packages/$_pkg/...`），
-  /// 而是 flutter web 构建后 package asset 对外暴露的 `assets/packages/...`
-  /// 路径，供 [WebVideoBackend] 动态注入 `<script src>` 用。
+  /// Web-only：vendored hls.js 的 HTTP 运行时 URL（web 构建后的
+  /// `assets/packages/...` 路径，不是 rootBundle asset key），
+  /// 供 [WebVideoBackend] 动态注入 `<script src>`。
   static const String hlsJsUrl = 'assets/packages/$_pkg/assets/hls/hls.min.js';
 }

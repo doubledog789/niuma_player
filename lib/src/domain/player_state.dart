@@ -6,36 +6,44 @@ import 'package:niuma_player/src/cast/cast_device.dart';
 import 'package:niuma_player/src/cast/cast_state.dart';
 import 'package:niuma_player/src/domain/player_backend.dart';
 
-/// [PlayerError] 的粗粒度分类。app 级代码用它判断是否重试、是否给用户
-/// 提示、是否切到 fallback 线路。取代以前用正则匹配错误字符串的做法。
+/// [PlayerError] 的粗粒度分类，供上层判断是否重试 / 提示 / 切线路。
 enum PlayerErrorCategory {
-  /// 播放中*可能*会自己恢复的小卡顿（单次解码 glitch、已发出若干帧
-  /// 之后的短暂网络停顿）。UI 可以保留播放器，由调用方决定是否重试。
+  /// 可能自愈的小卡顿，调用方自行决定是否重试。
   transient,
 
-  /// 解码器根本无法处理本流的 codec / 容器。
-  /// 如果是格式问题，换解码器（例如 video_player → IJK）也救不了；
-  /// 但换*线路*（转码后的另一条线路）有可能。
+  /// 解码器无法处理本流的 codec / 容器——换解码器救不了，换线路有可能。
   codecUnsupported,
 
-  /// 网络或 I/O 失败——DNS、TCP、TLS、HTTP、分片 404。解码器没问题，
-  /// 是字节没传到。调用方应重试线路或弹"网络不好"。
+  /// 网络 / I/O 失败（DNS、TCP、HTTP、分片 404），应重试线路或提示。
   network,
 
-  /// 永久失败、没有显而易见的恢复路径（服务端播放器挂了、关键元数据
-  /// 损坏等）。不要重试。
+  /// 永久失败，无恢复路径，不要重试。
   terminal,
 
-  /// 无法分类——按不透明处理。对只能拿到自由格式 `errorDescription`
-  /// 的 video_player 错误，默认就是这个。
+  /// 无法分类——video_player 只有自由格式 errorDescription 时默认这个。
   unknown,
 }
 
-/// `phase == error` 时附在 [NiumaPlayerValue] 上的结构化错误。
-/// 取代以前把 `"$code/extra=$extra@${pos}ms"` 塞进单条 `errorMessage`
-/// 字符串的做法；消费方现在可以直接 switch [category]，而不是去
-/// 模式匹配信息文本。
+/// `phase == error` 时附在 [NiumaPlayerValue] 上的结构化错误，
+/// 消费方直接 switch [category]，不必模式匹配信息文本。
 @immutable
+/// Android 上 ExoPlayer 与 IJK 兜底**双双失败**时抛出的组合异常。
+/// 同时携带两段错误——只报 IJK 的会掩盖 ExoPlayer 的根因（如 HTTP 403）。
+class EngineFallbackFailure implements Exception {
+  /// 构造组合异常。
+  const EngineFallbackFailure({required this.primary, required this.fallback});
+
+  /// ExoPlayer（主内核）的原始错误。
+  final Object primary;
+
+  /// IJK（兜底内核）重试后的错误。
+  final Object fallback;
+
+  @override
+  String toString() =>
+      '两个内核均失败 — ExoPlayer: $primary ; IJK fallback: $fallback';
+}
+
 class PlayerError {
   const PlayerError({
     required this.category,
@@ -46,8 +54,7 @@ class PlayerError {
   final PlayerErrorCategory category;
   final String message;
 
-  /// 可用时为 native 错误码（例如 IJK 的 `what` 值的字符串形式）。
-  /// 仅供诊断；消费方应基于 [category] 做逻辑决策。
+  /// native 错误码（如 IJK 的 `what`），仅供诊断；决策请基于 [category]。
   final String? code;
 
   @override
@@ -67,56 +74,37 @@ class PlayerError {
       'PlayerError(category: $category, code: $code, message: $message)';
 }
 
-/// 互斥的播放阶段。是"当前在做什么"的唯一事实来源；其它状态
-/// （`isPlaying`、`isBuffering`、`isCompleted`、`initialized`、
-/// `hasError`）都由它派生。
-///
-/// 状态机（仅前向边）：
-/// ```
-///   idle → opening → ready ⇄ playing ⇄ paused
-///                             ↘    ↑    ↗
-///                              buffering
-///   playing/paused/buffering → ended  （未 looping 时）
-///   any → error
-/// ```
+/// 互斥的播放阶段——"当前在做什么"的唯一事实来源，`isPlaying` 等
+/// 布尔状态全部由它派生。
 enum PlayerPhase {
-  /// [PlayerBackend.initialize] 调用之前。默认状态。
+  /// [PlayerBackend.initialize] 之前的默认状态。
   idle,
 
-  /// native 侧正在准备 source（解复用探测、解码器预热、首帧）。
-  /// Android 上对应 `prepareAsync` 进行中；可选的 `openingStage`
-  /// 标注当前在哪个子步骤。
+  /// native 侧正在准备 source；`openingStage` 标注子步骤。
   opening,
 
-  /// 已准备好，但还没有播放意图。`opening` 成功后到达；首次 `play()`
-  /// 后变为 `playing`。
+  /// 已准备好但还没有播放意图，首次 `play()` 后变 `playing`。
   ready,
 
   /// 正在渲染帧。
   playing,
 
-  /// 用户主动暂停。与 `buffering`（非自愿）区分。
+  /// 用户主动暂停，与 `buffering`（非自愿）区分。
   paused,
 
-  /// 播放意图为真但解码器拿不到数据。UI 应保留"暂停"图标——因为用户
-  /// *想*继续播——见 [NiumaPlayerValue.effectivelyPlaying]。
+  /// 播放意图为真但解码器拿不到数据，见
+  /// [NiumaPlayerValue.effectivelyPlaying]。
   buffering,
 
-  /// 未 looping 状态下到达媒体结尾。`position == duration`。
-  /// 当 `setLooping(true)` 时 native **不应**进入该状态——它应当
-  /// 透明地回到 `playing`。
+  /// 未 looping 时到达媒体结尾；looping 时 native 不应进入该状态。
   ended,
 
-  /// 终止错误。`errorMessage` 已设置。
+  /// 终止错误，`errorMessage` 已设置。
   error,
 }
 
-/// [NiumaPlayerController] 状态的不可变快照。
-///
-/// 字段集围绕 [PlayerPhase] 作为唯一事实来源构造。经典布尔访问器
-/// （`isPlaying`、`isBuffering`、`isCompleted`、`initialized`、
-/// `hasError`）作为兼容性 getter 保留，旧契约下编写的消费方不会
-/// 被破坏。
+/// [NiumaPlayerController] 状态的不可变快照，以 [PlayerPhase] 为唯一
+/// 事实来源；经典布尔 getter 作兼容保留。
 @immutable
 class NiumaPlayerValue {
   const NiumaPlayerValue({
@@ -146,24 +134,19 @@ class NiumaPlayerValue {
   final Duration duration;
   final Size size;
 
-  /// 底层播放器已加载到 [duration] 中的多远位置。驱动进度条上的
-  /// "已缓冲段"灰条。
+  /// 已缓冲到的位置，驱动进度条"已缓冲段"灰条。
   final Duration bufferedPosition;
 
-  /// `phase == opening` 时的可选子阶段描述（例如 `"openInput"`、
-  /// `"findStreamInfo"`、`"componentOpen"`）。会被填到 timeout /
-  /// 错误信息里用作诊断。否则为 null。
+  /// `phase == opening` 时的子阶段描述（如 `"openInput"`），供诊断。
   final String? openingStage;
 
-  /// 结构化错误信息；仅当 `phase == error` 时非 null。用
-  /// [PlayerError.category] 驱动重试 / 回退 / UI 决策。
+  /// 结构化错误，仅 `phase == error` 时非 null。
   final PlayerError? error;
 
   /// 当前倍速（默认 1.0）。由 [NiumaPlayerController.setPlaybackSpeed] 更新。
   final double playbackSpeed;
 
-  /// 当前是否在 PiP 窗（小窗）模式中。
-  /// initialize 前为 false；进 / 出 PiP 时由原生侧推送状态变化。
+  /// 当前是否在 PiP 小窗模式中，由原生侧推送状态变化。
   final bool isInPictureInPicture;
 
   /// 设备 + 当前视频是否支持 PiP（iOS 15+ / Android 8.0+，且已 initialize）。
@@ -172,28 +155,22 @@ class NiumaPlayerValue {
 
   // ────────────── 兼容性 getter（由 phase 派生） ──────────────
 
-  /// 纯文本错误描述，给在 [PlayerError] 出现前写的调用方保留。
+  /// 纯文本错误描述（兼容 getter）。
   String? get errorMessage => error?.message;
 
-  /// backend 拿到 metadata 并准备好播放（或更进一步）后为 true。
-  /// 取代旧的显式 `initialized` 字段——现在 value 是 [phase] 的函数，
-  /// 不可能与快照其它字段不一致。
+  /// backend 拿到 metadata 并可播后为 true，由 [phase] 派生。
   bool get initialized =>
       phase != PlayerPhase.idle && phase != PlayerPhase.opening;
 
   bool get isPlaying => phase == PlayerPhase.playing;
   bool get isBuffering => phase == PlayerPhase.buffering;
 
-  /// 是否未 looping 自然播完。native 应在内部处理 looping——
-  /// `setLooping(true)` 时本字段绝不应变为 true。
+  /// 是否未 looping 自然播完；looping 时绝不为 true。
   bool get isCompleted => phase == PlayerPhase.ended;
 
   bool get hasError => phase == PlayerPhase.error;
 
-  /// 面向用户的"播放按钮是否应该隐藏"——只要用户*想要*播放（即使
-  /// 解码器暂时缺数据）即为 true。用以取代消费方过去必须保留的
-  /// `_intentPlaying && !isCompleted` 兜底逻辑（避免 buffering 期间的
-  /// 闪烁）。
+  /// 用户*想要*播放即为 true（含 buffering），避免缓冲期间播放按钮闪烁。
   bool get effectivelyPlaying =>
       phase == PlayerPhase.playing || phase == PlayerPhase.buffering;
 
@@ -297,7 +274,8 @@ final class BackendSelected extends NiumaPlayerEvent {
 
   final PlayerBackendKind kind;
 
-  /// 当本次选择来自 [DeviceMemory] 而非实时尝试时为 true。
+  /// 【已废弃语义】设备记忆已移除，恒为 `false`；仅为兼容保留，
+  /// 后续 major 版本删除。
   final bool fromMemory;
 
   @override
@@ -316,8 +294,8 @@ final class FallbackTriggered extends NiumaPlayerEvent {
   final FallbackReason reason;
   final String? errorCode;
 
-  /// 可用时为底层 [PlayerError] 的分类。让下游选择逻辑把"解码器读不
-  /// 出"（值得回退到 IJK）和"网络断了"（没意义）区分开。
+  /// 底层 [PlayerError] 分类——区分"解码失败"（值得回退 IJK）和
+  /// "网络断了"（回退没意义）。
   final PlayerErrorCategory? errorCategory;
 
   @override
@@ -368,8 +346,7 @@ final class LineSwitchFailed extends NiumaPlayerEvent {
   String toString() => 'LineSwitchFailed(to: $toId, error: $error)';
 }
 
-/// PiP 模式状态变化事件——原生侧推送（iOS AVPictureInPictureControllerDelegate
-/// 或 Android Activity.onPictureInPictureModeChanged）。
+/// PiP 模式状态变化事件，原生侧推送。
 final class PipModeChanged extends NiumaPlayerEvent {
   /// 构造一个事件。
   const PipModeChanged({required this.isInPip});
@@ -378,10 +355,8 @@ final class PipModeChanged extends NiumaPlayerEvent {
   final bool isInPip;
 }
 
-/// PiP 窗内 RemoteAction（如 Android 系统 PiP 窗的 play/pause 按钮）触发事件。
-///
-/// iOS 端 PiP 强制使用 stock 控件，不通过此事件——AVPlayer 自己处理 play/pause。
-/// 只有 Android 通过 BroadcastReceiver 拦截 PendingIntent 后转此事件。
+/// PiP 窗内 RemoteAction 触发事件（Android only——iOS stock 控件由
+/// AVPlayer 自己处理，不走此事件）。
 final class PipRemoteAction extends NiumaPlayerEvent {
   /// 构造一个事件。
   const PipRemoteAction({required this.action});

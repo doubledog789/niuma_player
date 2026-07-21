@@ -11,19 +11,8 @@ import 'package:niuma_player/src/data/_pip_event_bus.dart';
 const MethodChannel _globalChannel = MethodChannel('cn.niuma/player');
 
 /// 由 niuma_player 自家 Android 插件支撑的 [PlayerBackend]。
-///
-/// Dart 这一侧故意对底层具体跑哪个 native player 不做假设——这个选择
-/// （硬解走 ExoPlayer，软解兜底走 IJK）由 `NiumaPlayerPlugin` 根据
-/// `forceIjk` 标志和持久化的 `DeviceMemoryStore` 决定。
-///
-/// [initialize] 完成后，[selectedVariant] 报告实际选中的变体（"exo"
-/// 或 "ijk"），[fromMemory] 报告本次选择是否由过去的失败记忆推动，
-/// 而不是新一次的尝试。
-///
-/// 通讯协议：
-///   - `cn.niuma/player`                       （全局：create / fingerprint）
-///   - `cn.niuma/player/<textureId>`           （每个实例：play/pause/...）
-///   - `cn.niuma/player/events/<textureId>`    （每个实例的状态流）
+/// ExoPlayer 还是 IJK 由 native 侧按 `forceIjk` 决定，Dart 侧不做假设；
+/// channel：`cn.niuma/player`（全局）+ `cn.niuma/player[/events]/<textureId>`（每实例）。
 class NativeBackend extends PlayerBackend {
   NativeBackend(
     this._dataSource, {
@@ -33,13 +22,11 @@ class NativeBackend extends PlayerBackend {
 
   final NiumaDataSource _dataSource;
 
-  /// 为 true 时，要求 native 侧直接用 IJK，不再尝试 ExoPlayer。
-  /// Dart 侧 controller 在 Exo 失败后的重试中会传 true。
+  /// 为 true 时 native 侧直接用 IJK，不再尝试 ExoPlayer（Exo 失败重试时传）。
   final bool forceIjk;
 
-  /// 为 true 时 native 侧不分配 SurfaceTexture，改走 PlatformView
-  /// （`SurfaceView`）渲染路径。见
-  /// `NiumaPlayerOptions.useAndroidPlatformView`。
+  /// 为 true 时走 PlatformView（`SurfaceView`）渲染路径，不分配
+  /// SurfaceTexture。见 `NiumaPlayerOptions.useAndroidPlatformView`。
   final bool useAndroidPlatformView;
 
   int? _textureId;
@@ -49,15 +36,10 @@ class NativeBackend extends PlayerBackend {
   int? get androidPlatformViewId => _isPlatformView ? _textureId : null;
   String? _fingerprint;
 
-  /// native 侧本次会话实际实例化的变体（`"exo"` 或 `"ijk"`）。
-  /// 由 [initialize] 填充。
+  /// native 侧实际实例化的变体（`"exo"` / `"ijk"`），[initialize] 填充。
   String? _selectedVariant;
   String? get selectedVariant => _selectedVariant;
 
-  /// 当 native 选 IJK 是因为 [DeviceMemoryStore] 说本设备过去需要它时，
-  /// 此值为 true。由 [initialize] 填充。
-  bool _fromMemory = false;
-  bool get fromMemory => _fromMemory;
 
   static const MethodChannel _systemChannel =
       MethodChannel('niuma_player/system');
@@ -72,24 +54,20 @@ class NativeBackend extends PlayerBackend {
   final StreamController<NiumaPlayerEvent> _eventController =
       StreamController<NiumaPlayerEvent>.broadcast();
 
-  /// 当 native 离开 `phase=opening`（即进入 `ready` / `playing` 等，
-  /// 或转到 `error`）时 resolve。
+  /// native 离开 `phase=opening`（进 ready/playing 或 error）时 resolve。
   final Completer<void> _preparedCompleter = Completer<void>();
 
   bool _disposed = false;
 
-  /// 在没有任何 native 进度事件的情况下等待多久后判定 prepare 失败。
-  /// 基于进度（而非绝对 wall-clock）：慢设备只要*在*进步就不会被误杀，
-  /// 真正卡住的 native 侧仍能快速失败。
+  /// 无进度事件多久判定 prepare 失败——按进度而非 wall-clock，慢设备不误杀。
   static const Duration _prepareNoProgressTimeout = Duration(seconds: 20);
 
   Timer? _prepareWatchdog;
 
-  /// 最近一次 native opening 阶段（`openInput`、`findStreamInfo` 等）。
-  /// 用于在 timeout 错误信息里指明 prepare 卡在哪一步。
+  /// 最近一次 native opening 阶段，用于 timeout 错误信息定位卡点。
   String? _lastOpeningStage;
 
-  /// 开始等待 prepare 的 wall-clock 时刻。仅用于装饰 timeout 错误信息。
+  /// 开始等待 prepare 的时刻，仅用于装饰 timeout 错误信息。
   DateTime? _prepareStartedAt;
 
   @override
@@ -138,7 +116,6 @@ class NativeBackend extends PlayerBackend {
     _textureId = tid;
     _fingerprint = result['fingerprint'] as String?;
     _selectedVariant = result['selectedVariant'] as String?;
-    _fromMemory = result['fromMemory'] == true;
     _isPlatformView = result['isPlatformView'] == true;
 
     _instanceChannel = MethodChannel('cn.niuma/player/$tid');
@@ -160,9 +137,8 @@ class NativeBackend extends PlayerBackend {
   }
 
   void _startPipEventListening() {
-    // 用 [pipEventBus] 共享 root listener——避免 Android Flutter engine
-    // EventChannel 在 controller 复用时跟 iOS 同样的 cancel race。详见
-    // _pip_event_bus.dart 头注释。
+    // 共享 root listener，避开 EventChannel 单 listener cancel race
+    //（见 _pip_event_bus.dart）。
     _pipEventSub = pipEventBus().listen(
       (dynamic data) {
         if (data is! Map) return;
@@ -290,8 +266,7 @@ class NativeBackend extends PlayerBackend {
       }
     }
 
-    // 把 terminal 错误冒泡出去，让 [NiumaPlayerController] 决定是否
-    // 重试 / 回退。
+    // 错误冒泡给 [NiumaPlayerController] 决定是否重试 / 回退。
     if (phase == PlayerPhase.error && !_eventController.isClosed) {
       _eventController.add(
         FallbackTriggered(
@@ -424,24 +399,17 @@ class NativeBackend extends PlayerBackend {
 
   static const MethodChannel _pipChannel = MethodChannel('niuma_player/pip');
 
-  /// PiP 事件 sub——监听共享 [pipEventBus]，dispose 时 cancel Dart 内 sub
-  /// 不触发 native cancel，避开 EventChannel 单 listener race。
+  /// 监听共享 [pipEventBus]——避开 EventChannel 单 listener race。
   StreamSubscription<dynamic>? _pipEventSub;
 
-  /// 进入 PiP（Android）。
-  ///
-  /// 通过 'niuma_player/pip' channel 发到 NiumaPlayerPlugin（Android 原生）。
-  /// 调用 Activity.enterPictureInPictureMode 不依赖 texture，故不传 textureId。
-  /// 失败 / 不支持返 false 不抛。
+  /// 进入 PiP（Android）。失败 / 不支持返 false 不抛。
   @override
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
     bool unsafeAutoBackground = false,
   }) async {
-    // unsafeAutoBackground 是 iOS-only hack——Android 原生 PiP 调用
-    // Activity.enterPictureInPictureMode 本来就立即生效（系统切到桌面
-    // + 显示小窗），不需要 home 键模拟。这里忽略该参数。
+    // unsafeAutoBackground 是 iOS-only hack，Android 原生 PiP 立即生效，忽略。
     try {
       final result = await _pipChannel.invokeMethod<bool>(
         'enterPictureInPicture',
@@ -456,10 +424,7 @@ class NativeBackend extends PlayerBackend {
     }
   }
 
-  /// 退出 PiP（Android）。
-  ///
-  /// **注意：** Android 系统 PiP 没有"主动退出"API——用户拖回主 app 即退出。
-  /// 本方法常返 false，仅保留接口对称性。
+  /// 退出 PiP（Android）。系统无"主动退出"API，常返 false，仅保留接口对称。
   @override
   Future<bool> exitPictureInPicture() async {
     try {
@@ -484,9 +449,8 @@ class NativeBackend extends PlayerBackend {
     }
   }
 
-  /// 更新 PiP 窗 RemoteAction 图标。播 → pause icon；停 → play icon。
-  /// 通过 'niuma_player/pip' channel 让 native 重新调
-  /// `setPictureInPictureParams`。失败静默忽略——不影响视频播放。
+  /// 更新 PiP 窗 RemoteAction 图标（播 → pause icon，停 → play icon）。
+  /// 失败静默忽略，不影响播放。
   @override
   Future<void> updatePictureInPictureActions({required bool isPlaying}) async {
     try {
@@ -516,16 +480,14 @@ class NativeBackend extends PlayerBackend {
           <String, dynamic>{'textureId': tid},
         );
       } catch (_) {
-        // 尽力而为：吞掉 native dispose 错误，保证 Dart 资源始终被
-        // 释放。
+        // 吞掉 native dispose 错误，保证 Dart 资源始终被释放。
       }
     }
     await _valueController.close();
     await _eventController.close();
   }
 
-  /// 便捷 helper，供 [NiumaPlayerController] 在创建任何 texture 之前
-  /// 取设备指纹。
+  /// 供 [NiumaPlayerController] 在创建 texture 之前取设备指纹。
   static Future<String?> fetchDeviceFingerprint() async {
     final result = await _globalChannel.invokeMapMethod<String, dynamic>(
       'deviceFingerprint',
@@ -533,9 +495,7 @@ class NativeBackend extends PlayerBackend {
     return result?['fingerprint'] as String?;
   }
 
-  /// 便捷 helper，供 [DefaultPlatformBridge] 查询 Android 进程堆上限
-  /// （`ActivityManager.memoryClass`，单位 MB）。原生不可用时返回 null，
-  /// 由调用方兜默认值。
+  /// 查询 Android 进程堆上限（MB）；原生不可用返 null，调用方兜默认值。
   static Future<int?> fetchProcessHeapLimitMb() async {
     return _globalChannel.invokeMethod<int>('getProcessHeapLimitMb');
   }

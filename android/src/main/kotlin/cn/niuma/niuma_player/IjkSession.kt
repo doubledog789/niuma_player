@@ -9,11 +9,9 @@ import tv.danmaku.ijk.media.player.IMediaPlayer
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 
 /**
- * [PlayerSession] driven by `tv.danmaku.ijk.media.player.IjkMediaPlayer`.
- *
- * Software-decoded path (`mediacodec=0`) used as the rescue option for
- * devices where the system MediaCodec is unstable. Slower than the
- * ExoPlayer fast path but crash-free on Huawei / low-end MTK SoCs etc.
+ * [PlayerSession] driven by IjkMediaPlayer. Software-decoded rescue path for
+ * devices where the system MediaCodec is unstable — slower than ExoPlayer but
+ * crash-free.
  */
 internal class IjkSession(
     textureRegistry: TextureRegistry?,
@@ -32,12 +30,8 @@ internal class IjkSession(
     // ── Configure ────────────────────────────────────────────────────────
 
     override fun configurePlayerOptions() {
-        // Force software decoding. IJK's raison d'être in this plugin is to
-        // rescue playback on devices where the system's MediaCodec is flaky
-        // (Huawei, old Xiaomi / Redmi low-end SoCs like MTK Helio G25/G35
-        // where MediaCodec can segfault in native). Turning mediacodec back
-        // on here would re-introduce the exact hardware path we're falling
-        // back from. FFmpeg software decoding is slower but crash-free.
+        // 强制软解：IJK 在本插件的职责就是兜 MediaCodec 不稳的设备，
+        // 开 mediacodec 会重新引入正在回避的硬解路径。
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
 
         // We orchestrate prepare → play from the Dart side; no auto-start.
@@ -45,65 +39,29 @@ internal class IjkSession(
             IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 0
         )
 
-        // Emit RGBA8888 frames instead of the default YV12 3-plane layout.
-        //
-        // Why this matters: with YV12, IJK uploads Y / U / V as three separate
-        // GL_LUMINANCE textures. Each plane's GL texture width is forced to
-        // the decoder's stride (not frame width) because ES2 has no
-        // GL_UNPACK_ROW_LENGTH. For videos with unusual widths — e.g. 2578
-        // (not a multiple of 4 or 16) — the decoded stride is padded up
-        // (2592 / 2624), and downstream consumers (Impeller / Vulkan) can
-        // reject the source texture with "Could not create Impeller texture"
-        // because their allocator has stricter alignment checks than ES2.
-        //
-        // RV32 makes IJK do YUV→RGBA on the CPU and emit a single, aligned,
-        // 4-channel texture. Costs ~5-10% extra CPU but sidesteps every
-        // plane/stride corner case (odd widths, 10-bit, weird SAR).
+        // RV32（RGBA8888）而非默认 YV12：单张对齐纹理，避开奇数宽 / stride
+        // 导致 Impeller 拒建纹理的所有角落；代价约 5-10% CPU。
         player.setOption(
             IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format",
             IjkMediaPlayer.SDL_FCC_RV32.toLong()
         )
 
-        // Cap the pre-decode frame queue during prepare. IJK normally
-        // pre-decodes a big batch of frames before reporting "prepared". With
-        // software decoding those frames sit in the queue with PTS in the
-        // past; when play() fires, IJK renders them as fast as possible to
-        // catch up with the just-set wall clock, which users see as "the
-        // first 2-3 seconds play at 3x speed" right after tap-to-play. 50
-        // frames is a safe cap — enough to avoid underrun, not enough to
-        // produce a visible catch-up burst.
+        // 限制 prepare 阶段预解码帧队列：过大时起播会快进式追时钟（前 2-3 秒
+        // 3x 速），50 足够防 underrun 又看不出追帧。
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 50)
 
-        // Drop late frames to stay in A/V sync. The audio master clock only
-        // sets the *target* timeline; on devices that can't software-decode in
-        // real time (Redmi 9A class, high-bitrate/4K, or under 2x/3x speed),
-        // framedrop is the ONLY mechanism that lets the lagging video catch up
-        // to that target. framedrop=0 → video drifts progressively behind audio
-        // (lips out of sync, worse the longer you watch). framedrop=1 → an
-        // occasional skipped frame when decoding can't keep up, but playback
-        // stays synced. Sync beats smoothness for drama/movie content. The
-        // earlier min-frames=50 cap already tames the tap-to-play catch-up
-        // burst, so framedrop no longer compounds it.
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1)
+        // framedrop 必须为 0：>0 会在软解跟不上时把所有帧 early-drop 掉，
+        // 黑屏有声；0 的代价是可能渐进失步，两害取其轻。
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 0)
 
-        // Shorter demuxer probe: we only target mp4 / m3u8 in this build so
-        // FFmpeg doesn't need to scan megabytes of source to figure out the
-        // container. Faster prepare + smaller prepare-time buffer.
-        player.setOption(
-            IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 1_000_000L
-        )
-        player.setOption(
-            IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", (100 * 1024).toLong()
-        )
+        // 不要调小 probesize / analyzeduration——它们是上限不是必读量，
+        // 调小会让高码率 TS 探不齐视频流（-10000 / 无限 buffering）；沿用 FFmpeg 默认。
 
-        // Network resilience. Transient mobile handoffs, HLS segment 404s,
-        // and TLS blips all surface as `error what=-10000 extra=0` with no
-        // further diagnostic info — so we give FFmpeg as much rope as
-        // possible to recover on its own before propagating the error.
+        // Network resilience: transient failures all surface as `what=-10000
+        // extra=0`, so let FFmpeg recover on its own before propagating.
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1)
-        player.setOption(
-            IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_streamed", 1
-        )
+        // 绝不能开 reconnect_streamed：它把 HLS 分片的正常 EOF 也当断连，
+        // 无限重连同一分片 → buffering/seek 死循环。
         player.setOption(
             IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_delay_max", 5L
         )
@@ -130,11 +88,8 @@ internal class IjkSession(
         }
 
         player.setOnErrorListener { _, what, extra ->
-            // IJK errors often come through with `what=-10000 extra=0`, which
-            // by itself tells us nothing. Capture the current playback
-            // position + duration so the Dart / app side has enough context
-            // to distinguish "failed before first frame" from "died mid-
-            // playback" in bug reports.
+            // 附带 position/duration 上下文——IJK 常报 what=-10000 extra=0，
+            // 本身零信息量。
             val pos = try { player.currentPosition } catch (_: Throwable) { -1L }
             val dur = try { player.duration } catch (_: Throwable) { -1L }
             val category = categorizeError(what, extra, hadFirstFrame)
@@ -156,10 +111,8 @@ internal class IjkSession(
                 IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START ->
                     notifyVideoRenderingStart()
 
-                // Prepare-phase stage decoration. Numeric constants come
-                // straight from IjkMediaPlayer.java — using literals avoids
-                // brittle imports if the IJK AAR ships a stripped-down
-                // IMediaPlayer interface without IJK-specific codes.
+                // Prepare-phase stage decoration; literals avoid depending on
+                // IJK-specific constants missing from some AAR builds.
                 MEDIA_INFO_OPEN_INPUT -> notifyOpeningStage("openInput")
                 MEDIA_INFO_FIND_STREAM_INFO -> notifyOpeningStage("findStreamInfo")
                 MEDIA_INFO_COMPONENT_OPEN -> notifyOpeningStage("componentOpen")
@@ -208,11 +161,8 @@ internal class IjkSession(
                 player.setDataSource(uri)
             }
             "asset" -> {
-                // Asset playback via IJK requires the full filesystem path
-                // resolved by Flutter's asset manager on the Dart side. We
-                // expect the caller to have already resolved it to an
-                // absolute file path, but also accept raw asset URIs as a
-                // best-effort.
+                // Caller is expected to pre-resolve to an absolute file path;
+                // raw asset URIs are accepted as a best-effort.
                 player.setDataSource(context, Uri.parse(uri))
             }
             else -> {
@@ -242,22 +192,9 @@ internal class IjkSession(
 
     // ── IJK error categorisation ─────────────────────────────────────────
 
-    /// Map IJK's `what` / `extra` codes to a coarse [PlayerErrorCategory]
-    /// name. The mapping is hand-tuned from observed production failures
-    /// rather than IJK's docs (which list constants without much guidance
-    /// on which to retry):
-    ///
-    ///  - `-1010` (UNSUPPORTED) / `-1007` (MALFORMED) → codec — switching
-    ///    decoders inside IJK won't help, and `-1010` specifically tells
-    ///    us FFmpeg already gave up on the codec.
-    ///  - `100` (SERVER_DIED) → terminal — the underlying mediaserver
-    ///    crashed; no retry will recover this session.
-    ///  - `-1004` (IO) / `-110` (TIMED_OUT) → network — the bytes aren't
-    ///    arriving; caller should retry the line, not the player.
-    ///  - `-10000` (generic IJK error, very common with `extra=0`): if
-    ///    we'd already rendered a frame it's likely a transient mid-
-    ///    playback glitch; if we never rendered one it's almost always a
-    ///    network issue in our environment.
+    /// Map IJK `what`/`extra` to a coarse [PlayerErrorCategory]，hand-tuned from
+    /// observed production failures; -10000 无信息量，按是否已出首帧区分
+    /// transient / network。
     private fun categorizeError(what: Int, extra: Int, hadFirstFrame: Boolean): String {
         return when (what) {
             -1010 -> "codecUnsupported"
@@ -271,10 +208,8 @@ internal class IjkSession(
     }
 
     companion object {
-        // IJK-specific MEDIA_INFO_* codes. Values mirror the public
-        // constants on `tv.danmaku.ijk.media.player.IjkMediaPlayer`.
-        // Declared here so we don't depend on their presence in whichever
-        // IJK AAR version is vendored in localmaven/.
+        // IJK-specific MEDIA_INFO_* codes, mirrored here so we don't depend on
+        // their presence in the vendored IJK AAR.
         private const val MEDIA_INFO_AUDIO_DECODED_START = 10003
         private const val MEDIA_INFO_VIDEO_DECODED_START = 10004
         private const val MEDIA_INFO_OPEN_INPUT = 10005

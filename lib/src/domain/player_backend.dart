@@ -3,19 +3,14 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
 
-/// 当前驱动 [NiumaPlayerController] 的 Dart 侧 backend 是哪个。
-///
-/// 注意 `native` 覆盖 ExoPlayer 和 IJK——那是 Android 插件*内部*选择的
-/// 子变体，本层看不到。需要这层细节请看
-/// `NiumaPlayerValue.openingStage` / 事件日志。
+/// 当前驱动 [NiumaPlayerController] 的 Dart 侧 backend 类型。
+/// `native` 覆盖 ExoPlayer 和 IJK——子变体由 Android 插件内部选择。
 enum PlayerBackendKind {
   /// `package:video_player`。iOS（AVPlayer）和 Web（`<video>`）使用。
   videoPlayer,
 
-  /// niuma_player 自己的 native 插件。Android 使用。内部在 ExoPlayer
-  /// （默认快路径）和 IJK（软解兜底）之间选择；从 Dart 侧看是不透明的，
-  /// 只能通过 backend 实现上的 `selectedVariant` 字段（经由
-  /// [BackendSelected.fromMemory] 事件抛出供 app 级日志）感知。
+  /// niuma_player 自家 native 插件（Android）。ExoPlayer / IJK 的选择
+  /// 对 Dart 侧不透明，可经 `selectedVariant` 感知。
   native,
 }
 
@@ -30,35 +25,23 @@ abstract class PlayerBackend {
   /// video_player 用自己的 widget）则为 null。
   int? get textureId;
 
-  /// Android PlatformView 模式下的 session instance id（注册到
-  /// `AndroidView` 的 `creationParams` 里供 native factory 查 session）。
-  /// 默认 null——只有 Android Native backend 在 `useAndroidPlatformView`
-  /// 时返非 null。`NiumaPlayerView` 检测到非 null 时用 `AndroidView` 渲染。
+  /// Android PlatformView 模式下的 session instance id；非 null 时
+  /// `NiumaPlayerView` 用 `AndroidView` 渲染。默认 null。
   int? get androidPlatformViewId => null;
 
-  /// Web-only：HtmlElementView 注册的 viewType。io 平台 / 非 web backend
-  /// 返 null（默认实现）。`NiumaPlayerView` 检测到非 null 时用
-  /// `HtmlElementView(viewType)` 渲染——backend 内部用
-  /// `dart:ui_web.platformViewRegistry.registerViewFactory` 注册。
-  ///
-  /// 默认实现 null——只有 [WebVideoBackend] 重写。
+  /// Web-only：HtmlElementView 注册的 viewType，非 null 时
+  /// `NiumaPlayerView` 用 `HtmlElementView` 渲染。默认 null。
   String? get htmlViewType {
     return null;
   }
 
-  /// Web-only：fullscreen 状态——SDK 通过它给 NiumaPlayerView 决定是
-  /// inline 还是 overlay 渲染。io 平台 / 非 web backend 返 null（默认）。
-  /// 只有 [WebVideoBackend] 重写。
+  /// Web-only：fullscreen 状态，NiumaPlayerView 据此选 inline / overlay
+  /// 渲染。默认 null，只有 [WebVideoBackend] 重写。
   ValueListenable<bool>? get webFullscreenState => null;
 
-  /// Web-only：让底层 `<video>` element 进入浏览器原生全屏。
-  ///
-  /// **不同浏览器走不同路径**——iOS Safari 不支持 `Element.requestFullscreen()`，
-  /// 只能 `video.webkitEnterFullscreen()`（私有 API，进入 iOS 原生 video player
-  /// UI——业务 Flutter 控件**不会**跟着进 fullscreen）；桌面 Safari / Chrome /
-  /// Firefox 用标准 `requestFullscreen()`。
-  ///
-  /// io 平台 / 非 web backend 返 false（默认实现）。
+  /// Web-only：让底层 `<video>` 进浏览器原生全屏。默认返 false。
+  /// iOS Safari 只能走 `webkitEnterFullscreen`（进系统 player，Flutter
+  /// 控件不跟随）；其余浏览器走标准 `requestFullscreen()`。
   Future<bool> enterNativeFullscreen() async => false;
 
   /// Web-only：退出浏览器原生 fullscreen。默认实现返 false。
@@ -89,10 +72,8 @@ abstract class PlayerBackend {
 
   Future<void> setLooping(bool looping);
 
-  /// 是否支持原地换源——复用底层播放器 / `<video>` 元素、不重建。默认 false。
-  ///
-  /// web 后端为 true：换源时复用同一个 `<video>` 元素，**保住 iOS Safari 的
-  /// 「有声播放激活」**（新建 video 元素会丢激活，导致后续自动播只能静音）。
+  /// 是否支持原地换源（复用底层播放器不重建）。默认 false；web 为 true——
+  /// 复用 `<video>` 元素保住 iOS Safari 的「有声播放激活」。
   bool get supportsSourceSwap => false;
 
   /// 原地换到新数据源 [source]，复用当前底层播放器。仅 [supportsSourceSwap]
@@ -100,12 +81,8 @@ abstract class PlayerBackend {
   Future<void> load(NiumaDataSource source) async =>
       throw UnsupportedError('backend does not support in-place source swap');
 
-  /// Web-only：开 / 关底层 `<video>` 的浏览器原生控件（`controls` 属性）。
-  ///
-  /// iOS Safari 上 Flutter 控件叠在 `<video>` platform-view 之上时，落在视频
-  /// 像素区的点击会被浏览器吞掉、到不了 Flutter——自定义控件几乎全失效。
-  /// 这种场景下接入方可开启浏览器原生控件（播放 / 进度 / 全屏由 Safari 接管）
-  /// 作为兜底。非 web backend 为空操作。
+  /// Web-only：开 / 关 `<video>` 浏览器原生控件。非 web 为空操作。
+  /// iOS Safari 会吞视频像素区的点击导致自定义控件失效，可开原生控件兜底。
   Future<void> setWebNativeControls(bool show) async {}
 
   /// 读当前亮度（窗口级 0..1，未支持返 0）。
@@ -120,19 +97,9 @@ abstract class PlayerBackend {
   /// 设置系统媒体音量（0..1）。失败 / 不支持返 false。
   Future<bool> setSystemVolume(double value) async => false;
 
-  /// 进入 PiP（画中画）。
-  ///
-  /// [aspectNum] / [aspectDen] 是 video aspect 的整数表达
-  /// （Android 端 PictureInPictureParams 要求 Rational）。
-  /// 不支持 / 失败返回 false。
-  ///
-  /// 默认实现返 false——backend 不支持 PiP（如 IJK、Mock）时**无需**重写
-  /// 此方法即为正确行为。VideoPlayerBackend / NativeBackend 应重写。
-  ///
-  /// [unsafeAutoBackground] 仅 iOS 生效：true 时 native 端在 PiP start 后
-  /// 调私有 API `UIApplication.suspend` 模拟 home 键，让 PiP 小窗立刻
-  /// 飘出而不需要 user 主动切后台。**会让 host app 失去上 App Store
-  /// 资格**——see [NiumaPlayerOptions.unsafePipAutoBackgroundOnEnter]。
+  /// 进入 PiP。[aspectNum]/[aspectDen] 为宽高比；失败 / 不支持返 false
+  /// （默认实现）。[unsafeAutoBackground] 仅 iOS：调私有 API 模拟 home 键
+  /// 让小窗立刻飘出，**会让 host app 失去上 App Store 资格**。
   Future<bool> enterPictureInPicture({
     required int aspectNum,
     required int aspectDen,
@@ -146,11 +113,8 @@ abstract class PlayerBackend {
   /// 查询当前设备 + 视频是否支持 PiP。默认返 false。
   Future<bool> queryPictureInPictureSupport() async => false;
 
-  /// 更新 PiP 窗内播放/暂停 RemoteAction 的图标——仅 Android 需要。
-  /// iOS 系统 PiP 控件由 AVPictureInPictureController 自动同步 AVPlayer
-  /// 状态，无需介入；默认实现 no-op。
-  ///
-  /// [isPlaying]=true → 显示 pause 图标；false → 显示 play 图标。
+  /// 更新 PiP 窗播放/暂停 RemoteAction 图标——仅 Android 需要，
+  /// iOS 由 AVKit 自动同步。默认 no-op。
   Future<void> updatePictureInPictureActions({required bool isPlaying}) async {}
 
   Future<void> dispose();

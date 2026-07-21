@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-22
+
+### Changed
+
+- **Android IJK 产物切换为 GSY 官方 MavenCentral 分发**
+  （`io.github.carguo:gsyvideoplayer-java/-ex_so:11.3.0`，bilibili ijkplayer
+  0.8.8 血统 + FFmpeg 4.3 全量：h264 / h265 / mp4 / HLS 全支持，minSdk 21）。
+  替换原自编 ShikinChen ff7.1 slim aar——后者存在 fork 私货（缓冲期反复
+  `seek(0)` 的 show_first_frame hack）与高码率流软解不出帧的问题，真机表现
+  为「有声无画 / 无限 buffering」。换装后同一条 2568×1440 加密 HLS 在 IJK
+  软解下正常出画（OPPO 真机验证）。
+- **移除设备记忆策略（Try-Fail-Remember）**：一次 ExoPlayer 失败不再被持久
+  化、不再影响后续会话的内核选择——SDK / 源侧问题修复后设备立即回到硬解
+  快路径。内核选择完全由 `forceIjkOnAndroid` 显式决定；会话内 Exo→IJK 的
+  单次兜底重试保留（不落盘）。
+  - **BREAKING**：删除 `NiumaPlayerController.clearDeviceMemory()`；
+    `BackendSelected.fromMemory` 字段保留但恒为 `false`（废弃语义）。
+- IJK `framedrop` 固定为 0：软解跟不上实时的临界场景下 `framedrop>0` 会把
+  所有帧 early-drop 掉（有声无画黑屏）；0 的代价是可能渐进失步，两害取轻。
+
+### Added
+
+- **`EngineFallbackFailure`**：Android 双内核（Exo + IJK 兜底）都失败时抛出
+  的组合异常，同时携带两段原始错误——修复「只报最后一环 IJK 错误、把 Exo
+  的根因（如 HTTP 403）掩盖」的排障陷阱。
+- example 新增「内核切换测试」页：运行时切 ExoPlayer / IJK 对比同一条流。
+
+### Fixed
+
+- IJK `probesize` 曾被设为 100KB「加速 prepare」——对 6Mbps+ 高码率 TS 连
+  一个视频关键帧都探不齐 → 视频流缺失（`-10000` / 无限 buffering）。改回
+  FFmpeg 默认（probesize 是上限而非必读量，调大零成本）。
+- IJK 移除 `reconnect_streamed=1`：它把 HLS 分片的正常 EOF 当断连，无限重
+  连同一分片导致播放卡死。
+
+### Removed
+
+- `android/localmaven/` 自编 ijkplayer aar 与 `android/scripts/` FFmpeg
+  编译链整体退役（GSY 产物上线后不再需要；git 历史可寻）。
+
 ## [0.3.4] - 2026-07-21
 
 ### Fixed

@@ -16,15 +16,8 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.view.TextureRegistry
 
 /**
- * [PlayerSession] driven by `androidx.media3.exoplayer.ExoPlayer`.
- *
- * Hardware-decode fast path. Used as the default Android backend on devices
- * that aren't on the IJK fallback list (which DeviceMemoryStore tracks).
- *
- * NOTE: This file is currently *not* instantiated by [NiumaPlayerPlugin] —
- * the selection state machine still lives on the Dart side and only
- * IjkSession is wired up natively. The full switch happens in M3.3, when
- * native takes over selection from Dart.
+ * [PlayerSession] driven by ExoPlayer. Hardware-decode fast path — the default
+ * Android backend; IJK is used only when the caller passes `forceIjk`.
  */
 internal class ExoPlayerSession(
     textureRegistry: TextureRegistry?,
@@ -32,18 +25,12 @@ internal class ExoPlayerSession(
     context: Context,
     dataSource: Map<String, Any?>,
     platformViewInstanceId: Long? = null,
-    /// Invoked when [PlaybackException] surfaces with a `codecUnsupported`
-    /// category before [hadFirstFrame] is set. The plugin uses this to
-    /// persist "this device needs IJK" so the next create call routes to
-    /// IjkSession directly without paying the Exo prepare cost again.
-    private val onCodecFailureBeforeFirstFrame: () -> Unit = {},
 ) : PlayerSession(textureRegistry, messenger, context, dataSource, platformViewInstanceId) {
 
     private val player: ExoPlayer = buildPlayer(context, dataSource)
 
-    /// Tracks whether we've already mapped the first STATE_READY into a
-    /// `notifyPrepared` call. Subsequent STATE_READY events become
-    /// notifyBufferingEnd instead.
+    /// First STATE_READY maps to notifyPrepared; subsequent ones become
+    /// notifyBufferingEnd.
     private var hasReportedPrepared = false
 
     init {
@@ -66,9 +53,8 @@ internal class ExoPlayerSession(
         }
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpFactory)
-        // 开启解码器回退：硬解 codec 初始化/查询失败时，ExoPlayer 在**同一会话内**
-        // 自动尝试下一个（含软件）解码器，而不是直接抛 PlaybackException 让 Dart
-        // 绕一圈重试 → IJK（用户会先看到一下错误闪）。覆盖更多边缘 codec 机型。
+        // 解码器回退：硬解 codec 失败时同会话内自动试下一个（含软件）解码器，
+        // 避免抛错绕 Dart 重试 IJK 时的错误闪现。
         val renderersFactory = DefaultRenderersFactory(context)
             .setEnableDecoderFallback(true)
         return ExoPlayer.Builder(context, renderersFactory)
@@ -89,9 +75,8 @@ internal class ExoPlayerSession(
             override fun onPlaybackStateChanged(state: Int) {
                 when (state) {
                     Player.STATE_BUFFERING -> {
-                        // First buffer is part of opening — no-op until
-                        // STATE_READY arrives. Subsequent buffers are
-                        // mid-playback stalls.
+                        // First buffer is part of opening; only subsequent
+                        // buffers are mid-playback stalls.
                         if (hasReportedPrepared) {
                             notifyBufferingStart()
                         }
@@ -111,9 +96,7 @@ internal class ExoPlayerSession(
                     }
                     Player.STATE_ENDED -> notifyCompletion()
                     Player.STATE_IDLE -> {
-                        // No-op — IDLE is the pre-prepare or post-error state
-                        // and we already drive phase from notifyError /
-                        // PHASE_OPENING in bringUp().
+                        // No-op — phase is already driven by notifyError / bringUp.
                     }
                 }
             }
@@ -122,12 +105,6 @@ internal class ExoPlayerSession(
                 val pos = try { player.currentPosition } catch (_: Throwable) { -1L }
                 val dur = try { player.duration } catch (_: Throwable) { -1L }
                 val category = categorizeExoError(error.errorCode)
-                // Codec failures BEFORE we ever rendered a frame strongly
-                // suggest the device's MediaCodec can't handle this stream.
-                // Mark memory now so the Dart-side retry routes to IJK.
-                if (!hadFirstFrame && category == "codecUnsupported") {
-                    try { onCodecFailureBeforeFirstFrame() } catch (_: Throwable) {}
-                }
                 notifyError(
                     category = category,
                     code = error.errorCode.toString(),
@@ -160,8 +137,7 @@ internal class ExoPlayerSession(
     override fun applyUnderlyingDataSource(dataSource: Map<String, Any?>) {
         val uri = dataSource["uri"] as? String
             ?: throw IllegalArgumentException("dataSource.uri is required")
-        // The MediaSourceFactory we built in [buildPlayer] already knows about
-        // headers and HLS detection; here we just hand it the URI.
+        // MediaSourceFactory already handles headers + HLS detection.
         player.setMediaItem(MediaItem.fromUri(Uri.parse(uri)))
     }
 
@@ -200,34 +176,20 @@ internal class ExoPlayerSession(
     override fun underlyingCurrentPosition(): Long = player.currentPosition
 
     override fun onHeartbeatTick() {
-        // ExoPlayer has no callback for "buffered position advanced". Sample
-        // it once per heartbeat instead. Coalesces with the position update
-        // into a single emitState by the base class.
+        // No callback for "buffered position advanced" — sample per heartbeat.
         setBufferedMsSilently(player.bufferedPosition)
     }
 
-    /// Map ExoPlayer's structured [PlaybackException.errorCode] to a coarse
-    /// [PlayerErrorCategory] name. Numeric codes are pulled from
-    /// `PlaybackException.ERROR_CODE_*` to avoid brittle string matching.
-    /// Ranges:
-    ///   - 1xxx — runtime / unknown
-    ///   - 2xxx — IO / network
-    ///   - 3xxx — content (parsing / format)
-    ///   - 4xxx — decoder / renderer
-    ///   - 5xxx — DRM (we don't support DRM, treat as terminal)
-    ///   - 6xxx — frame processing
-    ///   - 7xxx — audio sink (rarely terminal)
+    /// Map [PlaybackException.errorCode] ranges to a coarse
+    /// [PlayerErrorCategory]（2xxx IO / 3xxx 格式 / 4xxx 解码器 / 5xxx DRM）。
     private fun categorizeExoError(code: Int): String {
         return when (code) {
-            // 2xxx: IO. All network / source / IO failures.
             in 2000..2999 -> "network"
-            // 3xxx: parsing/format. The container/manifest is broken or
-            // unsupported. Switching backends won't help.
+            // 3xxx parsing/format：换 backend 也救不了，归 codec。
             in 3000..3999 -> "codecUnsupported"
-            // 4xxx: decoder. The codec itself can't be initialised or is
-            // unsupported on this device. IJK is our designated rescue.
+            // 4xxx decoder：本机解不了，IJK 是指定的兜底。
             in 4000..4999 -> "codecUnsupported"
-            // 5xxx: DRM. Not supported here — treat as terminal.
+            // 5xxx DRM：不支持，terminal。
             in 5000..5999 -> "terminal"
             else -> "unknown"
         }

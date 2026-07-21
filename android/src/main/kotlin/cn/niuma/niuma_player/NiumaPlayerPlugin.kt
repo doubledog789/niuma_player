@@ -44,8 +44,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private val players: MutableMap<Long, PlayerSession> = mutableMapOf()
 
-    private var deviceMemory: DeviceMemoryStore? = null
-
     /// Monotonic id allocator for platform-view mode sessions (texture mode
     /// borrows id from SurfaceTextureEntry).
     private val platformViewInstanceCounter = java.util.concurrent.atomic.AtomicLong(1)
@@ -56,13 +54,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         const val PIP_METHOD_CHANNEL = "niuma_player/pip"
         const val TAG = "NiumaPlayerPlugin"
 
-        /// codec-fail-before-first-frame 记忆的有效期（ms）。过去写
-        /// [DeviceMemoryStore.NO_EXPIRY]（永久），导致一次坏 codec 就把整机所有
-        /// 视频永久钉死走 IJK 软解——哪怕那只是单条视频/单次 codec 抽风。改成 7 天
-        /// TTL：仍能让近期重试直接走 IJK（避免反复撞同一个坏 codec），但到期后
-        /// 自动回 ExoPlayer 硬解重试，能硬解的视频回到硬解路径（更清晰、不发热、
-        /// 不音画失步）。Dart 侧到期判定与清理已就绪（device_memory.dart）。
-        const val CODEC_FAIL_MEMORY_TTL_MS: Long = 7L * 24 * 60 * 60 * 1000
 
         /// EventSink 静态字段——PipBroadcastReceiver 静态访问，
         /// host Activity 的 onPictureInPictureModeChanged 也通过这个推。
@@ -83,7 +74,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         messenger = flutterPluginBinding.binaryMessenger
         textureRegistry = flutterPluginBinding.textureRegistry
         applicationContext = flutterPluginBinding.applicationContext
-        deviceMemory = DeviceMemoryStore(flutterPluginBinding.applicationContext)
 
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "cn.niuma/player")
         channel.setMethodCallHandler(this)
@@ -104,10 +94,8 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         })
 
-        // Register the PlatformView factory used when consumer opts into
-        // `NiumaPlayerOptions.useAndroidPlatformView = true`. The Dart side
-        // hands AndroidView({creationParams: {instanceId: <textureId>}}) and
-        // the factory looks up the already-created PlayerSession by id.
+        // PlatformView factory（useAndroidPlatformView = true 时用）：按
+        // creationParams 的 instanceId 查已创建的 PlayerSession。
         flutterPluginBinding.platformViewRegistry.registerViewFactory(
             "cn.niuma/player_surface",
             PlayerSurfaceViewFactory { id -> players[id] },
@@ -159,8 +147,7 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         }
 
-        // Preserved from scaffold so existing unit test keeps passing without
-        // needing a FlutterPluginBinding.
+        // Preserved from scaffold so the existing unit test keeps passing.
         if (call.method == "getPlatformVersion") {
             result.success("Android ${Build.VERSION.RELEASE}")
             return
@@ -193,10 +180,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     ?.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                 result.success(am?.memoryClass ?: 256)
             }
-            "deviceMemory.get" -> handleDeviceMemoryGet(call, result)
-            "deviceMemory.set" -> handleDeviceMemorySet(call, result)
-            "deviceMemory.unset" -> handleDeviceMemoryUnset(call, result)
-            "deviceMemory.clear" -> handleDeviceMemoryClear(result)
             else -> result.notImplemented()
         }
     }
@@ -227,7 +210,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         messenger = null
         textureRegistry = null
         applicationContext = null
-        deviceMemory = null
     }
 
     // ---------------------------------------------------------------------
@@ -278,8 +260,7 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             val params = PictureInPictureParams.Builder()
                 .setActions(listOf(action))
                 .build()
-            // setPictureInPictureParams 在非 PiP 状态调也是合法的——只是
-            // 把"下次进 PiP 用的 params"设了，不会副作用。
+            // 非 PiP 状态调也合法——只是设"下次进 PiP 的 params"。
             activity.setPictureInPictureParams(params)
         } catch (e: Throwable) {
             Log.w(TAG, "updatePictureInPictureActions failed", e)
@@ -300,10 +281,8 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             result.success(false)
             return
         }
-        // 只检 SDK 级别——manifest 已声明 supportsPictureInPicture="true"，
-        // PackageManager.hasSystemFeature 在部分 MIUI / OEM 系统返 false 但
-        // 实际能跑 PiP（系统也尊重 manifest 声明）。先信 SDK，运行时 enterPictureInPictureMode
-        // 真失败再处理。
+        // 只检 SDK 级别——hasSystemFeature 在部分 OEM 系统误报 false 但实际
+        // 能跑 PiP；真失败留给运行时 enterPictureInPictureMode 处理。
         val sdkOk = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
         val hasFeature = activity.packageManager
             .hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
@@ -322,9 +301,8 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         } else {
             0
         }
-        // 同 requestCode + FLAG_UPDATE_CURRENT 让多次 createPlayPauseRemoteAction
-        // 共享同一个 PendingIntent 槽位；setPictureInPictureParams 会按内容
-        // diff 决定是否换图标——确保 update 调用真正生效。
+        // 同 requestCode + FLAG_UPDATE_CURRENT 复用同一 PendingIntent 槽位，
+        // 确保图标 update 真正生效。
         val pi = PendingIntent.getBroadcast(
             ctx,
             0,
@@ -426,12 +404,12 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             )
 
             val fingerprint = deviceFingerprint()
-            val memoryHit = !forceIjk && isMarkedForIjk(fingerprint)
-            val useIjk = forceIjk || memoryHit
+            // 设备记忆（Try-Fail-Remember）已移除：内核仅由 forceIjk 决定，
+            // Exo→IJK 兜底在 Dart 层单次完成、不落盘。
+            val useIjk = forceIjk
 
-            // In platform-view mode we don't own a SurfaceTextureEntry; pass
-            // null registry + an allocated instanceId. PlayerSurfaceView later
-            // calls session.setSurface() when SurfaceHolder.surfaceCreated fires.
+            // Platform-view mode: null registry + allocated instanceId；
+            // surface 由 PlayerSurfaceView 在 surfaceCreated 时补绑。
             val pvInstanceId: Long? = if (useAndroidPlatformView)
                 platformViewInstanceCounter.getAndIncrement() else null
             val sessionRegistry = if (useAndroidPlatformView) null else registry
@@ -439,24 +417,7 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             val player: PlayerSession = if (useIjk) {
                 IjkSession(sessionRegistry, msg, ctx, dataSource, pvInstanceId)
             } else {
-                // ExoPlayer is our default fast path. If a codec failure
-                // surfaces *before the first frame*, that almost always
-                // means this device can't decode this codec via system
-                // MediaCodec — record that fact so the next attempt picks
-                // IJK directly. The Dart-side controller will retry
-                // immediately on init failure; native marking the memory
-                // here means that retry hits the IJK branch.
-                ExoPlayerSession(
-                    sessionRegistry, msg, ctx, dataSource, pvInstanceId,
-                    onCodecFailureBeforeFirstFrame = {
-                        // 7 天 TTL 而非永久：近期重试直接走 IJK 避免反复撞坏 codec，
-                        // 到期后回 ExoPlayer 硬解重试（见 CODEC_FAIL_MEMORY_TTL_MS）。
-                        deviceMemory?.set(
-                            fingerprint,
-                            System.currentTimeMillis() + CODEC_FAIL_MEMORY_TTL_MS,
-                        )
-                    },
-                )
+                ExoPlayerSession(sessionRegistry, msg, ctx, dataSource, pvInstanceId)
             }
             players[player.textureId] = player
 
@@ -465,26 +426,13 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     "textureId" to player.textureId,
                     "fingerprint" to fingerprint,
                     "selectedVariant" to (if (useIjk) "ijk" else "exo"),
-                    "fromMemory" to memoryHit,
+                    "fromMemory" to false,
                     "isPlatformView" to useAndroidPlatformView,
                 )
             )
         } catch (e: Throwable) {
             result.error("NIUMA_PLAYER_CREATE_FAILED", e.message, null)
         }
-    }
-
-    /// Read the DeviceMemoryStore and return whether the given fingerprint
-    /// is currently marked as needing IJK. Treats expired entries as "not
-    /// marked" and eagerly purges them.
-    private fun isMarkedForIjk(fingerprint: String): Boolean {
-        val store = deviceMemory ?: return false
-        val raw = store.get(fingerprint) ?: return false
-        if (raw == DeviceMemoryStore.NO_EXPIRY) return true
-        if (raw > System.currentTimeMillis()) return true
-        // Expired — clean up so the read cost is paid once.
-        store.unset(fingerprint)
-        return false
     }
 
     private fun handleDispose(call: MethodCall, result: Result) {
@@ -521,76 +469,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    // ---------------------------------------------------------------------
-    // DeviceMemory MethodChannel handlers
-    //
-    // The TTL/expiry policy lives on the Dart side; this layer is a dumb
-    // key-value store. `expiresAt = null` over the wire maps to the
-    // [DeviceMemoryStore.NO_EXPIRY] sentinel internally.
-    // ---------------------------------------------------------------------
 
-    private fun handleDeviceMemoryGet(call: MethodCall, result: Result) {
-        val store = deviceMemory
-        if (store == null) {
-            result.error("NIUMA_PLAYER_UNATTACHED", "DeviceMemory not initialised", null)
-            return
-        }
-        val fingerprint = call.argument<String>("fingerprint")
-        if (fingerprint == null) {
-            result.error("NIUMA_PLAYER_BAD_ARGS", "fingerprint is required", null)
-            return
-        }
-        val raw = store.get(fingerprint)
-        if (raw == null) {
-            result.success(null)
-            return
-        }
-        // Sentinel → null over the wire.
-        val expiresAt: Long? = if (raw == DeviceMemoryStore.NO_EXPIRY) null else raw
-        result.success(mapOf("expiresAt" to expiresAt))
-    }
 
-    private fun handleDeviceMemorySet(call: MethodCall, result: Result) {
-        val store = deviceMemory
-        if (store == null) {
-            result.error("NIUMA_PLAYER_UNATTACHED", "DeviceMemory not initialised", null)
-            return
-        }
-        val fingerprint = call.argument<String>("fingerprint")
-        if (fingerprint == null) {
-            result.error("NIUMA_PLAYER_BAD_ARGS", "fingerprint is required", null)
-            return
-        }
-        val expiresAt = (call.argument<Number>("expiresAt"))?.toLong()
-            ?: DeviceMemoryStore.NO_EXPIRY
-        store.set(fingerprint, expiresAt)
-        result.success(null)
-    }
 
-    private fun handleDeviceMemoryUnset(call: MethodCall, result: Result) {
-        val store = deviceMemory
-        if (store == null) {
-            result.error("NIUMA_PLAYER_UNATTACHED", "DeviceMemory not initialised", null)
-            return
-        }
-        val fingerprint = call.argument<String>("fingerprint")
-        if (fingerprint == null) {
-            result.error("NIUMA_PLAYER_BAD_ARGS", "fingerprint is required", null)
-            return
-        }
-        store.unset(fingerprint)
-        result.success(null)
-    }
 
-    private fun handleDeviceMemoryClear(result: Result) {
-        val store = deviceMemory
-        if (store == null) {
-            result.error("NIUMA_PLAYER_UNATTACHED", "DeviceMemory not initialised", null)
-            return
-        }
-        store.clear()
-        result.success(null)
-    }
 
     // ---------------------------------------------------------------------
     // Device fingerprint: sha1("MANUFACTURER|MODEL|SDK_INT") hex encoded.
@@ -637,9 +519,8 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         result.success(true)
     }
 
-    /// 是否存在 video/hevc 的**硬件**解码器（纯软解不算——低端机软解 H.265
-    /// 卡顿，供源协商用的能力检测应只认硬解）。API 29+ 用 isSoftwareOnly；
-    /// 低版本按解码器名前缀识别 Google 软解实现。
+    /// 是否存在 video/hevc 的硬件解码器（纯软解不算——能力检测只认硬解）。
+    /// API 29+ 用 isSoftwareOnly，低版本按解码器名前缀识别 Google 软解。
     private fun hasHardwareHevcDecoder(): Boolean {
         return try {
             android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)

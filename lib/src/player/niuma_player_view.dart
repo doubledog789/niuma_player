@@ -14,9 +14,7 @@ import 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
     show NiumaFullscreenScope, webFullscreenRouteCountListenable;
 
 /// 渲染 [NiumaPlayerController] 当前激活的 backend。
-///
-/// backend 切换（例如回退到 IJK）时自动 rebuild，调用方直接把它丢
-/// 进 widget tree 即可。
+/// backend 切换（例如回退到 IJK）时自动 rebuild。
 class NiumaPlayerView extends StatelessWidget {
   const NiumaPlayerView(
     this.controller, {
@@ -31,20 +29,9 @@ class NiumaPlayerView extends StatelessWidget {
   /// 16:9 占位框以保持布局稳定。
   final double? aspectRatio;
 
-  /// **Android Native** Texture 路径下视频纹理的缩放过滤等级。
-  ///
-  /// 默认 [FilterQuality.medium]——比 Flutter `Texture` 的硬编码默认
-  /// [FilterQuality.low]（双线性）画质明显提升一档，尤其在大屏 / 高 DPI
-  /// 手机上拉伸视频不再糊；medium 用双三次插值，开销在 2020+ 中端机以上
-  /// 完全无感。
-  ///
-  /// 仅 Android Native（ExoPlayer / IJK 通过 Flutter Texture 渲染）路径
-  /// 生效。iOS 由 `VideoPlayer` widget 内部走 AVPlayer 原生 scaling，本
-  /// 参数无关；web `<video>` 由浏览器直接缩放，本参数同样无关。
-  ///
-  /// 极致性能场景（feed 多实例 + 低端机）可显式传 [FilterQuality.low]
-  /// 降回旧默认；追求极致画质可传 [FilterQuality.high]，但每帧 GPU 开销
-  /// 显著增加，不建议常规使用。
+  /// Android Native Texture 路径下视频纹理的缩放过滤等级；iOS / Web 由
+  /// 原生 / 浏览器自行缩放，本参数无关。
+  /// 默认 [FilterQuality.medium]——比 Texture 默认的 low 画质高一档，开销无感。
   final FilterQuality filterQuality;
 
   @override
@@ -55,20 +42,13 @@ class NiumaPlayerView extends StatelessWidget {
         final backend = controller.backend;
         final ratio = aspectRatio ?? _ratioFromValue(value);
         final Widget child;
-        // web 优先：backend 暴露 htmlViewType（WebVideoBackend）→ HtmlElementView
+        // web 优先：backend 暴露 htmlViewType → HtmlElementView
         final viewType = backend?.htmlViewType;
         if (kIsWeb && viewType != null) {
-          // Web fullscreen 模式：单 <video> element 不能两位置 mount——
-          // [NiumaFullscreenPage] route 那侧的 NiumaPlayerView 通过
-          // [NiumaFullscreenScope] InheritedWidget marker 渲染
-          // [HtmlElementView]，inline 那侧（不在 scope 里）返 ColoredBox 让
-          // element 让出，wrapper 元素在两个 platform-view 容器间 atomic
-          // 移动。
-          //
-          // 全屏状态读 [webFullscreenRouteCountListenable]——进程级计数跟
-          // [NiumaFullscreenPage] 路由生命周期挂钩，与 backend 实例解耦。
-          // line failover swap backend 时新 backend 默认 webFullscreenState
-          // 是 false，但 counter 不变，inline 不会误判退出全屏抢回 wrapper。
+          // 单 <video> 不能两处 mount：全屏路由那份（在 NiumaFullscreenScope
+          // 里）挂 HtmlElementView，inline 那份返 ColoredBox 让出元素。
+          // 全屏状态读进程级路由计数，与 backend 实例解耦（failover 换
+          // backend 不会让 inline 误判抢回 <video>）。
           final inFullscreenRoute =
               NiumaFullscreenScope.maybeOf(context) != null;
           return ValueListenableBuilder<int>(
@@ -88,29 +68,14 @@ class NiumaPlayerView extends StatelessWidget {
             },
           );
         } else if (backend is VideoPlayerBackend) {
-          // iOS 路径：VideoPlayer widget 内部走 AVPlayer 原生 scaling，无需上层
-          // 控制 filterQuality（且本版 video_player 也未暴露该参数）。
+          // iOS：VideoPlayer 内部走 AVPlayer 原生 scaling。
           child = VideoPlayer(backend.innerController);
         } else if (backend != null &&
             backend.androidPlatformViewId != null) {
-          // Android PlatformView 路径（NiumaPlayerOptions.useAndroidPlatformView
-          // = true）：让 SurfaceView 原生缩放，不吃 Texture 每帧 filterQuality
-          // 开销，画质上限更高。
-          //
-          // **必须用真正的 Hybrid Composition**（PlatformViewLink +
-          // initExpensiveAndroidView），不能用裸 AndroidView。裸 AndroidView 走
-          // TLHC/Virtual Display——靠把原生 view 内容拷进 Flutter 纹理再合成，而
-          // SurfaceView 的像素画在独立 Surface/窗口上，纹理拷贝抓不到 → 合成出来
-          // 是黑的（「有声黑屏」，进/退全屏、锁屏解锁、切后台最易触发；Flutter
-          // #128920 / #172641 / #144219）。HC 把 SurfaceView 插进原生视图层级
-          // 直接渲染，像素真正显示，原生缩放 / HDR 保留，Flutter 控件仍可叠层。
-          //
-          // 关键：用 initExpensiveAndroidView（纯 HC，不回退 VD）。
-          // initAndroidView / initSurfaceAndroidView 在不兼容场景会回退 Virtual
-          // Display（flutter#107313）→ 又黑回去。
-          //
-          // 创建参数 `instanceId` 让 native PlayerSurfaceViewFactory 找到对应
-          // 的 PlayerSession。视频面不吃手势，全部透传给上层皮肤。
+          // Android PlatformView 路径（useAndroidPlatformView=true）。
+          // 必须用 initExpensiveAndroidView 的纯 Hybrid Composition：其它方式
+          // 会走/回退 Virtual Display，抓不到 SurfaceView 独立 Surface 的像素
+          // → 有声黑屏（flutter#128920 / #107313）。
           child = PlatformViewLink(
             viewType: 'cn.niuma/player_surface',
             surfaceFactory: (context, controller) => AndroidViewSurface(

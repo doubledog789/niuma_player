@@ -4,10 +4,8 @@ import 'package:clock/clock.dart';
 import 'package:niuma_player/src/orchestration/multi_source.dart';
 import 'package:niuma_player/src/player/niuma_player_controller.dart';
 
-/// 池如何创建一个 [NiumaPlayerController]。
-///
-/// 由 consumer 提供——池只负责生命周期（建 / 缓存 / 回收 / 清理），
-/// 具体 options / backend / middleware 由这个工厂决定，池不关心。
+/// 池如何创建一个 [NiumaPlayerController]——由 consumer 提供，
+/// 池只管生命周期，options / backend / middleware 由工厂决定。
 typedef PoolControllerFactory = NiumaPlayerController Function(
   NiumaMediaSource source,
 );
@@ -18,40 +16,23 @@ class _Entry {
 
   final NiumaPlayerController controller;
 
-  /// 最近一次 acquire / preload 命中本条目的时间。stale 清理按它判过期。
+  /// 最近一次命中时间，stale 清理按它判过期。
   DateTime lastAccess = clock.now();
 
-  /// 单调递增的访问序号——LRU 排序用它而非 [lastAccess]，避免同毫秒内
-  /// 多次访问因 [DateTime.now] 分辨率不足而 tie、错挑 victim。
+  /// 单调递增访问序号——LRU 用它而非 [lastAccess]，避免同毫秒 tie 错挑 victim。
   int accessSeq = 0;
 
-  /// controller 是否已 `initialize()` 完成。acquire 命中需 ready 才直接返回，
-  /// 否则等待 init future。
+  /// controller 是否已 `initialize()` 完成。
   bool ready = false;
 
-  /// 仍在 init / pause 流程中的 future。并发 acquire / preload 同 key 时复用，
-  /// 避免对同一 source 建两个 controller。
+  /// 仍在 init / pause 中的 future；并发同 key 时复用，避免建两个 controller。
   Future<void>? pending;
 }
 
-/// 内存感知的 headless 播放器池——给短视频 / 短剧 feed 多实例场景控容量、
-/// 防 OOM。
-///
-/// **解决的痛点**：feed 滑动里每条视频一个 controller，不回收的话同时存活
-/// 的 ExoPlayer / AVPlayer 解码 buffer 把进程堆吃爆。池做三件事：
-///   1. **限容量** —— 最多 [capacity] 个 controller 同时存活，超了按 LRU
-///      evict 最旧的并 dispose（先 dispose 旧的再建新的，避免两个同时缓冲）。
-///   2. **预加载 + init-pause** —— [preload] 提前把下一条建好 + initialize，
-///      但 init 完立刻 `pause()` 压住 backend 继续缓冲，省 native heap。
-///   3. **stale 清理** —— 周期性把太久没访问、且没被持有的条目 dispose，
-///      防 buffer 内存随滑动越堆越多。
-///
-/// **容量按"进程堆上限"算，不是设备物理 RAM**：见
-/// [PlatformBridge.processHeapLimitMb] / [computeCapacityForHeap]。12GB RAM
-/// 的设备单进程堆照样被系统 cap 在一两百 MB，按 RAM 定池会 OOM。
-///
-/// 纯 Dart headless——不碰 widget / BuildContext，只依赖核现有类型 +
-/// `dart:async`，可在纯单测里跑。
+/// 内存感知的 headless 播放器池——feed 多实例场景限容量（LRU evict）
+/// + 预加载（init 完即 pause 压 heap）+ stale 清理，防解码 buffer 吃爆堆。
+/// 容量按进程堆上限算而非物理 RAM（见 [computeCapacityForHeap]），
+/// 按 RAM 定池会 OOM。纯 Dart，可在单测里跑。
 class NiumaPlayerPool {
   NiumaPlayerPool({
     required this.controllerFactory,
@@ -96,11 +77,8 @@ class NiumaPlayerPool {
   static String keyFor(NiumaMediaSource source) =>
       source.currentLine.source.uri;
 
-  /// 取得一个就绪的 controller。
-  ///
-  /// 命中（key 已在池且 ready）→ touch lastAccess 直接返回（可能是 [preload]
-  /// 预热好的）。未命中 → 工厂建 + `initialize()` 存入后返回。超容量时先按
-  /// LRU evict + dispose 一个，再放新条目。
+  /// 取得一个就绪的 controller：命中直接返回，未命中建 + `initialize()`；
+  /// 超容量先 LRU evict 一个。
   Future<NiumaPlayerController> acquire(NiumaMediaSource source) async {
     final key = keyFor(source);
     _active.add(key);
@@ -139,10 +117,8 @@ class NiumaPlayerPool {
     return entry.controller;
   }
 
-  /// 预加载：提前建 + `initialize()` 一条 source 备用，**init 完立刻 `pause()`**
-  /// 阻止 backend 继续缓冲、压低 native heap。已在池则跳过。
-  ///
-  /// 之后对同 key 的 [acquire] 直接命中，无需等 init。
+  /// 预加载：提前建 + `initialize()` 备用，init 完立刻 `pause()` 阻止
+  /// 继续缓冲压低 native heap。已在池则跳过，之后 [acquire] 直接命中。
   Future<void> preload(NiumaMediaSource source) async {
     final key = keyFor(source);
     if (_entries.containsKey(key)) return;
@@ -153,7 +129,6 @@ class NiumaPlayerPool {
     );
     if (entry == null) return;
     final init = entry.controller.initialize().then((_) async {
-      // init 完立刻 pause——预加载只为"建好备用"，不该真的播 / 持续缓冲。
       await entry.controller.pause();
     });
     entry.pending = init;
@@ -175,25 +150,16 @@ class NiumaPlayerPool {
     if (entry != null) _touch(entry);
   }
 
-  /// 强制移除 [key] 对应的 controller。
-  ///
-  /// 与 [release] 不同，本方法会立刻 dispose controller。Feed 等 native
-  /// 解码资源敏感场景可在离屏后主动调用，避免等容量 LRU / stale timer 才回收
-  /// MediaCodec buffer。
+  /// 强制移除并立刻 dispose [key] 的 controller（与 [release] 不同），
+  /// 解码资源敏感场景离屏后主动调，不等 LRU / stale 回收。
   Future<void> evict(String key) => _remove(key);
 
-  /// 池当前是否仍持有 [key] 对应的（未被回收 / dispose 的）controller。
-  /// 供 consumer 在渲染 / 操作缓存引用前确认其仍存活，避免误用已 dispose 的
-  /// controller（池可能因容量 LRU / stale 已把它回收）。
+  /// 池是否仍持有 [key] 的存活 controller——池可能已因 LRU / stale 回收，
+  /// 操作缓存引用前先确认，避免误用已 dispose 的实例。
   bool holds(String key) => _entries.containsKey(key);
 
-  /// 建一个新条目存入池。超容量先按 LRU evict 最旧 inactive 条目（先
-  /// dispose 旧的再返回新条目，避免两个 backend 同时缓冲）。
-  ///
-  /// active controller 代表正在播放或已被页面持有，不能被 preload 挤掉。
-  /// acquire 当前页时若容量已满且全是 active，允许短暂超过容量；调用方随后
-  /// release 旧页，stale/LRU 再回收。preload 没有这种刚需，遇到全 active
-  /// 直接跳过，避免低内存设备 capacity=1 时预加载把当前页 dispose。
+  /// 建新条目；超容量先 LRU evict 最旧 inactive。全 active 时 acquire
+  /// 允许短暂超容，preload 直接跳过（防 capacity=1 时挤掉当前页）。
   Future<_Entry?> _put(
     String key,
     NiumaMediaSource source, {
@@ -233,8 +199,7 @@ class NiumaPlayerPool {
     await entry?.controller.dispose();
   }
 
-  /// 周期性回收：把 `now - lastAccess > staleDuration` 且非 active 的条目
-  /// dispose 移除。active（持有中 / 正在播）的永远保留。
+  /// 周期性回收超过 staleDuration 未访问且非 active 的条目。
   void _sweepStale() {
     if (_disposed) return;
     final now = clock.now();

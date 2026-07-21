@@ -6,14 +6,8 @@ class NiumaCapabilities {
 
   static bool? _hevcCache;
 
-  /// 浏览器是否能播 H.265 / HEVC。
-  ///
-  /// 两路取或：
-  /// - `MediaSource.isTypeSupported`——hls.js（MSE）路径的硬前提
-  ///   （Chrome 107+ 在设备有硬解时支持）；
-  /// - `<video>.canPlayType`——Safari 原生 HLS / 直链 mp4 路径。
-  ///
-  /// codec 串用 `hvc1.1.6.L93.B0`（Main profile L3.1，最普遍的兼容探测串）。
+  /// 浏览器是否能播 H.265——`MediaSource.isTypeSupported`（MSE/hls.js 路径）
+  /// 与 `<video>.canPlayType`（Safari 原生）取或，探测串 `hvc1.1.6.L93.B0`。
   static Future<bool> supportsHevc() async {
     final cached = _hevcCache;
     if (cached != null) return cached;

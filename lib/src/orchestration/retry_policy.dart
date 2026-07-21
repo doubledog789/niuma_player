@@ -4,11 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:niuma_player/src/domain/player_state.dart';
 
-/// 控制播放器初始化失败时是否重试以及何时重试。
-///
-/// 通过命名构造提供三种现成策略：[RetryPolicy.smart]、
-/// [RetryPolicy.exponential]、[RetryPolicy.none]。
-/// 所有实例都不可变且支持 const 构造。
+/// 控制播放器初始化失败时是否重试以及何时重试；现成策略见
+/// [RetryPolicy.smart] / [RetryPolicy.exponential] / [RetryPolicy.none]。
 @immutable
 class RetryPolicy {
   const RetryPolicy._({
@@ -18,17 +15,11 @@ class RetryPolicy {
     required this.retryCategories,
   });
 
-  /// 大多数 app 的默认策略。
-  ///
-  /// 对 [PlayerErrorCategory.network] 与 [PlayerErrorCategory.transient]
-  /// 错误最多重试 [maxAttempts] 次（默认 3），使用从 1 秒开始、上限
-  /// 10 秒的指数退避。
+  /// 默认策略：network / transient 错误最多重试 [maxAttempts] 次
+  /// （默认 3），1s 起步、上限 10s 的指数退避。
   const factory RetryPolicy.smart({int maxAttempts}) = _SmartRetry;
 
-  /// 与 [RetryPolicy.smart] 类似，但允许调用方自定义 [base]、[max] 和
-  /// [maxAttempts]。
-  ///
-  /// 仅重试 network 与 transient 错误。
+  /// 同 [RetryPolicy.smart] 但可自定义 [base] / [max] / [maxAttempts]。
   const factory RetryPolicy.exponential({
     Duration base,
     Duration max,
@@ -38,9 +29,7 @@ class RetryPolicy {
   /// 完全禁用重试——[shouldRetry] 永远返回 `false`。
   const factory RetryPolicy.none() = _NoRetry;
 
-  /// 放弃前的最大重试次数。
-  ///
-  /// 当 `attempt > maxAttempts` 时 [shouldRetry] 返回 `false`。
+  /// 放弃前的最大重试次数；`attempt > maxAttempts` 时不再重试。
   final int maxAttempts;
 
   /// 第一次重试的延迟；后续延迟在此基础上翻倍。
@@ -49,22 +38,16 @@ class RetryPolicy {
   /// [delayFor] 指数增长的上限。
   final Duration max;
 
-  /// 允许重试的 [PlayerErrorCategory] 集合。
-  ///
-  /// 不在该集合中的 category 会让 [shouldRetry] 返回 `false`，
-  /// 无论 attempt 多少。
+  /// 允许重试的 [PlayerErrorCategory] 集合，之外的一律不重试。
   final Set<PlayerErrorCategory> retryCategories;
 
-  /// 当 [category] 可重试且 [attempt] 未超过 [maxAttempts] 时返回
-  /// `true`。
+  /// [category] 可重试且 [attempt] 未超 [maxAttempts] 时返回 `true`。
   bool shouldRetry(PlayerErrorCategory category, {required int attempt}) {
     if (attempt > maxAttempts) return false;
     return retryCategories.contains(category);
   }
 
-  /// 计算给定 [attempt]（从 1 开始）的退避延迟。
-  ///
-  /// 每次 attempt 翻倍（`base * 2^(attempt-1)`），上限 [max]。
+  /// 第 [attempt] 次（从 1 起）的退避延迟：`base * 2^(attempt-1)`，上限 [max]。
   Duration delayFor(int attempt) {
     final exp = base * pow(2, attempt - 1).toInt();
     return exp > max ? max : exp;

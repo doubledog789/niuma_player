@@ -57,6 +57,14 @@ class HomePage extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const FeedPage()),
             ),
           ),
+          ListTile(
+            leading: const Icon(Icons.swap_horiz),
+            title: const Text('内核切换测试（Exo / IJK）'),
+            subtitle: const Text('同一条加密 HLS，运行时切换 Android 内核对比'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const EngineSwitchPage()),
+            ),
+          ),
         ],
       ),
     );
@@ -118,6 +126,111 @@ class _StandardPlayerPageState extends State<StandardPlayerPage> {
           aspectRatio: 16 / 9,
           child: StandardPlayer(controller: _c, title: 'Big Buck Bunny'),
         ),
+      ),
+    );
+  }
+}
+
+/// 内核切换测试页：同一条加密 HLS，运行时切 ExoPlayer（硬解）/ IJK（软解）
+/// 对比。切换即销毁旧 controller、按所选内核重建（`forceIjkOnAndroid`）。
+class EngineSwitchPage extends StatefulWidget {
+  const EngineSwitchPage({super.key});
+
+  @override
+  State<EngineSwitchPage> createState() => _EngineSwitchPageState();
+}
+
+class _EngineSwitchPageState extends State<EngineSwitchPage> {
+  // TODO: 换成你自己的测试流地址（mp4 / m3u8 均可）。
+  static const String _url =
+      'https://artplayer.org/assets/sample/bbb-video.mp4';
+
+  /// false = ExoPlayer（默认硬解）；true = 强制 IJK 软解。
+  bool _useIjk = false;
+
+  NiumaPlayerController? _c;
+
+  /// 每次重建 +1，作为播放器子树的 key —— 皮肤 State 跟着换代，
+  /// 不会把旧 controller 的监听带到新实例上。
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuild();
+  }
+
+  Future<void> _rebuild() async {
+    final old = _c;
+    setState(() => _c = null);
+    await old?.dispose();
+    final c = NiumaPlayerController.dataSource(
+      // TODO: 若你的 CDN 校验 Referer 等请求头，在 headers 里补上，如
+      //   headers: const {'referer': 'https://your.domain'}。
+      NiumaDataSource.network(_url),
+      options: NiumaPlayerOptions(
+        useAndroidPlatformView: true,
+        forceIjkOnAndroid: _useIjk,
+      ),
+    );
+    if (!mounted) {
+      await c.dispose();
+      return;
+    }
+    setState(() {
+      _c = c;
+      _generation++;
+    });
+    // 等 initialize 完成再 play（避免后端就绪前 play 的竞态）；失败由
+    // value.phase=error 驱动皮肤错误层显示，无需在这里处理。
+    c.initialize().then((_) {
+      if (mounted && _c == c) c.play();
+    }).catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    _c?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _c;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(title: const Text('内核切换测试')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('ExoPlayer 硬解')),
+                ButtonSegment(value: true, label: Text('IJK 软解')),
+              ],
+              selected: {_useIjk},
+              onSelectionChanged: (s) {
+                setState(() => _useIjk = s.first);
+                _rebuild();
+              },
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: c == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : StandardPlayer(
+                        key: ValueKey(_generation),
+                        controller: c,
+                        title: _useIjk ? 'IJK 软解' : 'ExoPlayer 硬解',
+                      ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

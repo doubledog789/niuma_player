@@ -1,18 +1,9 @@
-/// PiP EventChannel 进程级单 listener bus——VideoPlayerBackend +
-/// NativeBackend 共用，避开 Flutter engine 的 EventChannel 单 listener
-/// 模型在 controller 复用时 cancel 报错。
+/// PiP EventChannel 进程级单 listener bus，各 backend 共用。
 ///
-/// 直接 `EventChannel('niuma_player/pip/events').receiveBroadcastStream()
-/// .listen(...)` + sub.cancel 的 race：第二次 listen 自动覆盖 native 端
-/// `_currentSink`，旧 sub.cancel 来时 native 端 sink 已被前一次清空 →
-/// iOS 报 `PlatformException(error, No active stream to cancel)` 从
-/// StreamController.onCancel 内部 zone 抛出（**不在 await 链上**、
-/// try-catch 抓不到）。Android engine 行为类似。
-///
-/// 解法：整个进程只 listen 一次 root EventChannel；每个 backend 实例
-/// sub-listen 这条 Dart-side broadcast。backend dispose 时 cancel 的是
-/// Dart 内 sub，**不向 native 发 cancel 消息**——根本不会触发 race。
-/// root sub 在 OS 进程结束时随 isolate 清理，无 leak 风险。
+/// 直接各自 listen/cancel 有 race：第二次 listen 覆盖 native sink，旧
+/// sub.cancel 报 `No active stream to cancel`（不在 await 链上，抓不到）。
+/// 故整进程只 listen 一次 root channel，backend 只 sub-listen Dart 侧
+/// broadcast，dispose 不向 native 发 cancel。
 library;
 
 import 'dart:async';

@@ -3,11 +3,8 @@ import Flutter
 import MediaPlayer
 import UIKit
 
-/// 系统亮度 / 音量 channel：niuma_player/system。
-///
-/// 亮度通过 UIScreen.main.brightness 直接读写。
-/// 音量通过隐藏的 MPVolumeView slider 读写（iOS 唯一不需要 entitlement
-/// 的系统音量控制方式）。
+/// 系统亮度 / 音量 channel（niuma_player/system）：亮度走 UIScreen.main.brightness，
+/// 音量走隐藏 MPVolumeView slider（唯一免 entitlement 的系统音量控制方式）。
 @objc public class NiumaSystemPlugin: NSObject, FlutterPlugin {
 
     /// 隐藏的 MPVolumeView——0px 加 keyWindow，通过其 UISlider 操作系统音量。
@@ -64,7 +61,6 @@ import UIKit
     }
 
     /// iOS 13+ 多 scene 兼容地拿 keyWindow，加隐藏 MPVolumeView。
-    /// iOS 12 fallback：UIApplication.shared.keyWindow（deprecated in iOS 13 but valid on 12）。
     private func ensureVolumeView() {
         if volumeView != nil { return }
         let view = MPVolumeView(frame: .zero)

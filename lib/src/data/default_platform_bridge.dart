@@ -10,11 +10,8 @@ import 'package:niuma_player/src/data/native_backend.dart';
 /// `NiumaPlayerPlugin` / iOS `NiumaSystemPlugin` 两端注册同名）。
 const MethodChannel _systemChannel = MethodChannel('niuma_player/system');
 
-/// 生产环境 [PlatformBridge]。
-///
-/// 在 iOS / Web 上从 SDK 侧合成 fingerprint，不走 Android 插件
-/// （那些平台没有）。Android 上转发到
-/// [NativeBackend.fetchDeviceFingerprint]。
+/// 生产环境 [PlatformBridge]：iOS / Web 侧合成 fingerprint，
+/// Android 转发到 [NativeBackend.fetchDeviceFingerprint]。
 class DefaultPlatformBridge implements PlatformBridge {
   const DefaultPlatformBridge();
 
@@ -40,8 +37,7 @@ class DefaultPlatformBridge implements PlatformBridge {
 
   @override
   Future<int> processHeapLimitMb() async {
-    // iOS / Web 没有"进程堆上限"这个 Android ActivityManager.memoryClass
-    // 概念——返回一个保守默认值，让 computeCapacityForHeap 落在中档容量。
+    // iOS / Web 无进程堆上限概念，返保守默认值落在中档容量。
     if (kIsWeb || Platform.isIOS) return 256;
     return await NativeBackend.fetchProcessHeapLimitMb() ?? 256;
   }

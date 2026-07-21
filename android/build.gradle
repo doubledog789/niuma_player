@@ -14,21 +14,10 @@ buildscript {
     }
 }
 
-// Propagate our vendored maven repo into the consumer's root project so
-// transitive ijkplayer resolution Just Works. Without this, `allprojects`
-// inside a Flutter plugin's build.gradle does NOT reach the consuming app.
-def niumaLocalMaven = file("${project.projectDir}/localmaven")
-rootProject.allprojects { proj ->
-    proj.repositories {
-        maven { url = uri(niumaLocalMaven) }
-    }
-}
-
 allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri(niumaLocalMaven) }
     }
 }
 
@@ -69,9 +58,17 @@ android {
     }
 
     dependencies {
-        // Vendored via localmaven/ instead of fileTree to satisfy AGP 8's
-        // prohibition on direct local .aar deps for library modules.
-        implementation("tv.danmaku.ijk:ijkplayer:0.8.8-ff7.1.1-20260602@aar")
+        // IJK 软解兜底改用 GSY 官方 MavenCentral 产物（bilibili ijkplayer
+        // 0.8.8 血统 + FFmpeg 4.3 全量：h264/h265/mp4/hls 全支持，多年线上
+        // 验证）。替换原自编 ShikinChen ff7.1 slim aar——后者在真机上连续
+        // 踩中 fork 私货（show_first_frame seek(0) hack）与 2.5K 软解不出
+        // 帧的问题，排障成本远超收益。体积：arm64 三件套约 7.5MB（比自编
+        // slim 大 ~0.6MB，市面稳定产物中最小）。
+        // - gsyvideoplayer-java：官方 ijkplayer-java（保留 tv.danmaku.ijk
+        //   包名，API 与 IjkSession 完全兼容），依赖仅 androidx 基础件
+        // - ex_so：含 hevc 的扩展版 so（标准版无 hevc）
+        implementation("io.github.carguo:gsyvideoplayer-java:11.3.0")
+        implementation("io.github.carguo:gsyvideoplayer-ex_so:11.3.0")
 
         // ExoPlayer (media3). Used as the hardware-decode fast path on
         // capable Android devices; IJK remains the software-decode fallback

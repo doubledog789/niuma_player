@@ -4,15 +4,9 @@ import Flutter
 import ObjectiveC
 import UIKit
 
-/// PiP（画中画）插件——iOS 端 niuma_player/pip 通道实现。
-///
-/// 通过 Obj-C runtime 反射访问 video_player_avfoundation 的内部
-/// `playersByIdentifier` 字典，拿到 AVPlayer 实例后创建
-/// AVPictureInPictureController。
-///
-/// **风险点：** 反射依赖 video_player 内部字段名，未来 video_player
-/// 升级可能改名导致 lookupAVPlayer 返 nil。pubspec 锁
-/// `video_player: ">=2.8.0 <3.0.0"` 范围。
+/// PiP 插件（niuma_player/pip）：反射 video_player_avfoundation 内部字典拿
+/// AVPlayer 后创建 AVPictureInPictureController。
+/// 风险：反射依赖 video_player 内部字段名，升级可能失效（pubspec 锁 <3.0.0）。
 @objc public class NiumaPipPlugin: NSObject, FlutterPlugin {
 
     /// 静态保存 registrar 引用，反射查找 video_player plugin 实例时用。
@@ -22,9 +16,8 @@ import UIKit
     private var pipController: AVPictureInPictureController?
     private var pipLayer: AVPlayerLayer?
     private var eventSink: FlutterEventSink?
-    /// KVO 观察 isPictureInPicturePossible 的 token——AVKit 在 layer
-    /// readyForDisplay + frame 有效后才把这个 flag 翻 true，固定 delay
-    /// 调 startPictureInPicture 不靠谱。
+    /// KVO 观察 isPictureInPicturePossible——AVKit ready 后才翻 true，
+    /// 固定 delay 启动不靠谱。
     private var pipPossibleObservation: NSKeyValueObservation?
     private var pipReadyTimeout: DispatchWorkItem?
 
@@ -70,9 +63,7 @@ import UIKit
         }
     }
 
-    /// 彻底清理 PiP 内部状态——layer / controller / KVO observation /
-    /// timeout work item 一次性清，让 [handleEnter] 总能在干净状态下重新
-    /// 拉起。defer 在每个 handleEnter 入口和 didStop delegate 中调用。
+    /// 彻底清理 PiP 内部状态，让 handleEnter 总能在干净状态下重新拉起。
     private func teardownPipState() {
         pipPossibleObservation?.invalidate()
         pipPossibleObservation = nil
@@ -85,9 +76,8 @@ import UIKit
 
     private func handleEnter(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         Self.log("handleEnter called")
-        // 每次入口先彻底清旧状态——user 从 PiP 小窗返回 app 后再次点 PiP
-        // 时若残留旧 pipController / pipLayer，AVKit 会把第二次启动 视为
-        // "重复启动" 静默拒绝。
+        // 先清旧状态——残留 pipController / pipLayer 会让 AVKit 把二次启动
+        // 当"重复启动"静默拒绝。
         teardownPipState()
         guard #available(iOS 15.0, *) else {
             Self.log("iOS < 15.0，PiP 不支持")
@@ -108,9 +98,7 @@ import UIKit
         let unsafeAutoBackground = (args["unsafeAutoBackground"] as? Bool) ?? false
         Self.log("textureId=\(textureId), unsafeAutoBackground=\(unsafeAutoBackground)")
 
-        // 配置 audio session：PiP 需要 background-capable category +
-        // longFormVideo route policy（iOS 13+）让 AVKit 把 audio 视为
-        // 视频伴音而不是普通媒体。
+        // PiP 需要 background-capable category + longFormVideo policy。
         do {
             let session = AVAudioSession.sharedInstance()
             if #available(iOS 13.0, *) {
@@ -140,12 +128,7 @@ import UIKit
         }
         Self.log("反射成功，拿到 AVPlayer=\(avPlayer)")
 
-        // 创建 AVPlayerLayer——iOS 16+ PiP 要求 layer 在 view hierarchy
-        // 中**真正可见、未被完全 cover**。之前放在 window.layer 底层被
-        // Flutter view 完全遮挡，AVKit 视为 occluded → startPictureInPicture
-        // 静默失败（delegate 一条都不回）。
-        // 修法：放到 rootViewController.view.layer 顶层 + opacity=0.01，
-        // user 几乎看不见但 AVKit 视为 visible。
+        // iOS 16+ PiP 要求 layer 真正可见、未被完全遮挡，否则 start 静默失败。
         guard let window = keyWindow() else {
             Self.log("拿不到 keyWindow")
             result(false)
@@ -156,14 +139,8 @@ import UIKit
             result(false)
             return
         }
-        // 关键平衡点：
-        //   - frame 必须有真实尺寸 + 不被 cover——AVKit 才视为 visible
-        //   - 但 frame 全屏 + opacity 0.01 在 ProMotion 屏上 1% 仍然
-        //     可见，叠在 Flutter video texture 上 → 用户"双画面"
-        // 折中：屏幕左上角 4×4 像素一小点，opacity 1.0（完全显示）。
-        // 用户视觉上是个 4×4 微小色块（在状态栏底下/导航栏区域），AVKit
-        // 视为完全可见 visible layer，PiP 启动条件满足。
-        // didStart 后会被 opacity=0.0 完全隐藏（PiP placeholder 行为）。
+        // 折中：rootView 顶层 4×4 小块、opacity 1.0——AVKit 视为 visible 且
+        // 用户几乎看不见；didStart 后再 opacity=0 完全隐藏。
         let layer = AVPlayerLayer(player: avPlayer)
         layer.frame = CGRect(x: 0, y: 0, width: 4, height: 4)
         layer.videoGravity = .resizeAspect
@@ -187,28 +164,16 @@ import UIKit
         Self.log("AVPictureInPictureController 初始化 OK，初始 isPictureInPicturePossible=\(pip.isPictureInPicturePossible)")
         Self.log("avPlayer.status=\(avPlayer.status.rawValue), currentItem.status=\(avPlayer.currentItem?.status.rawValue ?? -99), rate=\(avPlayer.rate)")
 
-        // 启动 PiP——分两条路径：
-        //   - possible 已 true（PiP layer ready，常发生在 user 第二次点
-        //     PiP 时 AVKit 状态有缓存）：直接 start，不 observe，不 schedule
-        //     timeout，避免 timeout 误杀已启动的 PiP。
-        //   - possible 仍 false（首次启动 / cold layer）：KVO 等翻 true
-        //     再 start，5s timeout 兜底防永等。
-        //
-        // 之前用 `.initial` 同步 fire callback——但 callback 早于 field
-        // assignment，self.pipPossibleObservation 在 callback 内仍是 nil，
-        // invalidate() 是 no-op，observation 永远没被取消，5s 后 timeout
-        // 把已启动的 PiP 误杀。
+        // 两条启动路径：possible 已 true 直接 start（不 observe / 不 timeout，
+        // 防误杀）；否则 KVO 等翻 true 再 start，5s timeout 兜底。不能用
+        // `.initial` 同步 fire——callback 早于字段赋值，observation 取消不掉。
         let startPip: (AVPictureInPictureController) -> Void = { p in
             DispatchQueue.main.async {
                 Self.log("调 startPictureInPicture()，pip.isPictureInPictureActive(start前)=\(p.isPictureInPictureActive)")
                 p.startPictureInPicture()
                 if unsafeAutoBackground {
-                    // ⚠️ 私有 API：调 home 键 selector 让 app 进入后台，PiP
-                    // 小窗立刻飘出。host app 无法过 App Store 审核。Apple
-                    // 后续 iOS 升级可能让此 selector 失效或抛 NSException——
-                    // 用 NiumaObjCExceptionCatcher 桥包 @try/@catch（Swift
-                    // do-catch 不抓 NSException），异常时仅记日志、不影响
-                    // PiP 本身。
+                    // ⚠️ 私有 API suspend selector：app 立即后台使 PiP 飘出，无法过审。
+                    // NiumaObjCExceptionCatcher 抓 NSException（Swift do-catch 抓不到）。
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         Self.log("⚠️ 触发 unsafe auto-background（私有 API suspend selector）")
                         let app = UIApplication.shared
@@ -217,8 +182,6 @@ import UIKit
                             Self.log("UIApplication 不响应 suspend selector，自动后台失败")
                             return
                         }
-                        // Swift 把 ObjC `+ method:error:` BOOL+NSError** 自动
-                        // 转成 throws——调用方式是 do/try/catch。
                         do {
                             try NiumaObjCExceptionCatcher.catchExceptions {
                                 app.perform(suspendSel)
@@ -273,10 +236,8 @@ import UIKit
         result(true)
     }
 
-    /// KVC 安全读取——key 不存在时返 nil 而不是抛 `valueForUndefinedKey:`
-    /// 让线程死锁。检测顺序参考 KVC 默认查找规则：
-    ///   `<key>` selector → `is<Key>` → `_<key>` → ObjC property → ivar
-    /// 全都不命中才返 nil；命中再调 `value(forKey:)`。
+    /// KVC 安全读取：先用 ObjC runtime 确认 selector / property / ivar 存在再
+    /// value(forKey:)，避免 valueForUndefinedKey: 抛 NSException 死锁线程。
     private static func safeKVCValue(_ obj: NSObject, key: String) -> Any? {
         let cls: AnyClass = type(of: obj)
         // method-based accessors
@@ -303,30 +264,14 @@ import UIKit
         return nil
     }
 
-    /// 通过 Obj-C runtime 反射读 video_player_avfoundation 的
-    /// `playersByIdentifier[textureId].player` 拿 AVPlayer。
-    ///
-    /// 反射链（4 步）：
-    /// ```
-    /// registrar — KVC: flutterEngine —→ FlutterEngine
-    ///     — perform(valuePublishedByPlugin:) —→ FVPVideoPlayerPlugin
-    ///     — KVC: playersByIdentifier[textureId] —→ FVPVideoPlayer
-    ///     — KVC: player —→ AVPlayer
-    /// ```
-    ///
-    /// **`valuePublishedByPlugin:` 在 `FlutterPluginRegistry` 协议（即
-    /// `FlutterEngine`）上**——不在 `FlutterEngineRegistrar` 上。之前的
-    /// 实现把它当 KVC key 直接在 registrar 上读，撞 valueForUndefinedKey:
-    /// 抛异常死锁线程。修法：先从 registrar 拿 `_flutterEngine` 弱引用
-    /// 再调 engine 的方法。
-    ///
-    /// 任意一步失败都返 nil（并 NSLog 标注哪步），不抛异常。
+    /// 反射链：registrar → flutterEngine → valuePublishedByPlugin(FVPVideoPlayerPlugin)
+    /// → playersByIdentifier[textureId] → .player；注意 valuePublishedByPlugin:
+    /// 在 FlutterEngine 上而非 registrar。任一步失败返 nil，不抛异常。
     private func lookupAVPlayer(textureId: Int64) -> AVPlayer? {
         guard let registrar = Self.pluginRegistrar else { return nil }
         guard let registrarObj = registrar as? NSObject else { return nil }
 
-        // Step 1: registrar → FlutterEngine（私有 ivar `_flutterEngine`，
-        // KVC 默认查找会 fallback 到 `flutterEngine` 或 `_flutterEngine`）
+        // Step 1: registrar → FlutterEngine（私有 ivar，试两个 key）
         var engine: NSObject? = nil
         for key in ["flutterEngine", "_flutterEngine"] {
             if let e = Self.safeKVCValue(registrarObj, key: key) as? NSObject {
@@ -339,8 +284,7 @@ import UIKit
             return nil
         }
 
-        // Step 2: engine.valuePublishedByPlugin("FVPVideoPlayerPlugin")
-        // 这是 ObjC method（不是 KVC property），用 selector + perform。
+        // Step 2: engine.valuePublishedByPlugin(...)——ObjC method，用 perform。
         let valuePublishedSel = NSSelectorFromString("valuePublishedByPlugin:")
         guard engine.responds(to: valuePublishedSel) else {
             Self.log("FlutterEngine 不暴露 valuePublishedByPlugin:")
@@ -423,10 +367,8 @@ extension NiumaPipPlugin: AVPictureInPictureControllerDelegate {
         _ pictureInPictureController: AVPictureInPictureController
     ) {
         Self.log("delegate: didStart ✓ PiP 真启动了")
-        // PiP 启动后把 source layer 完全隐藏：之前 opacity=0.01 是为了让
-        // AVKit 视为 visible（不被 cover），但 PiP 启动后 inline 这层
-        // layer 会渲染 placeholder/frozen frame，叠在 Flutter 自己的 video
-        // texture 上 → 用户视觉上看到"两个播放器"。
+        // 启动后隐藏 source layer——否则 inline placeholder 叠在 Flutter
+        // 纹理上出现"双画面"。
         pipLayer?.opacity = 0.0
         eventSink?(["event": "pipStarted"])
     }
@@ -435,9 +377,7 @@ extension NiumaPipPlugin: AVPictureInPictureControllerDelegate {
         _ pictureInPictureController: AVPictureInPictureController
     ) {
         Self.log("delegate: willStop")
-        // 即将退出 PiP——AVKit 需要 source layer visible 做过渡动画。
-        // 恢复 opacity 到 1.0（layer 本身就是 4×4 极小可见块，opacity
-        // 1.0 也几乎看不到）。
+        // AVKit 需要 source layer visible 做退出过渡动画。
         pipLayer?.opacity = 1.0
     }
 
@@ -458,11 +398,8 @@ extension NiumaPipPlugin: AVPictureInPictureControllerDelegate {
         teardownPipState()
     }
 
-    /// PiP 标准 delegate：user 从 PiP 小窗"返回 app"按钮触发——业务侧
-    /// 应该在 completion(true) 之前把 UI 恢复到适合 PiP 退出的状态。
-    /// 我们没特殊 UI 状态，直接 completion(true)；缺这个 method 会让
-    /// iOS 在某些版本上把"返回 app"路径上的 cleanup 时序搞乱，导致
-    /// 下次 startPictureInPicture 失败。
+    /// user 从 PiP 小窗"返回 app"时触发；缺这个 method 会打乱部分 iOS 版本
+    /// 的 cleanup 时序，导致下次 start 失败。
     public func pictureInPictureController(
         _ pictureInPictureController: AVPictureInPictureController,
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler

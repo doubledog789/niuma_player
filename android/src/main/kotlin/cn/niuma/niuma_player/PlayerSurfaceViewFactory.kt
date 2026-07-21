@@ -6,13 +6,8 @@ import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
 
 /**
- * Registered against viewType `cn.niuma/player_surface` in
- * [NiumaPlayerPlugin.onAttachedToEngine]. Looks up the [PlayerSession] by
- * `instanceId` from creationParams and wraps it in a [PlayerSurfaceView].
- *
- * Dart side passes `{instanceId: <int>}` via the `AndroidView`
- * `creationParams` to identify which already-created session this surface
- * should drive.
+ * Factory for viewType `cn.niuma/player_surface`：按 creationParams 的
+ * `instanceId` 查已创建的 [PlayerSession] 并包成 [PlayerSurfaceView]。
  */
 internal class PlayerSurfaceViewFactory(
     private val sessionLookup: (Long) -> PlayerSession?,

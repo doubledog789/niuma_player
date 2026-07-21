@@ -73,11 +73,8 @@ class VideoPlayerBackend extends PlayerBackend {
   }
 
   void _startPipEventListening() {
-    // 监听的是 [pipEventBus]——SDK 进程级 lazy singleton broadcast，跟
-    // NativeBackend 共用同一 root listener。backend dispose 时 cancel
-    // 的是这个 Dart-side sub，不会向 native 端发 cancel 消息，避开
-    // Flutter engine EventChannel 单 listener 模型在 controller 复用时
-    // 的 cancel race。详见 _pip_event_bus.dart 头注释。
+    // 共享 [pipEventBus] root listener，避开 EventChannel 单 listener
+    // cancel race（见 _pip_event_bus.dart）。
     _pipEventSub = pipEventBus().listen(
       (dynamic data) {
         if (data is! Map) return;
@@ -94,25 +91,19 @@ class VideoPlayerBackend extends PlayerBackend {
         }
       },
       onError: (Object error) {
-        // 静默忽略——PiP 不可用时 root bus 也可能 error
+        // 静默忽略——PiP 不可用时 root bus 也可能 error。
       },
     );
   }
 
-  /// 从 [VideoPlayerValue] 推导 [PlayerPhase]。
-  ///
-  /// 优先级：`error → opening → ended → buffering → playing → paused/ready`。
-  /// video_player 仅在 looping 为 OFF 时才会触发 `isCompleted`，所以这里
-  /// 可以把它当作权威的 end-of-media 信号来用。
+  /// 推导 [PlayerPhase]，优先级
+  /// `error → opening → ended → buffering → playing → paused/ready`。
   PlayerPhase _derivePhase(VideoPlayerValue v) {
     if (v.hasError) return PlayerPhase.error;
     if (!v.isInitialized) return PlayerPhase.opening;
     if (v.isCompleted) return PlayerPhase.ended;
     if (v.isBuffering) return PlayerPhase.buffering;
     if (v.isPlaying) return PlayerPhase.playing;
-    // 已初始化、未播放、未 buffering、未结束：
-    //   - position == 0  → ready（刚打开，从未播过）
-    //   - position > 0   → paused（之前播过）
     if (v.position == Duration.zero) return PlayerPhase.ready;
     return PlayerPhase.paused;
   }
@@ -120,15 +111,9 @@ class VideoPlayerBackend extends PlayerBackend {
   void _onInnerChanged() {
     if (_disposed) return;
     final v = _inner.value;
-    // video_player 把已缓冲段以 DurationRange 列表形式上报；UI 关心的是
-    // "已预加载到哪儿"，也就是最后一段的尾端。空列表 → 还没有 buffer
-    // 信息。
     final buffered = v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
     final phase = _derivePhase(v);
-    // video_player 只给出自由格式的 `errorDescription`——没有错误码，
-    // 没有分类。包成 `unknown` 让消费方仍能拿到结构化的 [PlayerError]
-    // 对象；切到 IJK 是唯一真正的恢复路径，因此除了"是的，出错了"
-    // 之外的细节在这里也没什么价值。
+    // video_player 只有自由格式 errorDescription，包成 unknown 分类。
     final PlayerError? playerError = v.hasError
         ? PlayerError(
             category: PlayerErrorCategory.unknown,
@@ -150,8 +135,6 @@ class VideoPlayerBackend extends PlayerBackend {
       }
     }
     if (v.hasError && !_eventController.isClosed) {
-      // video_player 通过 `value.errorDescription` 暴露错误；我们重新
-      // 以 `FallbackTriggered` 发出，让 controller 可以响应。
       _eventController.add(
         FallbackTriggered(
           FallbackReason.error,
@@ -162,10 +145,8 @@ class VideoPlayerBackend extends PlayerBackend {
     }
   }
 
-  // 所有 mutate _inner 的入口都先查 _disposed：dispose 期间 ChangeNotifier
-  // 还可能 flush 最后一次 notify，listener 同步调进来时 _inner 可能正在
-  // dispose。撞 'VideoPlayerController used after disposed' 的根因就在这。
-  // 已 disposed 直接 no-op——SDK 不该让调用方关心 race timing。
+  // mutate _inner 前先查 _disposed：dispose 期间 listener 可能同步调进来，
+  // 撞 'VideoPlayerController used after disposed'。
 
   @override
   Future<void> play() async {
@@ -253,20 +234,9 @@ class VideoPlayerBackend extends PlayerBackend {
     }
   }
 
-  /// 进入 PiP（iOS）。
-  ///
-  /// 通过 `niuma_player/pip` channel 发到 NiumaPipPlugin（iOS 原生）。
-  ///
-  /// [aspectNum] / [aspectDen] 为视频宽高比的整数分子/分母，传给原生侧
-  /// `AVPictureInPictureController` 设置首选比例。
-  ///
-  /// 实现细节：video_player 2.10+ 将内部播放器 ID 从 `textureId` 改名为
-  /// `playerId`（`@visibleForTesting`）。iOS 原生 NiumaPipPlugin（Task 10）
-  /// 通过该 ID 在 `playersByIdentifier` 字典里查找对应的 `FVPVideoPlayer`
-  /// 进而拿到 `AVPlayer`。channel 参数键名保持 `textureId` 以与协议约定
-  /// 保持一致（Task 10 按同名解析）。
-  ///
-  /// 失败 / 不支持返 `false` 不抛。
+  /// 进入 PiP（iOS）。[aspectNum]/[aspectDen] 为首选宽高比；失败 /
+  /// 不支持返 `false` 不抛。channel 键名保持 `textureId`（协议约定），
+  /// 实际取 video_player 2.10+ 的 `playerId`。
   @override
   Future<bool> enterPictureInPicture({
     required int aspectNum,
@@ -275,7 +245,7 @@ class VideoPlayerBackend extends PlayerBackend {
   }) async {
     // ignore: invalid_use_of_visible_for_testing_member
     final tid = _inner.playerId;
-    // kUninitializedPlayerId == -1；未初始化时不能 PiP
+    // kUninitializedPlayerId == -1；未初始化时不能 PiP。
     if (tid < 0) return false;
     try {
       final result = await _pipChannel.invokeMethod<bool>(
@@ -289,7 +259,7 @@ class VideoPlayerBackend extends PlayerBackend {
       );
       return result ?? false;
     } on PlatformException catch (e, st) {
-      // 不抛——失败默默返 false，让上层决定 UX
+      // 不抛——失败默默返 false，让上层决定 UX。
       assert(() {
         // ignore: avoid_print
         print('[VideoPlayerBackend] enterPip failed: $e\n$st');
@@ -299,10 +269,7 @@ class VideoPlayerBackend extends PlayerBackend {
     }
   }
 
-  /// 退出 PiP（iOS）。
-  ///
-  /// 通过 `niuma_player/pip` channel 通知 NiumaPipPlugin 退出画中画。
-  /// 失败 / 不支持返 `false` 不抛。
+  /// 退出 PiP（iOS）。失败 / 不支持返 `false` 不抛。
   @override
   Future<bool> exitPictureInPicture() async {
     try {
@@ -314,10 +281,7 @@ class VideoPlayerBackend extends PlayerBackend {
     }
   }
 
-  /// 查询设备 + video_player 是否支持 PiP（iOS 15+）。
-  ///
-  /// 通过 `niuma_player/pip` channel 查询 NiumaPipPlugin。
-  /// 不支持 / 查询失败返 `false` 不抛。
+  /// 查询设备 + video_player 是否支持 PiP（iOS 15+）。失败返 `false` 不抛。
   @override
   Future<bool> queryPictureInPictureSupport() async {
     try {
@@ -330,9 +294,7 @@ class VideoPlayerBackend extends PlayerBackend {
     }
   }
 
-  /// iOS 系统 PiP 用 AVPictureInPictureController + AVPlayer，stock
-  /// play/pause 控件由 AVKit 自动同步——这里 no-op，跟 PlayerBackend
-  /// 默认行为一致，只是显式标记表明"已知不需要做事"。
+  /// iOS PiP 的 stock 控件由 AVKit 自动同步——已知不需要做事，显式 no-op。
   @override
   Future<void> updatePictureInPictureActions({
     required bool isPlaying,
@@ -343,9 +305,7 @@ class VideoPlayerBackend extends PlayerBackend {
     if (_disposed) return;
     _disposed = true;
     _inner.removeListener(_onInnerChanged);
-    // _pipEventSub 是 [_pipEventBus] 的 sub-listener，cancel 它不触发
-    // native 端 EventChannel cancel——所以这里不会再撞 "No active stream
-    // to cancel"。root sub 持续 hold 整个进程，由 OS 在进程退出时清理。
+    // cancel 的是 bus 的 sub-listener，不触发 native EventChannel cancel。
     await _pipEventSub?.cancel();
     _pipEventSub = null;
     await _inner.dispose();
