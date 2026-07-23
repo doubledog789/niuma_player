@@ -17,7 +17,6 @@
 - [NiumaPlayerValue / PlayerPhase](#niumaplayervalue--playerphase)
 - [NiumaPlayerEvent](#niumaplayerevent)
 - [手势 / 全屏 headless controller](#手势--全屏-headless-controller)
-- [投屏（Cast）](#投屏cast)
 - [播放器池](#播放器池)
 - [工具函数](#工具函数)
 
@@ -207,8 +206,6 @@ class PlayerError {
 | `LineSwitchFailed(toId, error)` | 切换失败（即使 rollback 成功也 emit，供业务上报） |
 | `PipModeChanged(isInPip)` | 进入 / 退出 PiP（原生侧推送） |
 | `PipRemoteAction(action)` | PiP 小窗按钮事件 |
-| `CastStarted(session)` | 投屏开始 |
-| `CastEnded(reason)` | 投屏结束（`CastEndReason`） |
 
 ---
 
@@ -254,40 +251,6 @@ NiumaFullscreenScope                       // marker widget，包住全屏路由
 enterWebFullscreenRoute();
 exitWebFullscreenRoute();
 webFullscreenRouteCountListenable;         // ValueListenable<int>，只读
-```
-
----
-
-## 投屏（Cast）
-
-核只保留**值类型 + 协调入口**。协议实现（DLNA / AirPlay）与投屏 UI 在 git 历史
-的参考皮里——你实现 `CastService` 产出 `CastSession` 交给核。
-
-```dart
-await controller.connectCast(CastSession session);
-await controller.disconnectCast(reason: CastEndReason.userCancelled);
-controller.castSession;                     // ValueListenable<CastSession?>
-
-controller.events.listen((e) {
-  if (e is CastStarted) { /* e.device: CastDevice */ }
-  if (e is CastEnded)   { /* e.reason: CastEndReason */ }
-});
-```
-
-值类型：
-```dart
-class CastDevice { /* id / name / ... */ }
-abstract class CastSession {
-  CastDevice get device;
-  ValueListenable<CastConnectionState> get state;
-  Future<void> play();
-  Future<void> pause();
-  Future<void> seek(Duration position);
-  Future<Duration> getPosition();      // disconnect 时本地 seek 接续用
-  Future<void> disconnect();
-}
-enum CastConnectionState { idle, discovering, connecting, connected, error }
-enum CastEndReason { userCancelled, networkError, deviceLost, timeout }
 ```
 
 ---

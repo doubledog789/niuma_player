@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Android 主内核切换为官方 `video_player`**（2.0 架构）：三端主路径统一走
+  官方 video_player（iOS AVPlayer / Android ExoPlayer / Web `<video>`），由
+  Flutter 官方维护、可随意升级；niuma 退居「编排壳」——多线路 failover /
+  retry / middleware / 手势 / 全屏 / wakelock / PiP 编排 + **Android IJK
+  软解兜底**（video_player 初始化失败时当次会话自动接管，`forceIjkOnAndroid`
+  可显式强制）。自研 ExoPlayer 会话（`ExoPlayerSession.kt`）与 media3 直接
+  依赖删除——ExoPlayer 升级、Android 新版本适配从此归官方 video_player。
+  - 多线路 auto-failover 逻辑对 Android 主路径同样生效（此前仅 iOS / Web）
+  - vp 初始化 wall-clock 超时补发 `FallbackTriggered(timeout)`（对齐原
+    native 路径的排障信号）
+  - `BackendSelected.kind`：Android 主路径成功时为 `videoPlayer`（原为
+    `native`）；IJK 兜底成功时仍为 `native`
+  - `useAndroidPlatformView: true` 在主路径映射为 video_player 的
+    `VideoViewType.platformView`（0.3.3 根治有声黑屏的渲染路径在 vp 主路径
+    等价保留；IJK 兜底路径仍走自家 Hybrid Composition）
+- **新增 Dependabot**（pub / gradle / actions）：video_player 等依赖出新版
+  自动提 PR 并由 CI（analyze + test + example apk 构建）验证兼容性。
+- **BREAKING：环境门槛提升**——`video_player >=2.10`（viewType）要求
+  Flutter >=3.27 / Dart >=3.6，pubspec environment 同步收紧。
+
+### Fixed
+
+- **倍速状态不再被打回 1.0**：vp / IJK 两后端的 value 映射漏带
+  `playbackSpeed`，`setPlaybackSpeed(2.0)` 后下一条底层通知会把公开
+  `value.playbackSpeed` 覆盖回 1.0（实际播放仍 2x，UI 倍速指示闪回）。
+- **switchLine + `forceIjkOnAndroid` 播错线路**：IJK 路径此前固定拉默认
+  线路，目标线路被忽略（事件却报 LineSwitched 成功）；现按目标线路拉起。
+  vp 多线路全失败落 IJK 兜底后 `activeLineId` 也同步校正为实际播放的默认线。
+- **switchLine 重试改为重建式**：原实现在同一个已失败的 backend 上反复
+  `initialize()`（vp 失败后不重建必然再失败）；现与 init 路径共用同一
+  拉起序列（dispose → middleware → 重建 → init）。
+- **三处生命周期竞态**：dispose 后仍在退避重试中的 init 链会把新建的平台
+  播放器 attach 到已销毁的 controller 上（feed 快滑泄漏源）；init 未完成时
+  `load()` 换源会出现双活 init 链互相拆台；`NativeBackend.dispose()` 不
+  settle 等待中的 initialize（只能干等 initTimeout）。现分别以代际号 /
+  attach 前置检查 / completeError 处理。
+- **播放器池并发窗口**：`preload` 未 await 时立刻 `acquire` 会拿到未
+  初始化的半成品 controller（或在 evict 窗口重复建导致泄漏）——entry
+  插入与 pending 赋值改为同一同步段完成，附回归测试。
+- **手势亮度/音量起手闪谷底**：锁定方向后基准值异步读回期间的指针事件
+  以 0.0 为基准直接把系统亮度/音量设到谷底；现读回完成前丢弃。
+  水平 seek 结束改为提交拖动中算好的目标，不再从 HUD 进度反算（丢精度）。
+- **Android PlatformView 会话 id 与 texture id 可能撞号**：两套分配器
+  空间重叠，混用两种渲染模式时后建会话会顶掉先建的（泄漏）；PV id 起点
+  抬到 1e12 隔离。
+- **web 后端**：移除必然 MissingPluginException 的 PiP 总线订阅（每会话
+  一条控制台红错）；`timeupdate` 双 listener 合并为一次 value 广播。
+
+### Removed
+
+- **BREAKING：`PlatformBridge.deviceFingerprint()` 删除**——设备记忆策略
+  （0.4.0 移除）的最后残留，SDK 内已无任何消费方；自定义 `PlatformBridge`
+  实现删掉该 override 即可。native `create` 协议同步移除 `fingerprint` /
+  `fromMemory` 返回字段与 `deviceFingerprint` handler。
+- **BREAKING：`PlayerBackend.webFullscreenState` 删除**——从未被写入
+  （恒 false）也无消费方；web 全屏状态由
+  `webFullscreenRouteCountListenable` 承载。
+- **BREAKING：投屏（Cast）整体移出核**——值类型（`CastDevice` /
+  `CastSession` / `CastConnectionState` / `CastEndReason`）、controller 的
+  `connectCast` / `disconnectCast` / `castSession`、事件 `CastStarted` /
+  `CastEnded` / `CastError` 全部删除（协议实现本就在 git 历史参考皮）。
+  核收敛为"干净的播放"：需要投屏的业务自持会话对象，播放侧只需
+  `pause()` 本地播放器。
+- **BREAKING：`danmakuVisibility` 删除**——弹幕引擎 0.1.0 已随参考皮出核，
+  该遗留字段核内零消费；业务自持一个 `ValueNotifier<bool>` 即可。
+- **BREAKING：`BackendFactory.createNative` 移除 `forceIjk` 参数**（2.0 起
+  native 只有 IJK 会话，参数恒 true 无意义）；`NativeBackend` 构造与
+  create 协议同步移除。`NiumaPlayerValue.copyWith` 移除零调用的
+  `clearOpeningStage`；`GestureFeedbackState` 移除零调用的 `copyWith`。
+- 全库死代码清理：backend 级 `FallbackTriggered` 发射（controller 一律
+  丢弃，权威版本由 controller 自发）、native 全局 channel 的
+  play/pause/seek/setSpeed/setVolume 死分支与 `forward()`、
+  `NativeBackend.selectedVariant` 公开 getter、PlayerSession 的
+  Exo 时代钩子（onHeartbeatTick 等）、iOS/Android 的 getPlatformVersion
+  模板残留、gradle 的 no-op abiFilters / packagingOptions。
+
 ## [0.4.0] - 2026-07-22
 
 ### Changed

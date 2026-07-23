@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目定位
 
-`niuma_player` 是一个 **headless Flutter 视频播放内核 SDK 包**（不是 app）。0.1.0 起重定位：包**只导出播放内核**——`NiumaPlayerController` + 全部编排逻辑（orchestration：多线路 / auto-failover / retry / source middleware）+ 手势 / 全屏 headless controller + cast 值类型，覆盖 iOS / Android / Web 三端，Android 上 ExoPlayer → IJK 自动回退。**包内零 UI widget**：接入方用 `NiumaPlayerView` 渲染画面 + 监听 `controller.value` 自己拼 UI（或让 AI 生成）。`example/` 是消费内核的 **100 行最小 demo**（`example/lib/main.dart`），不是被测主体——核的测试在 `test/`。
+`niuma_player` 是一个 **headless Flutter 视频播放内核 SDK 包**（不是 app）。0.1.0 起重定位：包**只导出播放内核**——`NiumaPlayerController` + 全部编排逻辑（orchestration：多线路 / auto-failover / retry / source middleware）+ 手势 / 全屏 headless controller，覆盖 iOS / Android / Web 三端，主路径统一官方 `video_player`（web 除外，见下），Android 上 vp 失败自动回退 IJK 软解。**包内零 UI widget**：接入方用 `NiumaPlayerView` 渲染画面 + 监听 `controller.value` 自己拼 UI（或让 AI 生成）。`example/` 是消费内核的示例集（`example/lib/main.dart` 四入口菜单：minimal_player 最小接入 / standard_player 参考皮 / feed_demo 单播放器换源 / 内核切换测试），不是被测主体——核的测试在 `test/`。
 
 **曾经的整套参考皮（88 文件 niuma_ui：一体化壳 / 原子控件 / 控件条 / 全屏页 / 弹幕引擎 + overlay / 广告调度 / 缩略图取帧 / DLNA + AirPlay 投屏协议与 UI / 短视频 / 主题）已移出本仓，保留在 git 历史**——需要时 `git log --all -- 'example/lib/niuma_ui/**'` 定位 commit，`git show <sha>:...` 取文件，或喂给 AI 当参考。它们不进 semver 契约。
 
@@ -19,7 +19,6 @@ flutter test                 # 跑全部 Dart 单测
 
 # 单测
 flutter test test/state_machine_test.dart
-flutter test test/presentation/ad_scheduler_test.dart
 flutter test --name 'fallback'           # 按测试名 substring 过滤
 
 # 跑示例 app（消费 SDK 的真机/模拟器场景）
@@ -31,8 +30,6 @@ flutter build ios --no-codesign
 flutter build web
 ```
 
-注意：`test/presentation/niuma_thumbnail_view_test.dart` 历史上有挂起问题（详见 claude-mem 记忆 obs 237-239）。如果 `flutter test` 整体卡住，先 `flutter test --exclude-tags=...` 或显式跳过该文件定位问题，不要直接砍测试。
-
 ## 架构关键路径（多文件视角）
 
 ### 1. 三层 backend 抽象 + DI 是测试可行的关键
@@ -43,18 +40,19 @@ NiumaPlayerController (lib/src/player/niuma_player_controller.dart)
   │
   ├─ BackendFactory (lib/src/domain/backend_factory.dart)            ← 接口
   │   └─ DefaultBackendFactory (lib/src/data/default_backend_factory.dart)
-  │       ├─ VideoPlayerBackend  (iOS / Web → package:video_player)
-  │       └─ NativeBackend       (Android → 自家 Kotlin plugin)
+  │       ├─ VideoPlayerBackend  (iOS / Android 主路径 → package:video_player)
+  │       ├─ NativeBackend       (Android IJK 软解兜底 → 自家 Kotlin plugin)
+  │       └─ WebVideoBackend     (Web → 自家 <video> + hls.js，vp web 功能不够)
   │
   └─ PlatformBridge (lib/src/domain/platform_bridge.dart)            ← 接口
-      └─ DefaultPlatformBridge (Wakelock / brightness / volume / orientation)
+      └─ DefaultPlatformBridge (wakelock / 进程堆上限查询)
 ```
 
 **为什么这么分**：`BackendFactory` + `PlatformBridge` 都是接口，所有 platform-channel / system 调用都走它们。`test/state_machine_test.dart` 直接 inject fake，**纯 Dart 状态机覆盖 100% 分支**，不需要 integration test 跑设备。改 controller 时务必维持这个边界——不要在 controller 里直接 `import 'dart:io'` 或调 `MethodChannel`。
 
-### 2. Android 双内核（Exo 主 + IJK 兜底，选择完全显式）
+### 2. Android：官方 video_player 主路径 + IJK 软解兜底（2.0 架构）
 
-Android 默认 ExoPlayer 硬解；`forceIjkOnAndroid: true` 强制 IJK 软解。首次 initialize 失败时 Dart 侧**当次会话内**自动用 IJK 重试一次（不落盘）；双内核都失败抛 `EngineFallbackFailure`（携带两段原始错误）。**设备记忆策略（Try-Fail-Remember）已移除**——一次失败不再影响后续会话。
+Android 默认走官方 `video_player`（ExoPlayer 硬解，**官方维护、随 vp 升级，SDK 不再自维护 Exo**——自研 `ExoPlayerSession.kt` 与 media3 直接依赖已删除，git 历史可寻，别恢复）；`forceIjkOnAndroid: true` 强制 IJK 软解。initialize 失败时 Dart 侧**当次会话内**自动用 IJK 重试一次（不落盘）；双内核都失败抛 `EngineFallbackFailure`（携带两段原始错误）。**设备记忆策略（Try-Fail-Remember）已移除**——一次失败不再影响后续会话。`useAndroidPlatformView: true` 在 vp 主路径映射为 `VideoViewType.platformView`，在 IJK 路径走自家 Hybrid Composition。vp 依赖新版由 Dependabot 提 PR + CI 验证（`.github/dependabot.yml`）。
 
 IJK 原生产物来自 **GSY 官方 MavenCentral**（`io.github.carguo:gsyvideoplayer-java/-ex_so:11.3.0`，bilibili ijkplayer 0.8.8 + FFmpeg 4.3 全量：h264/h265/mp4/HLS，minSdk 21）。不要升到 12.x+（要求 minSdk 23）。历史上的自编 ShikinChen ff7.1 aar 及编译链已退役（git 历史可寻），别恢复——它有 fork 私货（show_first_frame 的 seek(0) hack）且高码率流软解不出帧。
 
@@ -72,13 +70,7 @@ IJK 原生产物来自 **GSY 官方 MavenCentral**（`io.github.carguo:gsyvideop
 
 弹幕引擎 / 广告调度 / 缩略图取帧 / 一体化壳 / 原子控件 / 控件条 / 全屏页全部**不在核**——在 git 历史的参考皮里。
 
-### 5. Cast 投屏：值类型留核、协议在 git 历史
-
-`lib/src/cast/` 只剩**值类型**：`CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`。`NiumaPlayerController.connectCast(session)` / `disconnectCast(...)` + `castSession` getter + `CastStarted` / `CastEnded` 事件依赖它们，故留核。
-
-**协议实现（DLNA SSDP/SOAP、AirPlay RoutePicker）+ `CastService` SPI + `NiumaCastRegistry` + 投屏 UI 全部移出核**，在 git 历史的参考皮（`example/lib/niuma_ui/cast/`）里。接入方自实现 `CastService` 产出 `CastSession`，交给 `controller.connectCast(...)`。
-
-### 6. iOS PiP 反射 hack 区
+### 5. iOS PiP 反射 hack 区
 
 iOS PiP（`ios/Classes/NiumaPipPlugin.swift`）依赖反射 `video_player_avfoundation` 内部字段拿 AVPlayer：`registrar → flutterEngine → valuePublishedByPlugin → FVPVideoPlayerPlugin → playersByIdentifier → FVPVideoPlayer.player → AVPlayer`。
 
@@ -88,7 +80,7 @@ iOS PiP（`ios/Classes/NiumaPipPlugin.swift`）依赖反射 `video_player_avfoun
 
 ## 公开 API 边界
 
-`lib/niuma_player.dart` 是唯一的 barrel export，0.1.0 起**只导出 headless 核**：backends / bridge / data_source / player_state（`NiumaPlayerValue` / `PlayerPhase` / 事件模型）/ `NiumaPlayerController` + `NiumaPlayerOptions` / `NiumaPlayerView` / 全部 orchestration（`NiumaMediaSource` / `MediaLine` / `MultiSourcePolicy` / `SourceMiddleware` 家族 / `RetryPolicy` / `AutoFailoverOrchestrator`）/ `NiumaGestureController` + 手势值对象（`GestureKind` / `GestureFeedbackState` / `GestureHudIcon`）/ `NiumaFullscreenController` + web 全屏协调（`NiumaFullscreenScope` / `enterWebFullscreenRoute` / `exitWebFullscreenRoute` / `webFullscreenRouteCountListenable`）/ cast 值类型（`CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`）/ `formatVideoTime` / `NiumaSdkAssets` / `NiumaCapabilities`（媒体能力探测，如 supportsHevc）。**绝不导出任何 UI widget**——它们在 git 历史的参考皮里。
+`lib/niuma_player.dart` 是唯一的 barrel export，0.1.0 起**只导出 headless 核**：backends / bridge / data_source / player_state（`NiumaPlayerValue` / `PlayerPhase` / 事件模型）/ `NiumaPlayerController` + `NiumaPlayerOptions` / `NiumaPlayerView` / 全部 orchestration（`NiumaMediaSource` / `MediaLine` / `MultiSourcePolicy` / `SourceMiddleware` 家族 / `RetryPolicy` / `AutoFailoverOrchestrator`）/ `NiumaGestureController` + 手势值对象（`GestureKind` / `GestureFeedbackState` / `GestureHudIcon`）/ `NiumaFullscreenController` + web 全屏协调（`NiumaFullscreenScope` / `enterWebFullscreenRoute` / `exitWebFullscreenRoute` / `webFullscreenRouteCountListenable`）/ `formatVideoTime` / `NiumaSdkAssets` / `NiumaCapabilities`（媒体能力探测，如 supportsHevc）。**绝不导出任何 UI widget**——它们在 git 历史的参考皮里。
 
 **任何 `lib/src/` 内部符号要对外暴露，必须显式 `export ... show ...;`** 这里。改这个文件等同于改 SDK 的公开 API：
 
@@ -109,19 +101,19 @@ iOS PiP（`ios/Classes/NiumaPipPlugin.swift`）依赖反射 `video_player_avfoun
 | 平台 | 入口文件 |
 |---|---|
 | Android | `android/src/main/kotlin/cn/niuma/niuma_player/NiumaPlayerPlugin.kt`（package: `cn.niuma.niuma_player`） |
-| iOS | `ios/Classes/NiumaPlayerPlugin.swift` + `NiumaPipPlugin.swift` + `NiumaSystemPlugin.swift` + `NiumaAirPlayPlugin.swift` + `NiumaObjCExceptionCatcher.{h,m}` |
+| iOS | `ios/Classes/NiumaPlayerPlugin.swift` + `NiumaPipPlugin.swift` + `NiumaSystemPlugin.swift` + `NiumaObjCExceptionCatcher.{h,m}` |
 
 PiP 需要业务侧 `MainActivity.onPictureInPictureModeChanged` 调 `NiumaPlayerPlugin.reportPipModeChanged(...)` 回调进 SDK——README "平台原生接入" 段有完整接入步骤，改 PiP 相关代码前先看那段。
 
 **修 Swift / ObjC 后必须跑 `flutter build ios --no-codesign --debug` 验证编译过**——hot reload 不重 build native，直接让用户 cold start 测会反复浪费时间（曾踩过这坑）。
 
-## `lib/src/` 目录组织（headless 核，38 文件 7 块）
+## `lib/src/` 目录组织（headless 核，36 文件 6 块）
 
 ```
 lib/src/
 ├── data/           三平台后端 + 平台桥
-│                   default_backend_factory(.io/.web) / video_player_backend(iOS)
-│                   / native_backend(Android ExoPlayer↔IJK) / web_video_backend
+│                   default_backend_factory(.io/.web) / video_player_backend(iOS+Android 主路径)
+│                   / native_backend(Android IJK 兜底) / web_video_backend
 │                   / hls_detect / default_platform_bridge / _pip_event_bus
 ├── domain/         接口 + 状态值对象
 │                   backend_factory / player_backend / platform_bridge / data_source
@@ -130,7 +122,6 @@ lib/src/
 ├── orchestration/  纯 Dart 编排：multi_source / auto_failover / retry_policy
 │                   / source_middleware / player_pool
 ├── capabilities/   媒体能力探测（supportsHevc，io/web 条件实现）
-├── cast/           投屏值类型：cast_device / cast_session / cast_state（协议在 git 历史）
 ├── player/         controller + 渲染面 + headless controller
 │                   niuma_player_controller / niuma_player_options / niuma_player_view
 │                   / niuma_gesture_controller / niuma_fullscreen_controller

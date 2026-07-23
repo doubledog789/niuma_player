@@ -238,7 +238,7 @@ controller.events.listen((e) {
 - loading / error / ended 三态：看 `value.phase`（`opening` / `buffering` /
   `error` → `value.error` / `ended`）
 
-复杂控件（bili 风长视频壳、抖音风短视频、弹幕 overlay、投屏面板、缩略图预
+复杂控件（bili 风长视频壳、抖音风短视频、缩略图预
 览）有成熟参考实现保留在 **git 历史**的 niuma_ui 参考皮里：
 
 ```bash

@@ -1,7 +1,7 @@
 # niuma_player
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Flutter](https://img.shields.io/badge/flutter-%E2%89%A53.10-blue)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/flutter-%E2%89%A53.27-blue)](https://flutter.dev)
 
 **Headless Flutter 视频播放内核**——**iOS / Android / Web 三端**统一 controller API，附带纯逻辑播放编排（多线路自动 failover / 切换失败回滚 / retry policy / source middleware）以及手势、全屏的 headless controller。
 
@@ -28,7 +28,7 @@ niuma_player 只做一件事：**把视频在三端可靠地播起来，并把�
 
 - 播放引擎、状态机、错误分类、多线路 failover、retry、source middleware 都在核里，是稳定的 semver 契约。
 - 画面渲染走一个无样式的 `NiumaPlayerView`（一块视频纹理 / `<video>` 表面）。
-- 所有控件——播放按钮、进度条、全屏、弹幕、投屏面板、缩略图预览——**由接入方自己写**：监听 `controller.value` 拿 phase / position / duration / size / error，调 `controller.play()` / `pause()` / `seekTo()` 等驱动。
+- 所有控件——播放按钮、进度条、全屏、缩略图预览——**由接入方自己写**：监听 `controller.value` 拿 phase / position / duration / size / error，调 `controller.play()` / `pause()` / `seekTo()` 等驱动。
 
 这样换来的好处：
 
@@ -38,19 +38,15 @@ niuma_player 只做一件事：**把视频在三端可靠地播起来，并把�
 
 **需要参考实现？** 整套老的参考皮（bili 风长视频壳 / 抖音风短视频 / 弹幕引擎 + overlay / DLNA + AirPlay 投屏协议与 UI / 缩略图取帧 / 广告调度 / 主题）都在 git 历史里。`git log --all -- 'example/lib/niuma_ui/**'` 找到那个 commit，`git show <sha>:example/lib/niuma_ui/...` 取文件即可。
 
-### 投屏（Cast）说明
-
-核里只保留**投屏的值类型 + 协调入口**：`CastDevice` / `CastSession` / `CastConnectionState` / `CastEndReason`，加上 `controller.connectCast(...)` / `controller.disconnectCast(...)` 和 `CastStarted` / `CastEnded` 事件。**具体协议实现（DLNA SSDP/SOAP、AirPlay RoutePicker）和投屏 UI 不在核里**——在 git 历史的参考皮中（`example/lib/niuma_ui/cast/`），接入方按需捞取自维护，并把自家 `CastService` 实现产出的 `CastSession` 交给 `controller.connectCast(...)`。
-
 ---
 
 ## 平台兼容
 
-| 平台 | 后端引擎 | HLS | PiP | 投屏 |
-|---|---|:-:|:-:|:-:|
-| **iOS** | AVPlayer (`video_player`) | ✅ 原生 | ✅（反射 AVPlayer 接 `AVPictureInPictureController`） | 值类型 + 协调在核；AirPlay 协议在参考皮 |
-| **Android** | ExoPlayer（硬解，默认）↔ IJK（软解兜底，GSY 官方产物：bilibili ijkplayer 0.8.8 + FFmpeg 4.3 全量，h264/h265） | ✅ 原生 | ✅（业务侧 1 行回调接入） | 值类型 + 协调在核；DLNA 协议在参考皮 |
-| **Web** | `<video>` + 按需 hls.js | ✅（Safari 原生 / Chrome·Firefox·Edge 走 hls.js 懒注入） | ⚠️ 浏览器无可靠程序化 API | ⚠️ 浏览器无可靠程序化 API |
+| 平台 | 后端引擎 | HLS | PiP |
+|---|---|:-:|:-:|
+| **iOS** | AVPlayer (`video_player`) | ✅ 原生 | ✅（反射 AVPlayer 接 `AVPictureInPictureController`） |
+| **Android** | ExoPlayer（`video_player` 官方维护，硬解，默认）↔ IJK（软解兜底，GSY 官方产物：bilibili ijkplayer 0.8.8 + FFmpeg 4.3 全量，h264/h265） | ✅ 原生 | ✅（业务侧 1 行回调接入） |
+| **Web** | `<video>` + 按需 hls.js | ✅（Safari 原生 / Chrome·Firefox·Edge 走 hls.js 懒注入） | ⚠️ 浏览器无可靠程序化 API |
 
 Web 端基于 `package:web`，**wasm-ready**（可随 `flutter build web --wasm` 编译）。
 
@@ -67,7 +63,7 @@ dependencies:
 flutter pub get
 ```
 
-Dart 侧外部依赖只有 5 个：`video_player`（iOS AVPlayer）、`web`（Web 后端）、`plugin_platform_interface`、`meta`、`clock`；另有 Flutter SDK 自带的 `flutter_web_plugins`。Android 原生自动引入 media3(ExoPlayer) 与 GSY ijkplayer（MavenCentral，minSdk 21）。
+Dart 侧外部依赖只有 5 个：`video_player`（iOS AVPlayer / Android ExoPlayer 主路径）、`web`（Web 后端）、`plugin_platform_interface`、`meta`、`clock`；另有 Flutter SDK 自带的 `flutter_web_plugins`。Android 原生只引入 GSY ijkplayer（MavenCentral，minSdk 21）作软解兜底——ExoPlayer 来自官方 `video_player`，随它升级，SDK 不再自维护。
 
 ---
 
@@ -183,13 +179,13 @@ c.activeLineId;           // 当前线路 id
 
 ```dart
 NiumaPlayerOptions(
-  forceIjkOnAndroid: false,       // true = 强制 IJK 软解（默认 ExoPlayer 硬解）
-  useAndroidPlatformView: false,  // true = SurfaceView 原生渲染（Hybrid Composition，画质上限更高）
+  forceIjkOnAndroid: false,       // true = 强制 IJK 软解（默认 video_player/ExoPlayer 硬解）
+  useAndroidPlatformView: false,  // true = SurfaceView 原生渲染（vp 主路径映射 platformView，IJK 走 Hybrid Composition）
   manageScreenWakelock: true,     // 播放中自动保持屏幕常亮
 )
 ```
 
-- 内核选择**完全显式**：默认 ExoPlayer；首次失败当次会话内自动用 IJK 兜底重试一次（不落盘）。双内核都失败抛 `EngineFallbackFailure`（同时携带两段原始错误）。
+- 内核选择**完全显式**：默认官方 `video_player`（ExoPlayer 硬解）；初始化失败当次会话内自动用 IJK 软解兜底重试一次（不落盘）。双内核都失败抛 `EngineFallbackFailure`（同时携带两段原始错误）。
 - **媒体能力探测**：`await NiumaCapabilities.supportsHevc()` —— Android 查硬解、iOS 恒 true、web 探 MSE/canPlayType。用于向服务端协商 H265 源（协议字段业务自定，SDK 不自动加请求头）。
 
 ### NiumaPlayerValue（监听这个拼 UI）
@@ -255,26 +251,12 @@ switch (webFullscreenMode) {
 退出 / ESC 同步：`exitBrowserFullscreen()` / `onBrowserFullscreenChange(cb)`。
 Web 单 `<video>` 在 inline / 全屏路由间搬迁的协调契约：`NiumaFullscreenScope` + `enterWebFullscreenRoute()` / `exitWebFullscreenRoute()` / `webFullscreenRouteCountListenable`。
 
-### 投屏（Cast）
-
-```dart
-// 你的 CastService 实现产出一个 CastSession，交给核：
-await c.connectCast(session);
-await c.disconnectCast(reason: CastEndReason.userCancelled);
-c.castSession;            // ValueListenable<CastSession?>
-
-c.events.listen((e) {
-  if (e is CastStarted) { /* e.device: CastDevice */ }
-  if (e is CastEnded)   { /* e.reason: CastEndReason */ }
-});
-```
-
 ### 事件流
 
 ```dart
 c.events.listen((e) {
   if (e is BackendSelected) { /* iOS / Android / Web 选定 */ }
-  if (e is FallbackTriggered) { /* Android ExoPlayer → IJK */ }
+  if (e is FallbackTriggered) { /* Android video_player → IJK */ }
   if (e is LineSwitching) {}
   if (e is LineSwitched) {}
   if (e is LineSwitchFailed) { /* 即使已回滚也会 emit，供业务上报 */ }
@@ -347,7 +329,7 @@ HLS 在 Chrome / Firefox / Edge 走核内置的 vendored `hls.js`（`assets/hls/
 
 ## Web 平台已知限制
 
-- **PiP / 投屏**：浏览器没有可靠的程序化 API，核在 web 上不提供这两个能力（自家 UI 应隐藏对应入口）。
+- **PiP**：浏览器没有可靠的程序化 API，核在 web 上不提供该能力（自家 UI 应隐藏对应入口）。
 - **`SystemChrome.setPreferredOrientations`**：web 平台 no-op，无法程序化锁方向。竖屏 viewport 放横屏视频时，建议自家 UI 浮一个"旋转屏幕"提示。
 - **iOS Safari `<video>.volume` setter 只读**：核同步设 `muted` 解决"按钮静音不生效"。
 - **iOS Safari `videoWidth/Height` 滞后**：`onLoadedMetadata` 时尺寸可能仍是 0，核在 `onPlaying` / `onTimeUpdate` 时 retry 同步 `value.size`。
