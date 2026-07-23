@@ -7,7 +7,6 @@ import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 
-import 'package:niuma_player/src/data/_pip_event_bus.dart';
 import 'package:niuma_player/src/data/hls_detect.dart';
 import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/domain/player_backend.dart';
@@ -85,12 +84,6 @@ class WebVideoBackend extends PlayerBackend {
   /// [initialize] 等待的 completer——让上层立刻得知 load 成败，不等 initTimeout。
   Completer<void>? _initCompleter;
 
-  /// Web overlay 假全屏状态；NiumaPlayerView 据此在 inline / overlay
-  /// 间搬迁同一 element（单 element 只 mount 一处）。
-  final ValueNotifier<bool> _isWebFullscreen = ValueNotifier<bool>(false);
-  @override
-  ValueListenable<bool> get webFullscreenState => _isWebFullscreen;
-
   NiumaPlayerValue _value = NiumaPlayerValue.uninitialized();
   final StreamController<NiumaPlayerValue> _valueController =
       StreamController<NiumaPlayerValue>.broadcast();
@@ -99,7 +92,6 @@ class WebVideoBackend extends PlayerBackend {
 
   // 保存 removeEventListener 回调，dispose 时统一移除。
   final List<void Function()> _listenerRemovers = <void Function()>[];
-  StreamSubscription<dynamic>? _pipEventSub;
 
   /// 注册 video 事件 listener 并登记反注册回调。
   void _on(String type, void Function() handler) {
@@ -229,26 +221,24 @@ class WebVideoBackend extends PlayerBackend {
         }
       }
     });
+    // position 与 buffered 同拍更新（progress event 暴露不一致），
+    // 单次 _emit 避免每 tick 广播两遍。
     _on('timeupdate', () {
       if (_disposed) return;
+      final buf = _video.buffered;
       _emit(_value.copyWith(
         position: Duration(
           milliseconds: (_video.currentTime * 1000).round(),
         ),
+        bufferedPosition: buf.length == 0
+            ? null
+            : Duration(
+                milliseconds: (buf.end(buf.length - 1) * 1000).round(),
+              ),
       ));
       if (_value.size.width <= 0 || _value.size.height <= 0) {
         _maybeUpdateSize();
       }
-    });
-    // buffered 进度随 timeupdate 更新（progress event 暴露不一致）。
-    _on('timeupdate', () {
-      if (_disposed) return;
-      final buf = _video.buffered;
-      if (buf.length == 0) return;
-      final end = buf.end(buf.length - 1);
-      _emit(_value.copyWith(
-        bufferedPosition: Duration(milliseconds: (end * 1000).round()),
-      ));
     });
     _on('ended', () {
       if (_disposed) return;
@@ -287,8 +277,6 @@ class WebVideoBackend extends PlayerBackend {
       }
     });
 
-    // 共享 PiP event bus 在 web 上 inert，仅保持 API 一致。
-    _pipEventSub = pipEventBus().listen((_) {});
   }
 
   @override
@@ -574,8 +562,6 @@ class WebVideoBackend extends PlayerBackend {
     _listenerRemovers.clear();
     _seekSafetyTimer?.cancel();
     _seekSafetyTimer = null;
-    await _pipEventSub?.cancel();
-    _pipEventSub = null;
     _video.pause();
     // hls.js 持有 MSE buffer / xhr，必须显式 destroy，否则泄漏。
     _hls?.callMethod('destroy'.toJS);
@@ -585,7 +571,6 @@ class WebVideoBackend extends PlayerBackend {
     _video.load();
     await _valueController.close();
     await _eventController.close();
-    _isWebFullscreen.dispose();
   }
 }
 

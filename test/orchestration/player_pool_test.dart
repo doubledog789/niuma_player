@@ -19,7 +19,6 @@ class _FakeBackend extends PlayerBackend {
   final StreamController<NiumaPlayerEvent> _events =
       StreamController<NiumaPlayerEvent>.broadcast(sync: true);
 
-  bool playCalled = false;
   bool pauseCalled = false;
   bool disposed = false;
 
@@ -50,7 +49,7 @@ class _FakeBackend extends PlayerBackend {
   }
 
   @override
-  Future<void> play() async => playCalled = true;
+  Future<void> play() async {}
   @override
   Future<void> pause() async => pauseCalled = true;
   @override
@@ -61,30 +60,6 @@ class _FakeBackend extends PlayerBackend {
   Future<void> setVolume(double volume) async {}
   @override
   Future<void> setLooping(bool looping) async {}
-  @override
-  Future<double> getBrightness() async => 0.0;
-  @override
-  Future<bool> setBrightness(double value) async => false;
-  @override
-  Future<double> getSystemVolume() async => 0.0;
-  @override
-  Future<bool> setSystemVolume(double value) async => false;
-  @override
-  Future<bool> enterPictureInPicture({
-    required int aspectNum,
-    required int aspectDen,
-    bool unsafeAutoBackground = false,
-  }) async =>
-      false;
-  @override
-  Future<bool> exitPictureInPicture() async => false;
-  @override
-  Future<bool> queryPictureInPictureSupport() async => false;
-  @override
-  Future<void> updatePictureInPictureActions({
-    required bool isPlaying,
-  }) async {}
-
   @override
   Future<void> dispose() async {
     disposed = true;
@@ -101,14 +76,15 @@ class _FakeFactory implements BackendFactory {
   final List<_FakeBackend> created = <_FakeBackend>[];
 
   @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) {
+  PlayerBackend createVideoPlayer(NiumaDataSource ds, {bool useAndroidPlatformView = false}) {
     final b = makeBackend?.call() ?? _FakeBackend();
     created.add(b);
     return b;
   }
 
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) {
+  PlayerBackend createNative(NiumaDataSource ds,
+      {bool useAndroidPlatformView = false}) {
     final b = makeBackend?.call() ?? _FakeBackend();
     created.add(b);
     return b;
@@ -117,11 +93,9 @@ class _FakeFactory implements BackendFactory {
 
 class _FakeBridge implements PlatformBridge {
   @override
-  bool get isIOS => true; // 走 video_player 路径，避免触碰 native 设备记忆
+  bool get isIOS => true; // 走 video_player 主路径，池测试无需 Android IJK 兜底分支
   @override
   bool get isWeb => false;
-  @override
-  Future<String> deviceFingerprint() async => 'test';
   @override
   Future<int> processHeapLimitMb() async => 256;
   @override
@@ -267,6 +241,36 @@ void main() {
   });
 
   group('preload', () {
+    test('preload 未 await 时立刻 acquire：等同一 init，不拿半成品也不重建',
+        () async {
+      // 回归：插入 entry 与赋 pending 若隔着 await，acquire 会命中
+      // pending==null 的半成品直接返回未初始化 controller。
+      final initGate = Completer<void>();
+      var initDone = false;
+      final bf = _FakeFactory(
+        makeBackend: () => _FakeBackend(initBlock: () async {
+          await initGate.future;
+          initDone = true;
+        }),
+      );
+      final pool = NiumaPlayerPool(controllerFactory: factoryWith(bf));
+      final source = _src('https://x/a.mp4');
+
+      final preloading = pool.preload(source); // 故意不 await
+      final acquiring = pool.acquire(source);
+
+      initGate.complete();
+      final c = await acquiring;
+      await preloading;
+
+      expect(initDone, isTrue,
+          reason: 'acquire 必须等 preload 的 initialize 完成');
+      expect(c, isA<NiumaPlayerController>());
+      expect(factoryCalls, 1, reason: '并发同 key 不得重复建 controller');
+
+      await pool.dispose();
+    });
+
     test('preload 后 init 完立刻 pause，acquire 命中不重建', () async {
       final bf = _FakeFactory();
       final pool = NiumaPlayerPool(controllerFactory: factoryWith(bf));

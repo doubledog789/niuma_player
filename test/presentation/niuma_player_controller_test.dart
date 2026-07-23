@@ -87,9 +87,6 @@ class _PipFakeBackend extends PlayerBackend {
     return exitPipResult;
   }
 
-  @override
-  Future<bool> queryPictureInPictureSupport() async => false;
-
   /// 测试用：记录最近一次推到 native PiP 的 isPlaying 状态。
   bool? lastPipActionsIsPlaying;
   int updatePipActionsCalled = 0;
@@ -103,15 +100,6 @@ class _PipFakeBackend extends PlayerBackend {
   }
 
   @override
-  Future<double> getBrightness() async => 0.0;
-  @override
-  Future<bool> setBrightness(double value) async => false;
-  @override
-  Future<double> getSystemVolume() async => 0.0;
-  @override
-  Future<bool> setSystemVolume(double value) async => false;
-
-  @override
   Future<void> dispose() async {
     await _valueCtrl.close();
     await _eventCtrl.close();
@@ -122,9 +110,11 @@ class _PipFakeFactory implements BackendFactory {
   _PipFakeFactory(this.backend);
   final _PipFakeBackend backend;
   @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) => backend;
+  PlayerBackend createVideoPlayer(NiumaDataSource ds, {bool useAndroidPlatformView = false}) =>
+      backend;
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) =>
+  PlayerBackend createNative(NiumaDataSource ds,
+      {bool useAndroidPlatformView = false}) =>
       backend;
 }
 
@@ -137,28 +127,6 @@ NiumaPlayerController _makeController(_PipFakeBackend backend) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  group('NiumaPlayerController danmakuVisibility', () {
-    test('danmakuVisibility ValueNotifier 默认 true', () {
-      final backend = _PipFakeBackend();
-      final ctl = _makeController(backend);
-      expect(ctl.danmakuVisibility, isA<ValueNotifier<bool>>());
-      expect(ctl.danmakuVisibility.value, isTrue);
-      ctl.dispose();
-    });
-
-    test('danmakuVisibility 可被外部更新并触发 listener', () {
-      final backend = _PipFakeBackend();
-      final ctl = _makeController(backend);
-      bool? heard;
-      ctl.danmakuVisibility.addListener(
-        () => heard = ctl.danmakuVisibility.value,
-      );
-      ctl.danmakuVisibility.value = false;
-      expect(heard, isFalse);
-      ctl.dispose();
-    });
-  });
 
   group('NiumaPlayerController PiP', () {
     test('enterPictureInPicture 在未 initialize 时返 false 不调 backend', () async {
@@ -307,7 +275,7 @@ void main() {
       await c.dispose();
     });
 
-    test('autoEnter=true → 注册 WidgetsBindingObserver；false → 摘除', () async {
+    test('autoEnter 闸门：true 时 inactive 触发进 PiP，false 时不触发', () async {
       final backend = _PipFakeBackend(enterPipResult: true);
       final c = _makeController(backend);
       await c.initialize();
@@ -332,7 +300,7 @@ void main() {
       c.autoEnterPictureInPictureOnBackground = false;
       binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       expect(backend.enterPipCalled, 1,
-          reason: 'autoEnter=false 后 observer 已摘除，不应再触发');
+          reason: 'autoEnter=false 后闸门关闭，observer 常驻但不再触发');
 
       await c.dispose();
     });

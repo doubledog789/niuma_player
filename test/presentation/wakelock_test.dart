@@ -12,8 +12,6 @@ class _RecordingBridge implements PlatformBridge {
   @override
   bool get isWeb => false;
   @override
-  Future<String> deviceFingerprint() async => 'test';
-  @override
   Future<int> processHeapLimitMb() async => 256;
 
   final List<bool> calls = <bool>[];

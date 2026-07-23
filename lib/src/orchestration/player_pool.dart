@@ -95,7 +95,10 @@ class NiumaPlayerPool {
       }
       return existing.controller;
     }
-    final entry = await _put(
+    // 插入 entry 与赋 pending 必须在同一同步段完成——中间隔 await 的话，
+    // 并发同 key 调用会命中 pending==null 的半成品，拿走未初始化的
+    // controller（或在 evict 窗口重复建第二个，先建的泄漏）。
+    final entry = _put(
       key,
       source,
       allowOverflowWhenNoInactiveVictim: true,
@@ -122,7 +125,7 @@ class NiumaPlayerPool {
   Future<void> preload(NiumaMediaSource source) async {
     final key = keyFor(source);
     if (_entries.containsKey(key)) return;
-    final entry = await _put(
+    final entry = _put(
       key,
       source,
       allowOverflowWhenNoInactiveVictim: false,
@@ -160,18 +163,22 @@ class NiumaPlayerPool {
 
   /// 建新条目；超容量先 LRU evict 最旧 inactive。全 active 时 acquire
   /// 允许短暂超容，preload 直接跳过（防 capacity=1 时挤掉当前页）。
-  Future<_Entry?> _put(
+  /// **同步**完成 victim 摘除与新 entry 插入（victim 的 dispose 后台进行），
+  /// 调用方得以在同一同步段内给 entry 赋 pending。
+  _Entry? _put(
     String key,
     NiumaMediaSource source, {
     required bool allowOverflowWhenNoInactiveVictim,
-  }) async {
+  }) {
     while (_entries.isNotEmpty && _entries.length >= capacity) {
       final victim = _lruInactiveKey();
       if (victim == null) {
         if (allowOverflowWhenNoInactiveVictim) break;
         return null;
       }
-      await _remove(victim);
+      _active.remove(victim);
+      final evicted = _entries.remove(victim);
+      if (evicted != null) unawaited(evicted.controller.dispose());
     }
     final entry = _Entry(controllerFactory(source));
     _entries[key] = entry;

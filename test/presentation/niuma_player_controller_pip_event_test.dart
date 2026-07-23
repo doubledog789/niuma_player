@@ -57,29 +57,6 @@ class _PipEmittingFakeBackend extends PlayerBackend {
   @override
   Future<void> setLooping(bool looping) async {}
   @override
-  Future<bool> enterPictureInPicture({
-    required int aspectNum,
-    required int aspectDen,
-    bool unsafeAutoBackground = false,
-  }) async =>
-      false;
-  @override
-  Future<bool> exitPictureInPicture() async => false;
-  @override
-  Future<bool> queryPictureInPictureSupport() async => false;
-  @override
-  Future<void> updatePictureInPictureActions({
-    required bool isPlaying,
-  }) async {}
-  @override
-  Future<double> getBrightness() async => 0.0;
-  @override
-  Future<bool> setBrightness(double value) async => false;
-  @override
-  Future<double> getSystemVolume() async => 0.0;
-  @override
-  Future<bool> setSystemVolume(double value) async => false;
-  @override
   Future<void> dispose() async {
     await _valueCtrl.close();
     await _eventCtrl.close();
@@ -90,9 +67,11 @@ class _PipEmittingFakeFactory implements BackendFactory {
   _PipEmittingFakeFactory(this.backend);
   final _PipEmittingFakeBackend backend;
   @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) => backend;
+  PlayerBackend createVideoPlayer(NiumaDataSource ds, {bool useAndroidPlatformView = false}) =>
+      backend;
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) =>
+  PlayerBackend createNative(NiumaDataSource ds,
+      {bool useAndroidPlatformView = false}) =>
       backend;
 }
 

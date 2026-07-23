@@ -10,6 +10,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import 'package:niuma_player/src/domain/player_state.dart';
+
 const EventChannel _rawPipEventChannel =
     EventChannel('niuma_player/pip/events');
 
@@ -30,4 +32,28 @@ Stream<dynamic> pipEventBus() {
             ctrl.addError(error, stack),
       );
   return ctrl.stream;
+}
+
+/// 订阅 [pipEventBus] 并把 native map 事件翻成 [NiumaPlayerEvent] 喂给
+/// [add]——vp / native 两 backend 共用同一份解析。错误静默（PiP 不可用时
+/// root bus 也可能 error）。
+StreamSubscription<dynamic> subscribePipEvents(
+  void Function(NiumaPlayerEvent event) add,
+) {
+  return pipEventBus().listen(
+    (dynamic data) {
+      if (data is! Map) return;
+      final event = data['event'];
+      if (event is! String) return;
+      switch (event) {
+        case 'pipStarted':
+          add(const PipModeChanged(isInPip: true));
+        case 'pipStopped':
+          add(const PipModeChanged(isInPip: false));
+        case 'playPauseToggle':
+          add(const PipRemoteAction(action: 'playPauseToggle'));
+      }
+    },
+    onError: (Object error) {/* 静默忽略 */},
+  );
 }

@@ -32,6 +32,14 @@ class NiumaGestureController {
   Offset _panStart = Offset.zero;
   Duration _seekStart = Duration.zero;
   double _origValue = 0.0;
+
+  /// [_origValue] 是否已异步读回。锁定亮度/音量后、读回完成前的指针事件
+  /// 直接丢弃——否则会拿 0.0 当基准把系统亮度/音量瞬间打到谷底。
+  bool _origValueReady = false;
+
+  /// 水平 seek 的最新目标；onPanEnd 直接提交它，不从 HUD 进度反算。
+  Duration? _pendingSeekTarget;
+
   double? _originalSpeed;
   Timer? _hideTimer;
   double? _initialBrightness;
@@ -112,6 +120,8 @@ class NiumaGestureController {
     _seekStart = player.value.position;
     _lockedKind = null;
     _origValue = 0.0;
+    _origValueReady = false;
+    _pendingSeekTarget = null;
   }
 
   Future<void> _ensureOrigValue(GestureKind kind) async {
@@ -143,6 +153,7 @@ class NiumaGestureController {
         return;
       }
       await _ensureOrigValue(_lockedKind!);
+      _origValueReady = true;
     }
 
     switch (_lockedKind!) {
@@ -155,6 +166,7 @@ class NiumaGestureController {
         final clamped = Duration(
           milliseconds: target.inMilliseconds.clamp(0, duration.inMilliseconds),
         );
+        _pendingSeekTarget = clamped;
         _showHud(GestureFeedbackState(
           kind: GestureKind.horizontalSeek,
           progress: clamped.inMilliseconds /
@@ -167,6 +179,7 @@ class NiumaGestureController {
         ));
       case GestureKind.brightness:
       case GestureKind.volume:
+        if (!_origValueReady) return;
         final newValue =
             (_origValue - (dy / (size.height * 0.5))).clamp(0.0, 1.0);
         // 节流 50ms
@@ -201,19 +214,13 @@ class NiumaGestureController {
     }
   }
 
-  /// pan 结束 → 水平 seek 时按当前 HUD 进度提交 seek。
+  /// pan 结束 → 水平 seek 时提交拖动中算好的目标位置。
   void onPanEnd() {
-    if (_lockedKind == GestureKind.horizontalSeek) {
-      final hud = _feedback.value;
-      if (hud != null) {
-        final duration = player.value.duration;
-        final progress = hud.progress;
-        final target = Duration(
-          milliseconds: (duration.inMilliseconds * progress).round(),
-        );
-        player.seekTo(target);
-      }
+    final target = _pendingSeekTarget;
+    if (_lockedKind == GestureKind.horizontalSeek && target != null) {
+      player.seekTo(target);
     }
+    _pendingSeekTarget = null;
     _lockedKind = null;
     _scheduleHide();
   }

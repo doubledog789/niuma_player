@@ -78,9 +78,11 @@ class _Factory implements BackendFactory {
   _Factory(this.backend);
   final _RecBackend backend;
   @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) => backend;
+  PlayerBackend createVideoPlayer(NiumaDataSource ds, {bool useAndroidPlatformView = false}) =>
+      backend;
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) =>
+  PlayerBackend createNative(NiumaDataSource ds,
+      {bool useAndroidPlatformView = false}) =>
       backend;
 }
 
@@ -89,8 +91,6 @@ class _NoopBridge implements PlatformBridge {
   bool get isIOS => false;
   @override
   bool get isWeb => false;
-  @override
-  Future<String> deviceFingerprint() async => 'test';
   @override
   Future<int> processHeapLimitMb() async => 256;
   @override
