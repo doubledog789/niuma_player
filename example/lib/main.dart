@@ -1,7 +1,7 @@
 // niuma_player example:
 // - minimal_player/: 最小接入，展示 SDK 公共 API 的基本闭环。
 // - standard_player/: 基于 headless 核拼出来的完整参考播放器皮。
-// - feed_demo/: 短视频/短剧 feed 中的播放器池用法。
+// - feed_demo/: 短视频 feed 单播放器换源用法（池化预加载另见 NiumaPlayerPool）。
 import 'package:flutter/material.dart';
 import 'package:niuma_player/niuma_player.dart';
 
@@ -23,7 +23,7 @@ class StandardDemoApp extends StatelessWidget {
   }
 }
 
-/// 三入口菜单：最小接入 / 标准播放器 / 短视频 feed（播放器池）。
+/// 四入口菜单：最小接入 / 标准播放器 / 短视频 feed / 内核切换测试。
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -51,8 +51,8 @@ class HomePage extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.video_collection_outlined),
-            title: const Text('短视频 Feed（播放器池）'),
-            subtitle: const Text('翻页预加载 + 复用 + 防 OOM'),
+            title: const Text('短视频 Feed（单播放器换源）'),
+            subtitle: const Text('停稳后 load() 换源 + iOS Safari 有声连播'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const FeedPage()),
             ),
@@ -60,7 +60,7 @@ class HomePage extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.swap_horiz),
             title: const Text('内核切换测试（Exo / IJK）'),
-            subtitle: const Text('同一条加密 HLS，运行时切换 Android 内核对比'),
+            subtitle: const Text('同一条测试流，运行时切换 Android 内核对比'),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const EngineSwitchPage()),
             ),
@@ -131,7 +131,7 @@ class _StandardPlayerPageState extends State<StandardPlayerPage> {
   }
 }
 
-/// 内核切换测试页：同一条加密 HLS，运行时切 ExoPlayer（硬解）/ IJK（软解）
+/// 内核切换测试页：同一条测试流，运行时切 ExoPlayer（硬解）/ IJK（软解）
 /// 对比。切换即销毁旧 controller、按所选内核重建（`forceIjkOnAndroid`）。
 class EngineSwitchPage extends StatefulWidget {
   const EngineSwitchPage({super.key});
