@@ -9,13 +9,16 @@ class DefaultBackendFactory implements BackendFactory {
   const DefaultBackendFactory();
 
   @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) => WebVideoBackend(ds);
+  PlayerBackend createVideoPlayer(
+    NiumaDataSource ds, {
+    bool useAndroidPlatformView = false,
+  }) =>
+      WebVideoBackend(ds);
 
   /// Web 无 native 插件——返 [WebVideoBackend] 兜底，仅保接口完整性。
   @override
   PlayerBackend createNative(
     NiumaDataSource ds, {
-    required bool forceIjk,
     bool useAndroidPlatformView = false,
   }) =>
       WebVideoBackend(ds);

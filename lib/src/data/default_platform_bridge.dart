@@ -10,8 +10,7 @@ import 'package:niuma_player/src/data/native_backend.dart';
 /// `NiumaPlayerPlugin` / iOS `NiumaSystemPlugin` 两端注册同名）。
 const MethodChannel _systemChannel = MethodChannel('niuma_player/system');
 
-/// 生产环境 [PlatformBridge]：iOS / Web 侧合成 fingerprint，
-/// Android 转发到 [NativeBackend.fetchDeviceFingerprint]。
+/// 生产环境 [PlatformBridge]。
 class DefaultPlatformBridge implements PlatformBridge {
   const DefaultPlatformBridge();
 
@@ -24,16 +23,6 @@ class DefaultPlatformBridge implements PlatformBridge {
 
   @override
   bool get isWeb => kIsWeb;
-
-  @override
-  Future<String> deviceFingerprint() async {
-    if (kIsWeb) return 'web';
-    if (Platform.isIOS) {
-      return 'ios-${Platform.operatingSystemVersion}';
-    }
-    final fp = await NativeBackend.fetchDeviceFingerprint();
-    return fp ?? 'unknown';
-  }
 
   @override
   Future<int> processHeapLimitMb() async {

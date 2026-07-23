@@ -1,16 +1,13 @@
-import 'package:flutter/foundation.dart' show ValueListenable;
-
 import 'package:niuma_player/src/domain/data_source.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
 
 /// 当前驱动 [NiumaPlayerController] 的 Dart 侧 backend 类型。
-/// `native` 覆盖 ExoPlayer 和 IJK——子变体由 Android 插件内部选择。
 enum PlayerBackendKind {
-  /// `package:video_player`。iOS（AVPlayer）和 Web（`<video>`）使用。
+  /// `package:video_player`——三端主路径（iOS AVPlayer / Android
+  /// ExoPlayer；Web 上则由自家 WebVideoBackend 顶同一位置）。
   videoPlayer,
 
-  /// niuma_player 自家 native 插件（Android）。ExoPlayer / IJK 的选择
-  /// 对 Dart 侧不透明，可经 `selectedVariant` 感知。
+  /// niuma_player 自家 native 插件（Android IJK 软解兜底）。
   native,
 }
 
@@ -34,10 +31,6 @@ abstract class PlayerBackend {
   String? get htmlViewType {
     return null;
   }
-
-  /// Web-only：fullscreen 状态，NiumaPlayerView 据此选 inline / overlay
-  /// 渲染。默认 null，只有 [WebVideoBackend] 重写。
-  ValueListenable<bool>? get webFullscreenState => null;
 
   /// Web-only：让底层 `<video>` 进浏览器原生全屏。默认返 false。
   /// iOS Safari 只能走 `webkitEnterFullscreen`（进系统 player，Flutter

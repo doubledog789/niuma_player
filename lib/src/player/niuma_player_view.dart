@@ -68,7 +68,8 @@ class NiumaPlayerView extends StatelessWidget {
             },
           );
         } else if (backend is VideoPlayerBackend) {
-          // iOS：VideoPlayer 内部走 AVPlayer 原生 scaling。
+          // iOS / Android 主路径：渲染交给 vp 的 VideoPlayer widget
+          //（texture / platformView 由 vp 按 viewType 自决）。
           child = VideoPlayer(backend.innerController);
         } else if (backend != null &&
             backend.androidPlatformViewId != null) {

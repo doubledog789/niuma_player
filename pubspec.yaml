@@ -15,18 +15,17 @@ topics:
   - ijkplayer
 
 environment:
-  # 3.4 needed for package:web + dart:js_interop_unsafe (web 后端用)。
-  sdk: '>=3.4.0 <4.0.0'
-  flutter: '>=3.10.0'
+  # video_player >=2.10（viewType / platformView）要求 Flutter 3.27 / Dart 3.6。
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.27.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  # iOS uses video_player → AVPlayer; Web uses video_player → <video>.
-  # Android does NOT use video_player at runtime (we ship native ExoPlayer +
-  # IJK), but the package still has to be in the pubspec because
-  # VideoPlayerBackend on the Dart side imports it. AGP just leaves the
-  # video_player_android plugin's small Java surface unused.
+  # 三端主路径都是 video_player：iOS → AVPlayer，Android → ExoPlayer（官方
+  # 维护，随 vp 升级），Web 例外——用自家 WebVideoBackend（vp web 缺 Chrome
+  # HLS / httpHeaders，且有手势拦截、全屏搬迁黑屏等问题）。Android 另带
+  # GSY IJK 作软解兜底。
   #
   # Web HLS note: mp4 plays natively via <video> in all browsers, Safari plays
   # m3u8 natively. Chrome/Firefox/Edge need hls.js (MSE) for HLS — we vendor

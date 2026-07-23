@@ -5,12 +5,10 @@ import android.app.ActivityManager
 import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.media.AudioManager
 import android.os.Build
@@ -26,7 +24,6 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.view.TextureRegistry
-import java.security.MessageDigest
 
 /** NiumaPlayerPlugin */
 class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
@@ -45,8 +42,11 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private val players: MutableMap<Long, PlayerSession> = mutableMapOf()
 
     /// Monotonic id allocator for platform-view mode sessions (texture mode
-    /// borrows id from SurfaceTextureEntry).
-    private val platformViewInstanceCounter = java.util.concurrent.atomic.AtomicLong(1)
+    /// borrows id from SurfaceTextureEntry). 起点抬到 1e12 与 texture id
+    /// 空间隔离——两种渲染模式混用时撞 id 会让先建的会话从 players map
+    /// 失联、永不 release。
+    private val platformViewInstanceCounter =
+        java.util.concurrent.atomic.AtomicLong(1_000_000_000_000L)
 
     companion object {
         const val ACTION_PIP_PLAY_PAUSE = "cn.niuma.niuma_player.ACTION_PIP_PLAY_PAUSE"
@@ -103,7 +103,7 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
-        // System channel methods (brightness + volume)
+        // System channel methods (brightness + volume + wakelock)
         when (call.method) {
             "getBrightness" -> {
                 handleGetBrightness(result)
@@ -147,32 +147,11 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
         }
 
-        // Preserved from scaffold so the existing unit test keeps passing.
-        if (call.method == "getPlatformVersion") {
-            result.success("Android ${Build.VERSION.RELEASE}")
-            return
-        }
-
+        // 播放命令走每实例 channel（PlayerSession.onMethodCall）；
+        // 全局 channel 只承载 create / dispose / 堆上限查询。
         when (call.method) {
             "create" -> handleCreate(call, result)
             "dispose" -> handleDispose(call, result)
-            "play" -> forward(call, result) { it.play() }
-            "pause" -> forward(call, result) { it.pause() }
-            "seekTo" -> forward(call, result) { p ->
-                val positionMs = (call.argument<Number>("positionMs") ?: 0).toLong()
-                p.seekTo(positionMs)
-            }
-            "setSpeed" -> forward(call, result) { p ->
-                val speed = (call.argument<Number>("speed") ?: 1.0).toFloat()
-                p.setSpeed(speed)
-            }
-            "setVolume" -> forward(call, result) { p ->
-                val volume = (call.argument<Number>("volume") ?: 1.0).toFloat()
-                p.setVolume(volume)
-            }
-            "deviceFingerprint" -> {
-                result.success(mapOf("fingerprint" to deviceFingerprint()))
-            }
             "getProcessHeapLimitMb" -> {
                 // ActivityManager.memoryClass = 本进程标准堆上限（MB），
                 // 即使大 RAM 设备也被系统 cap。NiumaPlayerPool 按它定容量。
@@ -393,7 +372,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             val type = call.argument<String>("type") ?: "network"
             @Suppress("UNCHECKED_CAST")
             val headers = call.argument<Map<String, String>>("headers")
-            val forceIjk = call.argument<Boolean>("forceIjk") ?: false
             val useAndroidPlatformView =
                 call.argument<Boolean>("useAndroidPlatformView") ?: false
 
@@ -403,30 +381,22 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 "headers" to headers
             )
 
-            val fingerprint = deviceFingerprint()
-            // 设备记忆（Try-Fail-Remember）已移除：内核仅由 forceIjk 决定，
-            // Exo→IJK 兜底在 Dart 层单次完成、不落盘。
-            val useIjk = forceIjk
-
             // Platform-view mode: null registry + allocated instanceId；
             // surface 由 PlayerSurfaceView 在 surfaceCreated 时补绑。
             val pvInstanceId: Long? = if (useAndroidPlatformView)
                 platformViewInstanceCounter.getAndIncrement() else null
             val sessionRegistry = if (useAndroidPlatformView) null else registry
 
-            val player: PlayerSession = if (useIjk) {
+            // 2.0 起 native 只承载 IJK 软解兜底——Android 主路径由 Dart 层
+            // 直接走官方 video_player（自研 ExoPlayer 会话已退役）。
+            val player: PlayerSession =
                 IjkSession(sessionRegistry, msg, ctx, dataSource, pvInstanceId)
-            } else {
-                ExoPlayerSession(sessionRegistry, msg, ctx, dataSource, pvInstanceId)
-            }
             players[player.textureId] = player
 
             result.success(
                 mapOf(
                     "textureId" to player.textureId,
-                    "fingerprint" to fingerprint,
-                    "selectedVariant" to (if (useIjk) "ijk" else "exo"),
-                    "fromMemory" to false,
+                    "selectedVariant" to "ijk",
                     "isPlatformView" to useAndroidPlatformView,
                 )
             )
@@ -446,49 +416,6 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    private inline fun forward(
-        call: MethodCall,
-        result: Result,
-        block: (PlayerSession) -> Unit
-    ) {
-        val textureId = (call.argument<Number>("textureId") ?: -1).toLong()
-        val player = players[textureId]
-        if (player == null) {
-            result.error(
-                "NIUMA_PLAYER_NOT_FOUND",
-                "No player for textureId=$textureId",
-                null
-            )
-            return
-        }
-        try {
-            block(player)
-            result.success(null)
-        } catch (e: Throwable) {
-            result.error("NIUMA_PLAYER_ERROR", e.message, null)
-        }
-    }
-
-
-
-
-
-
-    // ---------------------------------------------------------------------
-    // Device fingerprint: sha1("MANUFACTURER|MODEL|SDK_INT") hex encoded.
-    // ---------------------------------------------------------------------
-
-    private fun deviceFingerprint(): String {
-        val raw = "${Build.MANUFACTURER}|${Build.MODEL}|${Build.VERSION.SDK_INT}"
-        val digest = MessageDigest.getInstance("SHA-1").digest(raw.toByteArray(Charsets.UTF_8))
-        val sb = StringBuilder(digest.size * 2)
-        for (b in digest) {
-            val v = b.toInt() and 0xFF
-            if (v < 0x10) sb.append('0')
-            sb.append(Integer.toHexString(v))
-        }
-        return sb.toString()
-    }
 
     // ---------------------------------------------------------------------
     // System channel handlers: brightness + volume

@@ -7,23 +7,19 @@ import 'package:niuma_player/src/domain/player_backend.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/data/_pip_event_bus.dart';
 
-/// 用于 texture 创建和设备指纹查询的全局 channel。
+/// 用于 texture 创建 / 释放的全局 channel。
 const MethodChannel _globalChannel = MethodChannel('cn.niuma/player');
 
 /// 由 niuma_player 自家 Android 插件支撑的 [PlayerBackend]。
-/// ExoPlayer 还是 IJK 由 native 侧按 `forceIjk` 决定，Dart 侧不做假设；
+/// 2.0 起 native 侧只承载 IJK 软解兜底（Android 主路径走官方 video_player）；
 /// channel：`cn.niuma/player`（全局）+ `cn.niuma/player[/events]/<textureId>`（每实例）。
 class NativeBackend extends PlayerBackend {
   NativeBackend(
     this._dataSource, {
-    this.forceIjk = false,
     this.useAndroidPlatformView = false,
   });
 
   final NiumaDataSource _dataSource;
-
-  /// 为 true 时 native 侧直接用 IJK，不再尝试 ExoPlayer（Exo 失败重试时传）。
-  final bool forceIjk;
 
   /// 为 true 时走 PlatformView（`SurfaceView`）渲染路径，不分配
   /// SurfaceTexture。见 `NiumaPlayerOptions.useAndroidPlatformView`。
@@ -34,11 +30,9 @@ class NativeBackend extends PlayerBackend {
 
   @override
   int? get androidPlatformViewId => _isPlatformView ? _textureId : null;
-  String? _fingerprint;
 
-  /// native 侧实际实例化的变体（`"exo"` / `"ijk"`），[initialize] 填充。
+  /// native 侧实例化的变体。2.0 起恒 `"ijk"`，仅用于超时错误信息。
   String? _selectedVariant;
-  String? get selectedVariant => _selectedVariant;
 
 
   static const MethodChannel _systemChannel =
@@ -76,9 +70,6 @@ class NativeBackend extends PlayerBackend {
   @override
   int? get textureId => _textureId;
 
-  /// [initialize] 期间由 native 侧返回的设备指纹。
-  String? get fingerprint => _fingerprint;
-
   @override
   NiumaPlayerValue get value => _value;
 
@@ -95,7 +86,6 @@ class NativeBackend extends PlayerBackend {
       <String, dynamic>{
         'uri': _dataSource.uri,
         'type': _dataSource.type.name,
-        'forceIjk': forceIjk,
         'useAndroidPlatformView': useAndroidPlatformView,
         if (_dataSource.headers != null) 'headers': _dataSource.headers,
       },
@@ -114,7 +104,6 @@ class NativeBackend extends PlayerBackend {
       );
     }
     _textureId = tid;
-    _fingerprint = result['fingerprint'] as String?;
     _selectedVariant = result['selectedVariant'] as String?;
     _isPlatformView = result['isPlatformView'] == true;
 
@@ -137,27 +126,7 @@ class NativeBackend extends PlayerBackend {
   }
 
   void _startPipEventListening() {
-    // 共享 root listener，避开 EventChannel 单 listener cancel race
-    //（见 _pip_event_bus.dart）。
-    _pipEventSub = pipEventBus().listen(
-      (dynamic data) {
-        if (data is! Map) return;
-        final event = data['event'];
-        if (event is! String) return;
-        switch (event) {
-          case 'pipStarted':
-            _eventController.add(const PipModeChanged(isInPip: true));
-          case 'pipStopped':
-            _eventController.add(const PipModeChanged(isInPip: false));
-          case 'playPauseToggle':
-            _eventController
-                .add(const PipRemoteAction(action: 'playPauseToggle'));
-        }
-      },
-      onError: (Object error) {
-        // 静默忽略——PiP 不可用时 EventChannel 也可能 error
-      },
-    );
+    _pipEventSub = subscribePipEvents(_eventController.add);
   }
 
   void _bumpPrepareWatchdog() {
@@ -248,6 +217,8 @@ class NativeBackend extends PlayerBackend {
       size: Size(width, height),
       bufferedPosition: Duration(milliseconds: bufferedMs),
       openingStage: openingStage,
+      // native 事件不上报速度，携带前值，防 setSpeed 后被打回 1.0。
+      playbackSpeed: _value.playbackSpeed,
       error: playerError,
     );
     _updateValue(next);
@@ -267,15 +238,6 @@ class NativeBackend extends PlayerBackend {
     }
 
     // 错误冒泡给 [NiumaPlayerController] 决定是否重试 / 回退。
-    if (phase == PlayerPhase.error && !_eventController.isClosed) {
-      _eventController.add(
-        FallbackTriggered(
-          FallbackReason.error,
-          errorCode: errorCode == null ? null : '$errorCode@${positionMs}ms',
-          errorCategory: playerError?.category,
-        ),
-      );
-    }
   }
 
   void _onChannelError(Object error, [StackTrace? stack]) {
@@ -329,6 +291,7 @@ class NativeBackend extends PlayerBackend {
       'setSpeed',
       _argsWithId(<String, dynamic>{'speed': speed}),
     );
+    _updateValue(_value.copyWith(playbackSpeed: speed));
   }
 
   @override
@@ -467,6 +430,14 @@ class NativeBackend extends PlayerBackend {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    // 仍在 await initialize() 的调用方立刻失败，别等 initTimeout 兜底
+    //（更别让重试链在已 dispose 的实例上继续拉起僵尸播放器）。
+    if (!_preparedCompleter.isCompleted) {
+      _preparedCompleter.completeError(
+        StateError('NativeBackend disposed before prepared'),
+      );
+      _preparedCompleter.future.ignore();
+    }
     _prepareWatchdog?.cancel();
     _prepareWatchdog = null;
     await _eventSub?.cancel();
@@ -485,14 +456,6 @@ class NativeBackend extends PlayerBackend {
     }
     await _valueController.close();
     await _eventController.close();
-  }
-
-  /// 供 [NiumaPlayerController] 在创建 texture 之前取设备指纹。
-  static Future<String?> fetchDeviceFingerprint() async {
-    final result = await _globalChannel.invokeMapMethod<String, dynamic>(
-      'deviceFingerprint',
-    );
-    return result?['fingerprint'] as String?;
   }
 
   /// 查询 Android 进程堆上限（MB）；原生不可用返 null，调用方兜默认值。

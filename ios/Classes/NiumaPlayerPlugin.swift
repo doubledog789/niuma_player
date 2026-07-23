@@ -1,23 +1,15 @@
 import Flutter
 import UIKit
 
+/// iOS 插件入口：iOS 主路径走官方 video_player，这里只负责注册
+/// PiP / System 子插件（无自有播放 channel）。
 public class NiumaPlayerPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "niuma_player", binaryMessenger: registrar.messenger())
-    let instance = NiumaPlayerPlugin()
-    registrar.addMethodCallDelegate(instance, channel: channel)
-
-    // 注册 PiP / System 子插件
     NiumaPipPlugin.register(with: registrar)
     NiumaSystemPlugin.register(with: registrar)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    switch call.method {
-    case "getPlatformVersion":
-      result("iOS " + UIDevice.current.systemVersion)
-    default:
-      result(FlutterMethodNotImplemented)
-    }
+    result(FlutterMethodNotImplemented)
   }
 }

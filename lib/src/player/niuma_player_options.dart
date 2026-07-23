@@ -15,15 +15,18 @@ class NiumaPlayerOptions {
   });
 
   /// backend 初始化的 wall-clock 上限；超时视作失败（Android 上以 IJK 重试）。
-  /// 默认宽松，因 native 侧已自带 20s no-progress watchdog。
+  /// vp 主路径只靠本超时兜底；IJK 路径另有 backend 内 20s 无进度 watchdog
+  /// 与 FFmpeg 层 15s 网络超时。
   final Duration initTimeout;
 
-  /// Android 上绕过 ExoPlayer 直接走 IJK（紧急覆盖 / A/B 用）。
+  /// Android 上绕过 video_player 主路径直接走 IJK 软解（紧急覆盖 / A/B 用）。
   /// iOS 和 Web 忽略本标志。
   final bool forceIjkOnAndroid;
 
   /// Android 上把视频渲染从 Flutter Texture 切到 PlatformView（SurfaceView
   /// 原生缩放），画质上限更高。默认 false（opt-in）；iOS / Web 忽略。
+  /// 主路径映射为 video_player 的 `VideoViewType.platformView`，IJK 兜底
+  /// 路径走自家 Hybrid Composition——两条路径均可根治部分 ROM 的有声黑屏。
   /// 注意：首帧略晚（等 surfaceCreated），个别 ROM 叠层需真机回归。
   final bool useAndroidPlatformView;
 
@@ -38,12 +41,13 @@ class NiumaPlayerOptions {
   final bool unsafePipAutoBackgroundOnEnter;
 
   /// 用户主动 switchLine 失败时是否自动回滚到原线路（保留 position /
-  /// wasPlaying）。默认 `true`：回滚成功不 rethrow，回滚也失败才
-  /// emit [LineSwitchFailed] 并 rethrow。与 [autoFailoverOnInitialError] 独立。
+  /// wasPlaying）。默认 `true`。切换失败无论回滚成败都 emit
+  /// [LineSwitchFailed]（供上报）；回滚成功不 rethrow，回滚也失败才 rethrow。
+  /// 与 [autoFailoverOnInitialError] 独立。
   final bool rollbackOnSwitchFailure;
 
-  /// 默认线路首次 initialize 失败时，是否自动按 priority 升序遍历其余线路。
-  /// 默认 `true`：全失败才抛最后一条错误 → `PlayerPhase.error`。
-  /// 单线路场景本 flag 无效。
+  /// 多线路时首次 initialize 是否把**全部线路**按 priority 升序遍历（含默认
+  /// 线路——defaultLine 指向非最低 priority 线路时它不保证先试），全失败才
+  /// 抛最后一条错误 → `PlayerPhase.error`。默认 `true`；单线路本 flag 无效。
   final bool autoFailoverOnInitialError;
 }

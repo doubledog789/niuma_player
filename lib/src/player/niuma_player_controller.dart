@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:niuma_player/src/data/default_backend_factory.dart';
@@ -13,16 +12,15 @@ import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/orchestration/multi_source.dart';
 import 'package:niuma_player/src/orchestration/retry_policy.dart';
 import 'package:niuma_player/src/orchestration/source_middleware.dart';
-import 'package:niuma_player/src/cast/cast_session.dart';
-import 'package:niuma_player/src/cast/cast_state.dart';
 import 'package:niuma_player/src/player/niuma_player_options.dart';
 import 'package:niuma_player/src/player/pip_lifecycle_observer.dart';
 
 /// 进程级「正在播放且要求亮屏的 controller 数」，归并多实例，见 `_syncWakelock`。
 int _wakelockHolderCount = 0;
 
-/// 播放内核的单一公共门面：选 backend（iOS/Web → video_player，Android →
-/// 自家 native 插件，ExoPlayer 失败当次会话回退 IJK）、多线路编排、PiP / 投屏。
+/// 播放内核的单一公共门面：选 backend（三端主路径官方 video_player，web 走
+/// 自家 WebVideoBackend，Android 失败当次会话回退 IJK 软解）、多线路编排、
+/// PiP。
 ///
 /// 注意：[events] 流和 value 监听器都是**同步** fire——build 期间直接
 /// setState 会撞 framework locked，建议用 `ValueListenableBuilder` 消费。
@@ -77,8 +75,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   final List<SourceMiddleware> middlewares;
 
   /// [initialize] 抛可恢复错误时的重试策略。
-  /// 注意重试在 Android forceIjk 兜底层之内：最坏 `maxAttempts × 2` 次
-  /// 初始化（默认值下约 194s 才暴露失败），收紧上限调低 maxAttempts / initTimeout。
+  /// 注意重试在 Android IJK 兜底层之内：最坏 `(maxAttempts+1) × 2` 次
+  /// 初始化（默认值下约 254s 才暴露失败，autoFailover 多线路再乘线路数），
+  /// 收紧上限调低 maxAttempts / initTimeout。
   final RetryPolicy retryPolicy;
 
   /// 向后兼容访问器：当前激活线路的数据源。
@@ -95,6 +94,11 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   StreamSubscription<NiumaPlayerEvent>? _eventSub;
   Completer<void>? _initCompleter;
   bool _disposed = false;
+
+  /// 代际号：[load]（非换源路径）与 [dispose] 递增。仍在退避重试中的旧
+  /// init 链在下一次 attempt 时发现代际不符即自行终止，防止旧链复活旧源 /
+  /// 泄漏新建 backend。
+  int _epoch = 0;
 
   /// 当前激活线路的 id。初始值 = `source.defaultLineId`，[switchLine] 成功后更新。
   String get activeLineId => _activeLineId ?? source.defaultLineId;
@@ -141,12 +145,12 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
         if (!completer.isCompleted) completer.complete();
       },
       onError: (Object e, StackTrace st) {
-        if (_initCompleter == completer) {
-          _initCompleter = null;
-        }
+        final isCurrent = _initCompleter == completer;
+        if (isCurrent) _initCompleter = null;
         // 失败必须同步落到 value（phase=error）：否则调用方没 catch future 时
         // value 驱动的 UI 永远等不到 error 态，用户只看到无限转圈。
-        if (!_disposed) {
+        // 已被 load() 取代的旧链不写——避免覆盖新链的正常状态。
+        if (isCurrent && !_disposed) {
           value = value.copyWith(
             phase: PlayerPhase.error,
             error: PlayerError(
@@ -176,6 +180,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
           await runSourceMiddlewares(newSource.currentLine.source, middlewares);
       await backend.load(_resolvedSource!).timeout(options.initTimeout);
     } else {
+      _epoch++; // 作废可能仍在退避重试中的旧 init 链
       await _disposeCurrentBackend();
       _initCompleter = null;
       await initialize();
@@ -213,93 +218,116 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _runInitialize() async {
-    // iOS / Web → 永远走 video_player。
+    // 三端主路径统一走官方 video_player（iOS AVPlayer / Android ExoPlayer /
+    // Web <video>，由官方维护、可随意升级）。Android 额外带 IJK 软解兜底。
     if (_platform.isIOS || _platform.isWeb) {
-      // autoFailover 开且多线路时按 priority 升序全遍历，否则只试 defaultLine。
-      final candidates =
-          (options.autoFailoverOnInitialError && source.lines.length > 1)
-              ? ([...source.lines]
-                ..sort((a, b) => a.priority.compareTo(b.priority)))
-              : <MediaLine>[source.currentLine];
-
-      Object? lastError;
-      StackTrace? lastStack;
-      for (var i = 0; i < candidates.length; i++) {
-        final line = candidates[i];
-        try {
-          _activeLineId = line.id;
-          await _withRetry(() async {
-            // 每次重试：dispose 旧 backend，重跑 middleware（保证 URL/headers 新鲜）。
-            await _disposeCurrentBackend();
-            _resolvedSource = await runSourceMiddlewares(
-              line.source,
-              middlewares,
-            );
-            await _attachBackend(
-                _backendFactory.createVideoPlayer(_resolvedSource!));
-            await _backend!.initialize().timeout(options.initTimeout);
-          });
-          _emit(const BackendSelected(
-            PlayerBackendKind.videoPlayer,
-            fromMemory: false,
-          ));
-          return;
-        } catch (e, st) {
-          lastError = e;
-          lastStack = st;
-          if (candidates.length > 1) {
-            _emit(LineSwitchFailed(toId: line.id, error: e));
-          }
-        }
-      }
-      // 所有线路都失败 → 上抛最后一个错误，转成 PlayerPhase.error。
-      Error.throwWithStackTrace(lastError!, lastStack ?? StackTrace.current);
-    }
-
-    // Android：ExoPlayer 失败时 dispose 后用 forceIjk=true 重开一次。
-    if (options.forceIjkOnAndroid) {
-      await _initNative(forceIjk: true);
+      await _initVideoPlayer();
       return;
     }
 
+    // Android。
+    if (options.forceIjkOnAndroid) {
+      await _initNative(source.currentLine.source);
+      return;
+    }
     try {
-      await _initNative(forceIjk: false);
-    } catch (exoError) {
-      // ExoPlayer 失败 → 当次会话内用 IJK 兜底重试（不落盘）。
+      await _initVideoPlayer();
+    } catch (vpError) {
+      // video_player 失败 → 当次会话内用 IJK 软解兜底重试（不落盘）。
       _emit(FallbackTriggered(
         FallbackReason.error,
-        errorCode: exoError.toString(),
+        errorCode: vpError.toString(),
       ));
       await _disposeCurrentBackend();
+      // 多线路遍历会把 _activeLineId 停在最后一条失败线，而 IJK 兜底实际
+      // 播的是默认线路——先校正，别让 activeLineId 撒谎。
+      _activeLineId = source.defaultLineId;
       try {
-        await _initNative(forceIjk: true);
+        await _initNative(source.currentLine.source);
       } catch (ijkError, st) {
-        // 两内核都失败：合成双段错误一起抛，避免 IJK 的错掩盖 Exo 的根因。
+        // 两内核都失败：合成双段错误一起抛，避免 IJK 的错掩盖 vp 的根因。
         Error.throwWithStackTrace(
-          EngineFallbackFailure(primary: exoError, fallback: ijkError),
+          EngineFallbackFailure(primary: vpError, fallback: ijkError),
           st,
         );
       }
     }
   }
 
-  Future<void> _initNative({required bool forceIjk}) async {
+  /// 单次拉起序列：dispose 旧 backend → 重跑 middleware（URL/headers 新鲜）
+  /// → 建新 backend → attach → initialize（带 wall-clock 超时）。
+  /// [_initVideoPlayer] / [_initNative] / [_doSwitchTo] 的每次 attempt 共用。
+  Future<void> _bringUp(
+    int epoch,
+    NiumaDataSource raw,
+    PlayerBackend Function(NiumaDataSource resolved) create,
+  ) async {
+    if (_disposed || epoch != _epoch) {
+      throw StateError('NiumaPlayerController superseded or disposed');
+    }
+    await _disposeCurrentBackend();
+    _resolvedSource = await runSourceMiddlewares(raw, middlewares);
+    await _attachBackend(create(_resolvedSource!));
+    await _backend!.initialize().timeout(options.initTimeout);
+  }
+
+  PlayerBackend _createVideoPlayer(NiumaDataSource resolved) =>
+      _backendFactory.createVideoPlayer(
+        resolved,
+        useAndroidPlatformView: options.useAndroidPlatformView,
+      );
+
+  /// video_player 主路径初始化：autoFailover 开且多线路时按 priority 升序
+  /// 全遍历，否则只试 defaultLine；全失败抛最后一条错误。
+  Future<void> _initVideoPlayer() async {
+    final epoch = _epoch;
+    final candidates =
+        (options.autoFailoverOnInitialError && source.lines.length > 1)
+            ? ([...source.lines]
+              ..sort((a, b) => a.priority.compareTo(b.priority)))
+            : <MediaLine>[source.currentLine];
+
+    Object? lastError;
+    StackTrace? lastStack;
+    for (var i = 0; i < candidates.length; i++) {
+      final line = candidates[i];
+      try {
+        _activeLineId = line.id;
+        await _withRetry(
+            () => _bringUp(epoch, line.source, _createVideoPlayer));
+        _emit(const BackendSelected(
+          PlayerBackendKind.videoPlayer,
+          fromMemory: false,
+        ));
+        return;
+      } catch (e, st) {
+        if (e is TimeoutException) {
+          // 与 IJK 路径一致：wall-clock 超时发独立信号，便于排障区分。
+          _emit(const FallbackTriggered(FallbackReason.timeout));
+        }
+        lastError = e;
+        lastStack = st;
+        if (candidates.length > 1) {
+          _emit(LineSwitchFailed(toId: line.id, error: e));
+        }
+      }
+    }
+    Error.throwWithStackTrace(lastError!, lastStack ?? StackTrace.current);
+  }
+
+  /// IJK 软解兜底初始化。[raw] 为目标线路的原始数据源——middleware 在每次
+  /// attempt 内重跑。
+  Future<void> _initNative(NiumaDataSource raw) async {
+    final epoch = _epoch;
     try {
-      await _withRetry(() async {
-        // 每次重试：dispose 旧 backend，重跑 middleware（保证 URL/headers 新鲜）。
-        await _disposeCurrentBackend();
-        _resolvedSource = await runSourceMiddlewares(
-          source.currentLine.source,
-          middlewares,
-        );
-        final native = _backendFactory.createNative(
-          _resolvedSource!,
-          forceIjk: forceIjk,
-          useAndroidPlatformView: options.useAndroidPlatformView,
-        );
-        await _attachBackend(native);
-        await native.initialize().timeout(options.initTimeout);
-      });
+      await _withRetry(() => _bringUp(
+            epoch,
+            raw,
+            (resolved) => _backendFactory.createNative(
+              resolved,
+              useAndroidPlatformView: options.useAndroidPlatformView,
+            ),
+          ));
     } on TimeoutException {
       // timeout 转成 FallbackTriggered 语义再 rethrow。
       _emit(const FallbackTriggered(FallbackReason.timeout));
@@ -360,6 +388,13 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> _attachBackend(PlayerBackend backend) async {
+    if (_disposed) {
+      // dispose 后仍在跑的重试链造出的 backend 必须就地销毁，否则泄漏
+      // 真实平台播放器；StateError 属 unknown 类，各预设 RetryPolicy 均
+      // 不重试，僵尸链就此终止。
+      await backend.dispose();
+      throw StateError('NiumaPlayerController has been disposed');
+    }
     await _detachBackend();
     _backend = backend;
     _valueSub = backend.valueStream.listen((v) {
@@ -419,31 +454,16 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
   }
 
   Future<void> play() async {
-    final session = _castSession.value;
-    if (session != null) {
-      await session.play();
-      return;
-    }
     await _backend?.play();
     // PiP RemoteAction 同步只走 value setter；这里再主动 push 会双调
     // setPictureInPictureParams，导致 OS PiP UI 反复重置闪掉。
   }
 
   Future<void> pause() async {
-    final session = _castSession.value;
-    if (session != null) {
-      await session.pause();
-      return;
-    }
     await _backend?.pause();
   }
 
   Future<void> seekTo(Duration position) async {
-    final session = _castSession.value;
-    if (session != null) {
-      await session.seek(position);
-      return;
-    }
     await _backend?.seekTo(position);
   }
 
@@ -495,7 +515,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     } catch (e) {
       if (_disposed) return;
       // rollbackOnSwitchFailure：切换失败静默回滚到原线路。
-      if (options.rollbackOnSwitchFailure && fromId != lineId) {
+      if (options.rollbackOnSwitchFailure) {
         try {
           await _doSwitchTo(fromId, savedPos: savedPos, wasPlaying: wasPlaying);
           // 回滚成功：发 LineSwitchFailed 供上报，但不 rethrow。
@@ -510,8 +530,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     }
   }
 
-  /// [switchLine] 与 rollback 共用：dispose 老 backend → middleware →
-  /// 新 backend initialize → seek + 续播。
+  /// [switchLine] 与 rollback 共用：拉起目标线路（重建式重试）→ seek + 续播。
   Future<void> _doSwitchTo(
     String lineId, {
     required Duration savedPos,
@@ -521,24 +540,18 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     if (target == null) {
       throw ArgumentError.value(lineId, 'lineId', 'unknown line id');
     }
-    await _disposeCurrentBackend();
     if (_disposed) return;
     _activeLineId = lineId;
-    final resolved = await runSourceMiddlewares(target.source, middlewares);
-    if (_disposed) return;
-    _resolvedSource = resolved;
 
-    if (_platform.isIOS || _platform.isWeb) {
-      await _attachBackend(_backendFactory.createVideoPlayer(resolved));
-      if (_disposed) {
-        // 刚 attach 的 backend 不能泄漏
-        await _disposeCurrentBackend();
-        return;
-      }
-      await _withRetry(
-          () => _backend!.initialize().timeout(options.initTimeout));
+    if (!_platform.isIOS && !_platform.isWeb && options.forceIjkOnAndroid) {
+      // Android 且显式强制 IJK——用目标线路的源，别再用默认线。
+      await _initNative(target.source);
     } else {
-      await _initNative(forceIjk: options.forceIjkOnAndroid);
+      // 三端统一 video_player 主路径；每次重试整链重建（复用同一个失败
+      // backend 反复 initialize 是打不活的）。
+      final epoch = _epoch;
+      await _withRetry(
+          () => _bringUp(epoch, target.source, _createVideoPlayer));
     }
     if (_disposed) {
       await _disposeCurrentBackend();
@@ -551,16 +564,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     }
     if (wasPlaying) {
       await _backend!.play();
-      if (_disposed) return;
     }
   }
 
-
-  // ────────────── 弹幕显示开关 ──────────────
-
-  /// 弹幕显示开关（默认 `true`）。业务监听它决定是否渲染弹幕层，
-  /// dispose 时自动释放。
-  final ValueNotifier<bool> danmakuVisibility = ValueNotifier(true);
 
   // ────────────── PiP（画中画） ──────────────
 
@@ -650,75 +656,19 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
 
   static int _gcd(int a, int b) => b == 0 ? a : _gcd(b, a % b);
 
-  // ────────────── Cast（投屏） ──────────────
-
-  final ValueNotifier<CastSession?> _castSession =
-      ValueNotifier<CastSession?>(null);
-
-  /// 当前投屏会话。null = 未投屏；UI 监听它切换控件远程映射状态。
-  ValueListenable<CastSession?> get castSession => _castSession;
-
-  /// 测试辅助：直接 set [_castSession.value]。生产路径走 connectCast。
-  @visibleForTesting
-  void debugSetCastSession(CastSession? session) {
-    _castSession.value = session;
-  }
-
-  /// 进入投屏：pause 本地 backend，写入 [castSession]，emit [CastStarted]。
-  Future<void> connectCast(CastSession session) async {
-    await pause(); // 此时 _castSession 还 null，调本地 backend
-    _castSession.value = session;
-    if (!_eventController.isClosed) {
-      _eventController.add(CastStarted(session.device));
-    }
-  }
-
-  /// 退出投屏。从 session 拿当前位置；本地 seekTo 接续；emit [CastEnded] 事件。
-  Future<void> disconnectCast({
-    required CastEndReason reason,
-  }) async {
-    final session = _castSession.value;
-    if (session == null) return;
-    Duration? remotePos;
-    try {
-      remotePos = await session.getPosition();
-    } catch (_) {
-      remotePos = null;
-    }
-    try {
-      await session.disconnect();
-    } catch (_) {}
-    _castSession.value = null;
-    if (remotePos != null && !_disposed) {
-      await seekTo(remotePos);
-    }
-    if (!_eventController.isClosed) {
-      _eventController.add(CastEnded(reason));
-    }
-  }
-
   @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _epoch++; // 作废仍在退避重试中的 init 链
     // 仍在播时直接销毁（feed 滑走等）也要退出亮屏计数，不留泄漏。
     _syncWakelock(false);
     if (_pipObserver != null) {
       WidgetsBinding.instance.removeObserver(_pipObserver!);
       _pipObserver = null;
     }
-    final session = _castSession.value;
-    if (session != null) {
-      try {
-        await session.disconnect().timeout(const Duration(seconds: 2));
-      } catch (_) {
-        // 忽略——dispose 中不抛
-      }
-    }
     await _disposeCurrentBackend();
     await _eventController.close();
-    danmakuVisibility.dispose();
-    _castSession.dispose();
     super.dispose();
   }
 }

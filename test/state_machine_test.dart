@@ -30,7 +30,7 @@ class _CountingMiddleware extends SourceMiddleware {
   }
 }
 
-/// Simple controllable fake. Tests provide [initFuture] to drive the
+/// Simple controllable fake. Tests provide [initBlock] to drive the
 /// "Try-Once-Then-Retry" state machine in [NiumaPlayerController].
 class FakePlayerBackend extends PlayerBackend {
   FakePlayerBackend({
@@ -54,7 +54,6 @@ class FakePlayerBackend extends PlayerBackend {
 
   NiumaPlayerValue _value = NiumaPlayerValue.uninitialized();
 
-  bool initializeCalled = false;
   bool disposed = false;
 
   /// Last argument passed to [seekTo]; null if seekTo was never called.
@@ -77,7 +76,6 @@ class FakePlayerBackend extends PlayerBackend {
 
   @override
   Future<void> initialize() async {
-    initializeCalled = true;
     if (initBlock != null) {
       await initBlock!();
     }
@@ -130,34 +128,6 @@ class FakePlayerBackend extends PlayerBackend {
   Future<void> setLooping(bool looping) async {}
 
   @override
-  Future<double> getBrightness() async => 0.0;
-  @override
-  Future<bool> setBrightness(double value) async => false;
-  @override
-  Future<double> getSystemVolume() async => 0.0;
-  @override
-  Future<bool> setSystemVolume(double value) async => false;
-
-  @override
-  Future<bool> enterPictureInPicture({
-    required int aspectNum,
-    required int aspectDen,
-    bool unsafeAutoBackground = false,
-  }) async =>
-      false;
-
-  @override
-  Future<bool> exitPictureInPicture() async => false;
-
-  @override
-  Future<bool> queryPictureInPictureSupport() async => false;
-
-  @override
-  Future<void> updatePictureInPictureActions({
-    required bool isPlaying,
-  }) async {}
-
-  @override
   Future<void> dispose() async {
     disposed = true;
     await _valueController.close();
@@ -167,8 +137,7 @@ class FakePlayerBackend extends PlayerBackend {
 
 /// Records every [createVideoPlayer] / [createNative] call. Tests can drive
 /// a sequence of fake backends (e.g. first one errors, second one succeeds)
-/// by giving a `makeNative` that picks a different fake based on its
-/// `forceIjk` argument or call index.
+/// by giving a `makeNative` that picks a different fake per call index.
 ///
 /// The no-arg [FakeBackendFactory()] constructor creates simple, always-
 /// succeeding video-player backends and is convenient for tests that only
@@ -176,19 +145,17 @@ class FakePlayerBackend extends PlayerBackend {
 class FakeBackendFactory implements BackendFactory {
   FakeBackendFactory({
     FakePlayerBackend Function(NiumaDataSource ds)? makeVideoPlayer,
-    FakePlayerBackend Function(NiumaDataSource ds, bool forceIjk)? makeNative,
+    FakePlayerBackend Function(NiumaDataSource ds)? makeNative,
   })  : makeVideoPlayer = makeVideoPlayer ??
             ((_) => FakePlayerBackend(kind: PlayerBackendKind.videoPlayer)),
         makeNative = makeNative ??
-            ((_, __) => FakePlayerBackend(kind: PlayerBackendKind.native));
+            ((_) => FakePlayerBackend(kind: PlayerBackendKind.native));
 
   final FakePlayerBackend Function(NiumaDataSource ds) makeVideoPlayer;
-  final FakePlayerBackend Function(NiumaDataSource ds, bool forceIjk)
-      makeNative;
+  final FakePlayerBackend Function(NiumaDataSource ds) makeNative;
 
   final List<FakePlayerBackend> videoPlayers = <FakePlayerBackend>[];
   final List<FakePlayerBackend> nativePlayers = <FakePlayerBackend>[];
-  final List<bool> nativeForceIjkArgs = <bool>[];
 
   /// Records the last [NiumaDataSource] passed to either [createVideoPlayer]
   /// or [createNative], after the middleware pipeline has run. Tests assert
@@ -211,7 +178,7 @@ class FakeBackendFactory implements BackendFactory {
   Duration? get lastSeekTarget => _latestBackend?.lastSeekTarget;
 
   @override
-  PlayerBackend createVideoPlayer(NiumaDataSource ds) {
+  PlayerBackend createVideoPlayer(NiumaDataSource ds, {bool useAndroidPlatformView = false}) {
     lastSourceFromMiddleware = ds;
     final b = makeVideoPlayer(ds);
     videoPlayers.add(b);
@@ -219,11 +186,11 @@ class FakeBackendFactory implements BackendFactory {
   }
 
   @override
-  PlayerBackend createNative(NiumaDataSource ds, {required bool forceIjk, bool useAndroidPlatformView = false}) {
+  PlayerBackend createNative(NiumaDataSource ds,
+      {bool useAndroidPlatformView = false}) {
     lastSourceFromMiddleware = ds;
-    final b = makeNative(ds, forceIjk);
+    final b = makeNative(ds);
     nativePlayers.add(b);
-    nativeForceIjkArgs.add(forceIjk);
     return b;
   }
 }
@@ -233,7 +200,6 @@ class FakePlatformBridge implements PlatformBridge {
   FakePlatformBridge({
     this.isIOS = false,
     this.isWeb = false,
-    this.fingerprint = 'fake-fp',
   });
 
   @override
@@ -242,21 +208,11 @@ class FakePlatformBridge implements PlatformBridge {
   @override
   final bool isWeb;
 
-  final String fingerprint;
-
-  @override
-  Future<String> deviceFingerprint() async => fingerprint;
-
   @override
   Future<int> processHeapLimitMb() async => 256;
 
-  /// 记录 setKeepScreenOn 调用序列，供 wakelock 边沿断言。
-  final List<bool> keepScreenOnCalls = <bool>[];
-
   @override
-  Future<void> setKeepScreenOn(bool on) async {
-    keepScreenOnCalls.add(on);
-  }
+  Future<void> setKeepScreenOn(bool on) async {}
 }
 
 void main() {
@@ -270,7 +226,7 @@ void main() {
       final factory = FakeBackendFactory(
         makeVideoPlayer: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, __) =>
+        makeNative: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
@@ -305,7 +261,7 @@ void main() {
       final factory = FakeBackendFactory(
         makeVideoPlayer: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, __) =>
+        makeNative: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
@@ -331,7 +287,7 @@ void main() {
       final factory = FakeBackendFactory(
         makeVideoPlayer: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, __) =>
+        makeNative: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
@@ -348,17 +304,15 @@ void main() {
       expect(controller.activeBackend, PlayerBackendKind.native);
       expect(factory.videoPlayers, isEmpty);
       expect(factory.nativePlayers.length, 1);
-      expect(factory.nativeForceIjkArgs, <bool>[true]);
 
       await controller.dispose();
     });
 
-    test('D. Android default + native succeeds first time → no retry',
-        () async {
+    test('D. Android default → video_player 主路径，不触碰 native', () async {
       final factory = FakeBackendFactory(
         makeVideoPlayer: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, __) =>
+        makeNative: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
@@ -374,41 +328,32 @@ void main() {
       await controller.initialize();
       await Future<void>.delayed(Duration.zero);
 
-      expect(controller.activeBackend, PlayerBackendKind.native);
-      expect(factory.videoPlayers, isEmpty);
-      expect(factory.nativePlayers.length, 1);
-      expect(factory.nativeForceIjkArgs, <bool>[false]);
+      expect(controller.activeBackend, PlayerBackendKind.videoPlayer);
+      expect(factory.videoPlayers.length, 1);
+      expect(factory.nativePlayers, isEmpty);
       expect(events.whereType<FallbackTriggered>(), isEmpty);
       final selected = events.whereType<BackendSelected>().single;
-      expect(selected.kind, PlayerBackendKind.native);
+      expect(selected.kind, PlayerBackendKind.videoPlayer);
 
       await sub.cancel();
       await controller.dispose();
     });
 
-    test(
-        'E. Android default + native errors → controller retries with forceIjk=true',
-        () async {
+    test('E. Android vp 主路径失败 → IJK 兜底（forceIjk=true）', () async {
       final factory = FakeBackendFactory(
-        makeVideoPlayer: (_) =>
-            FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, forceIjk) {
-          if (!forceIjk) {
-            // First (default) attempt: simulate a codec failure mid-prepare.
-            return FakePlayerBackend(
-              kind: PlayerBackendKind.native,
-              initBlock: () async {
-                throw StateError('codec unsupported');
-              },
-            );
-          }
-          // Retry succeeds.
-          return FakePlayerBackend(kind: PlayerBackendKind.native);
-        },
+        makeVideoPlayer: (_) => FakePlayerBackend(
+          kind: PlayerBackendKind.videoPlayer,
+          initBlock: () async {
+            throw StateError('vp source error');
+          },
+        ),
+        makeNative: (_) =>
+            FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
-      final controller = NiumaPlayerController.dataSource(
-        ds,
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        retryPolicy: const RetryPolicy.none(),
         platform: FakePlatformBridge(),
         backendFactory: factory,
       );
@@ -419,16 +364,11 @@ void main() {
       await controller.initialize();
       await Future<void>.delayed(Duration.zero);
 
-      // Both attempts went through, in order.
-      expect(factory.nativeForceIjkArgs, <bool>[false, true]);
-      expect(factory.nativePlayers.length, 2);
-      // The first (failed) backend was disposed.
-      expect(factory.nativePlayers[0].disposed, isTrue);
-      // The retry backend is the active one.
+      // vp 先试并失败（已 dispose），IJK 兜底成功且 active。
+      expect(factory.videoPlayers.length, 1);
+      expect(factory.videoPlayers[0].disposed, isTrue);
       expect(controller.activeBackend, PlayerBackendKind.native);
 
-      // Caller-visible events: a FallbackTriggered for the failure, then a
-      // BackendSelected for the successful retry.
       final fb = events.whereType<FallbackTriggered>().single;
       expect(fb.reason, FallbackReason.error);
       final selected = events.whereType<BackendSelected>().single;
@@ -438,12 +378,16 @@ void main() {
       await controller.dispose();
     });
 
-    test('F. Android default + native errors twice → initialize() throws',
+    test('F. Android vp 与 IJK 兜底双双失败 → initialize() 抛组合异常',
         () async {
       final factory = FakeBackendFactory(
-        makeVideoPlayer: (_) =>
-            FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, __) => FakePlayerBackend(
+        makeVideoPlayer: (_) => FakePlayerBackend(
+          kind: PlayerBackendKind.videoPlayer,
+          initBlock: () async {
+            throw StateError('hard failure');
+          },
+        ),
+        makeNative: (_) => FakePlayerBackend(
           kind: PlayerBackendKind.native,
           initBlock: () async {
             throw StateError('hard failure');
@@ -451,8 +395,9 @@ void main() {
         ),
       );
 
-      final controller = NiumaPlayerController.dataSource(
-        ds,
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        retryPolicy: const RetryPolicy.none(),
         platform: FakePlatformBridge(),
         backendFactory: factory,
       );
@@ -465,8 +410,8 @@ void main() {
             .having((e) => e.primary.toString(), 'primary', contains('hard failure'))
             .having((e) => e.fallback.toString(), 'fallback', contains('hard failure'))),
       );
-      // Both attempts ran (default, then forceIjk).
-      expect(factory.nativeForceIjkArgs, <bool>[false, true]);
+      // vp 一次 + IJK 兜底一次。
+      expect(factory.videoPlayers.length, 1);
       // value 也进 error 态且信息带双段
       expect(controller.value.phase, PlayerPhase.error);
       expect(controller.value.error!.message, contains('ExoPlayer'));
@@ -508,27 +453,25 @@ void main() {
       await controller.dispose();
     });
 
-    test('G. Android default + native init wall-clock timeout → retry kicks in',
+    test('G. Android vp 初始化 wall-clock 超时 → retry 重建 vp backend',
         () async {
-      // The first native attempt never resolves; the controller should hit
-      // its wall-clock timeout and retry by rebuilding the backend.
+      // 第一次 vp 初始化永不完成 → 撞 initTimeout → retry 重建。
       final firstAttemptCompleter = Completer<void>();
-      var nativeCallIndex = 0;
+      var vpCallIndex = 0;
 
       final factory = FakeBackendFactory(
-        makeVideoPlayer: (_) =>
-            FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, forceIjk) {
-          final attempt = nativeCallIndex++;
+        makeVideoPlayer: (_) {
+          final attempt = vpCallIndex++;
           if (attempt == 0) {
             return FakePlayerBackend(
-              kind: PlayerBackendKind.native,
+              kind: PlayerBackendKind.videoPlayer,
               initBlock: () => firstAttemptCompleter.future,
             );
           }
-          // Retry succeeds.
-          return FakePlayerBackend(kind: PlayerBackendKind.native);
+          return FakePlayerBackend(kind: PlayerBackendKind.videoPlayer);
         },
+        makeNative: (_) =>
+            FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
       final controller = NiumaPlayerController(
@@ -553,37 +496,26 @@ void main() {
       await controller.initialize();
       await Future<void>.delayed(Duration.zero);
 
-      // Both attempts ran; both with forceIjk=false (retry rebuilds the
-      // backend on the same path, so the outer Try-Fail-Remember layer
-      // never has to fire).
-      expect(controller.activeBackend, PlayerBackendKind.native);
-      expect(factory.nativeForceIjkArgs, <bool>[false, false],
-          reason: 'retry rebuilds with the same forceIjk value; outer '
-              'fallback only kicks in when retry is fully exhausted');
-      // The first (timed-out) backend was disposed before retry built the
-      // second one.
-      expect(factory.nativePlayers[0].disposed, isTrue);
+      // retry 在 vp 主路径内重建，同路径两次；IJK 兜底无需触发。
+      expect(controller.activeBackend, PlayerBackendKind.videoPlayer);
+      expect(factory.videoPlayers.length, 2);
+      expect(factory.nativePlayers, isEmpty);
+      // 第一个（超时的）backend 已 dispose。
+      expect(factory.videoPlayers[0].disposed, isTrue);
 
       await sub.cancel();
       await controller.dispose();
     });
 
-    test(
-        'G2. Android default + native timeout exhausts retry → forceIjk fallback fires',
-        () async {
-      // Every non-forceIjk attempt times out; only forceIjk=true succeeds.
+    test('G2. Android vp 超时耗尽 retry → IJK 兜底接管', () async {
+      // vp 每次都超时；IJK 兜底成功。
       final factory = FakeBackendFactory(
-        makeVideoPlayer: (_) =>
-            FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, forceIjk) {
-          if (!forceIjk) {
-            return FakePlayerBackend(
-              kind: PlayerBackendKind.native,
-              initBlock: () => Completer<void>().future,
-            );
-          }
-          return FakePlayerBackend(kind: PlayerBackendKind.native);
-        },
+        makeVideoPlayer: (_) => FakePlayerBackend(
+          kind: PlayerBackendKind.videoPlayer,
+          initBlock: () => Completer<void>().future,
+        ),
+        makeNative: (_) =>
+            FakePlayerBackend(kind: PlayerBackendKind.native),
       );
 
       final controller = NiumaPlayerController(
@@ -607,9 +539,8 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(controller.activeBackend, PlayerBackendKind.native);
-      // With maxAttempts=2: attempt 1 → retry, attempt 2 → retry, attempt 3 →
-      // exhausted. Then the outer forceIjk fallback fires once.
-      expect(factory.nativeForceIjkArgs, <bool>[false, false, false, true]);
+      // vp 重试 3 次全超时（maxAttempts=2 → 3 次尝试），随后 IJK 兜底一次。
+      expect(factory.videoPlayers.length, 3);
 
       // Both controller-level FallbackTriggered events fire: timeout (from
       // exhausted retry) and error (from outer try/catch).
@@ -627,7 +558,7 @@ void main() {
       final fake = FakeBackendFactory(
         makeVideoPlayer: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.videoPlayer),
-        makeNative: (_, __) =>
+        makeNative: (_) =>
             FakePlayerBackend(kind: PlayerBackendKind.native),
       );
       final ctrl = NiumaPlayerController(
@@ -650,9 +581,9 @@ void main() {
         () async {
       var initCount = 0;
       final fake = FakeBackendFactory(
-        makeNative: (_, __) {
+        makeVideoPlayer: (_) {
           return FakePlayerBackend(
-            kind: PlayerBackendKind.native,
+            kind: PlayerBackendKind.videoPlayer,
             initBlock: () async {
               initCount++;
               if (initCount == 1) {
@@ -676,8 +607,18 @@ void main() {
 
     test('RetryPolicy does not retry codecUnsupported (short-circuits)',
         () async {
+      var vpInits = 0;
       final fake = FakeBackendFactory(
-        makeNative: (_, __) {
+        makeVideoPlayer: (_) {
+          return FakePlayerBackend(
+            kind: PlayerBackendKind.videoPlayer,
+            initBlock: () async {
+              vpInits++;
+              throw _RetryableError(PlayerErrorCategory.codecUnsupported);
+            },
+          );
+        },
+        makeNative: (_) {
           return FakePlayerBackend(
             kind: PlayerBackendKind.native,
             initBlock: () async =>
@@ -692,6 +633,8 @@ void main() {
         backendFactory: fake,
       );
       await expectLater(ctrl.initialize(), throwsA(anything));
+      // codecUnsupported 短路不重试：vp 只 init 一次（随后 IJK 兜底也失败）。
+      expect(vpInits, 1);
       ctrl.dispose();
     });
 
@@ -729,13 +672,13 @@ void main() {
 
     test(
         'retry rebuilds the backend on each attempt: first backend disposed, '
-        'second backend constructed (Android path)', () async {
-      var nativeIdx = 0;
+        'second backend constructed (Android / vp 主路径)', () async {
+      var vpIdx = 0;
       final fake = FakeBackendFactory(
-        makeNative: (_, __) {
-          final attempt = nativeIdx++;
+        makeVideoPlayer: (_) {
+          final attempt = vpIdx++;
           return FakePlayerBackend(
-            kind: PlayerBackendKind.native,
+            kind: PlayerBackendKind.videoPlayer,
             initBlock: () async {
               if (attempt == 0) {
                 throw _RetryableError(PlayerErrorCategory.network);
@@ -758,13 +701,12 @@ void main() {
       await ctrl.initialize();
 
       // Two distinct backends were constructed (one per attempt).
-      expect(fake.nativePlayers.length, 2,
+      expect(fake.videoPlayers.length, 2,
           reason: 'each retry attempt must build a fresh backend');
-      // First (failed) backend was disposed.
-      expect(fake.nativePlayers[0].disposed, isTrue,
+      expect(fake.videoPlayers[0].disposed, isTrue,
           reason: 'failed backend must be disposed before retry');
-      // Second backend is the active one.
-      expect(fake.nativePlayers[1].disposed, isFalse);
+      expect(fake.videoPlayers[1].disposed, isFalse);
+      expect(fake.nativePlayers, isEmpty);
 
       ctrl.dispose();
     });
@@ -1146,31 +1088,6 @@ void main() {
       final c = a.copyWith(isInPictureInPicture: true);
       expect(b, equals(c));
       expect(b.hashCode, equals(c.hashCode));
-    });
-  });
-
-  group('M15 Cast events', () {
-    test('CastStarted 携带 device', () {
-      const d = CastDevice(id: 'dlna:1', name: 'TV', protocolId: 'dlna');
-      final e = CastStarted(d);
-      expect(e.device, d);
-    });
-
-    test('CastEnded 携带 reason', () {
-      const e = CastEnded(CastEndReason.userCancelled);
-      expect(e.reason, CastEndReason.userCancelled);
-    });
-
-    test('CastError 带 code + 可选 message', () {
-      const e = CastError(code: 'TIMEOUT', message: 'connect 30s 超时');
-      expect(e.code, 'TIMEOUT');
-      expect(e.message, 'connect 30s 超时');
-    });
-
-    test('CastError message 可省略', () {
-      const e = CastError(code: 'NETWORK_DOWN');
-      expect(e.code, 'NETWORK_DOWN');
-      expect(e.message, isNull);
     });
   });
 

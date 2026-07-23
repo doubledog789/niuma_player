@@ -11,9 +11,13 @@ import 'package:niuma_player/src/data/_pip_event_bus.dart';
 
 /// 包装 `package:video_player` 的 [PlayerBackend] 实现。
 class VideoPlayerBackend extends PlayerBackend {
-  VideoPlayerBackend(this._dataSource);
+  VideoPlayerBackend(this._dataSource, {this.useAndroidPlatformView = false});
 
   final NiumaDataSource _dataSource;
+
+  /// Android 上映射为 vp 的 `VideoViewType.platformView`（SurfaceView，
+  /// Hybrid Composition）——对齐 0.3.3 根治有声黑屏的渲染路径。
+  final bool useAndroidPlatformView;
 
   late final VideoPlayerController _inner = _buildController();
 
@@ -37,16 +41,22 @@ class VideoPlayerBackend extends PlayerBackend {
 
   VideoPlayerController _buildController() {
     final headers = _dataSource.headers ?? const <String, String>{};
+    final viewType = useAndroidPlatformView && Platform.isAndroid
+        ? VideoViewType.platformView
+        : VideoViewType.textureView;
     switch (_dataSource.type) {
       case NiumaSourceType.network:
         return VideoPlayerController.networkUrl(
           Uri.parse(_dataSource.uri),
           httpHeaders: headers,
+          viewType: viewType,
         );
       case NiumaSourceType.asset:
-        return VideoPlayerController.asset(_dataSource.uri);
+        return VideoPlayerController.asset(_dataSource.uri,
+            viewType: viewType);
       case NiumaSourceType.file:
-        return VideoPlayerController.file(File(_dataSource.uri));
+        return VideoPlayerController.file(File(_dataSource.uri),
+            viewType: viewType);
     }
   }
 
@@ -73,27 +83,7 @@ class VideoPlayerBackend extends PlayerBackend {
   }
 
   void _startPipEventListening() {
-    // 共享 [pipEventBus] root listener，避开 EventChannel 单 listener
-    // cancel race（见 _pip_event_bus.dart）。
-    _pipEventSub = pipEventBus().listen(
-      (dynamic data) {
-        if (data is! Map) return;
-        final event = data['event'];
-        if (event is! String) return;
-        switch (event) {
-          case 'pipStarted':
-            _eventController.add(const PipModeChanged(isInPip: true));
-          case 'pipStopped':
-            _eventController.add(const PipModeChanged(isInPip: false));
-          case 'playPauseToggle':
-            _eventController
-                .add(const PipRemoteAction(action: 'playPauseToggle'));
-        }
-      },
-      onError: (Object error) {
-        // 静默忽略——PiP 不可用时 root bus 也可能 error。
-      },
-    );
+    _pipEventSub = subscribePipEvents(_eventController.add);
   }
 
   /// 推导 [PlayerPhase]，优先级
@@ -126,6 +116,7 @@ class VideoPlayerBackend extends PlayerBackend {
       duration: v.duration,
       size: v.size,
       bufferedPosition: buffered,
+      playbackSpeed: v.playbackSpeed,
       error: playerError,
     );
     if (mapped != _value) {
@@ -133,15 +124,6 @@ class VideoPlayerBackend extends PlayerBackend {
       if (!_valueController.isClosed) {
         _valueController.add(_value);
       }
-    }
-    if (v.hasError && !_eventController.isClosed) {
-      _eventController.add(
-        FallbackTriggered(
-          FallbackReason.error,
-          errorCode: v.errorDescription,
-          errorCategory: PlayerErrorCategory.unknown,
-        ),
-      );
     }
   }
 

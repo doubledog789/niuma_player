@@ -105,8 +105,6 @@ internal abstract class PlayerSession(
                 if (System.currentTimeMillis() >= suppressHeartbeatUntilMs) {
                     try {
                         positionMs = underlyingCurrentPosition()
-                        // Subclass hook (e.g. ExoPlayer bufferedPosition sampling).
-                        onHeartbeatTick()
                         emitState()
                     } catch (_: Throwable) {
                         // swallow — player may be transitioning / released
@@ -115,15 +113,6 @@ internal abstract class PlayerSession(
             }
             mainHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
         }
-    }
-
-    /// Per-heartbeat subclass hook; updates are coalesced into the heartbeat's
-    /// single emitState.
-    protected open fun onHeartbeatTick() {}
-
-    /// Update bufferedMs WITHOUT emitting — the heartbeat's emitState picks it up.
-    protected fun setBufferedMsSilently(ms: Long) {
-        bufferedMs = ms.coerceAtLeast(0L)
     }
 
     /// Texture mode: the Flutter texture id. Platform-view mode: session
@@ -342,12 +331,6 @@ internal abstract class PlayerSession(
             bufferedMs = durationMs * p / 100L
             emitState()
         }
-    }
-
-    protected fun notifyBufferedMs(bufferedMs: Long) {
-        if (released) return
-        this.bufferedMs = bufferedMs.coerceAtLeast(0L)
-        emitState()
     }
 
     /// Subclass calls this on terminal error, translating its native codes into
