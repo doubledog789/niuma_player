@@ -1,0 +1,16 @@
+# 依赖新版感知:vp（video_player）等 pub 依赖出新版自动提 PR，
+# 由 ci.yml 跑 analyze + test + apk 构建验证兼容性（尤其 iOS PiP 反射）。
+version: 2
+updates:
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
