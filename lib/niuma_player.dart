@@ -33,10 +33,7 @@ export 'src/domain/player_state.dart'
         LineSwitched,
         LineSwitchFailed,
         PipModeChanged,
-        PipRemoteAction,
-        CastStarted,
-        CastEnded,
-        CastError;
+        PipRemoteAction;
 export 'src/player/niuma_player_controller.dart'
     show NiumaPlayerController;
 export 'src/player/niuma_player_options.dart' show NiumaPlayerOptions;
@@ -89,10 +86,3 @@ export 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
         requestBrowserFullscreen,
         exitBrowserFullscreen,
         onBrowserFullscreenChange;
-
-// M15 投屏（Cast）值类型——controller.connectCast / 事件模型依赖，故留核；
-// 协议实现 + UI 在参考皮。
-export 'package:niuma_player/src/cast/cast_device.dart' show CastDevice;
-export 'package:niuma_player/src/cast/cast_state.dart'
-    show CastConnectionState, CastEndReason;
-export 'package:niuma_player/src/cast/cast_session.dart' show CastSession;

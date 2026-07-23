@@ -27,20 +27,6 @@ class GestureFeedbackState {
   /// 映射到自家 icon 资源（[GestureHudIcon.pause] → 暂停图标 等）。
   final GestureHudIcon? hudIcon;
 
-  /// 返回字段更新后的新实例。
-  GestureFeedbackState copyWith({
-    GestureKind? kind,
-    double? progress,
-    String? label,
-    GestureHudIcon? hudIcon,
-  }) =>
-      GestureFeedbackState(
-        kind: kind ?? this.kind,
-        progress: progress ?? this.progress,
-        label: label ?? this.label,
-        hudIcon: hudIcon ?? this.hudIcon,
-      );
-
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

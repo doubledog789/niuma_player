@@ -30,21 +30,4 @@ void main() {
     expect(a.hashCode, equals(b.hashCode));
     expect(a, isNot(equals(c)));
   });
-
-  test('copyWith 单字段更新保留其他', () {
-    const a = GestureFeedbackState(
-      kind: GestureKind.brightness,
-      progress: 0.5,
-      label: '50%',
-    );
-    final b = a.copyWith(progress: 0.7);
-    expect(b.progress, 0.7);
-    expect(b.kind, GestureKind.brightness);
-    expect(b.label, '50%');
-  });
-
-  test('copyWith() 无参数返回等值', () {
-    const a = GestureFeedbackState(kind: GestureKind.doubleTap, progress: 1.0);
-    expect(a.copyWith(), equals(a));
-  });
 }

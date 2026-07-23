@@ -2,8 +2,6 @@ import 'dart:ui' show Size;
 
 import 'package:flutter/foundation.dart';
 
-import 'package:niuma_player/src/cast/cast_device.dart';
-import 'package:niuma_player/src/cast/cast_state.dart';
 import 'package:niuma_player/src/domain/player_backend.dart';
 
 /// [PlayerError] 的粗粒度分类，供上层判断是否重试 / 提示 / 切线路。
@@ -24,16 +22,13 @@ enum PlayerErrorCategory {
   unknown,
 }
 
-/// `phase == error` 时附在 [NiumaPlayerValue] 上的结构化错误，
-/// 消费方直接 switch [category]，不必模式匹配信息文本。
-@immutable
-/// Android 上 ExoPlayer 与 IJK 兜底**双双失败**时抛出的组合异常。
-/// 同时携带两段错误——只报 IJK 的会掩盖 ExoPlayer 的根因（如 HTTP 403）。
+/// Android 上 video_player 与 IJK 兜底**双双失败**时抛出的组合异常。
+/// 同时携带两段错误——只报 IJK 的会掩盖主内核的根因（如 HTTP 403）。
 class EngineFallbackFailure implements Exception {
   /// 构造组合异常。
   const EngineFallbackFailure({required this.primary, required this.fallback});
 
-  /// ExoPlayer（主内核）的原始错误。
+  /// video_player（主内核）的原始错误。
   final Object primary;
 
   /// IJK（兜底内核）重试后的错误。
@@ -44,6 +39,9 @@ class EngineFallbackFailure implements Exception {
       '两个内核均失败 — ExoPlayer: $primary ; IJK fallback: $fallback';
 }
 
+/// `phase == error` 时附在 [NiumaPlayerValue] 上的结构化错误，
+/// 消费方直接 switch [category]，不必模式匹配信息文本。
+@immutable
 class PlayerError {
   const PlayerError({
     required this.category,
@@ -188,7 +186,6 @@ class NiumaPlayerValue {
     Size? size,
     Duration? bufferedPosition,
     String? openingStage,
-    bool clearOpeningStage = false,
     // 用一个 sentinel 显式置 null：传 `clearError: true` 来重置。
     PlayerError? error,
     bool clearError = false,
@@ -203,7 +200,7 @@ class NiumaPlayerValue {
       size: size ?? this.size,
       bufferedPosition: bufferedPosition ?? this.bufferedPosition,
       openingStage:
-          clearOpeningStage ? null : (openingStage ?? this.openingStage),
+          openingStage ?? this.openingStage,
       error: clearError ? null : (error ?? this.error),
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       isInPictureInPicture: isInPictureInPicture ?? this.isInPictureInPicture,
@@ -282,8 +279,9 @@ final class BackendSelected extends NiumaPlayerEvent {
   String toString() => 'BackendSelected(kind: $kind, fromMemory: $fromMemory)';
 }
 
-/// controller 因错误或 timeout 不得不拆掉 video_player 启动 IJK 时
-/// 触发。
+/// 内核降级 / 初始化超时信号。`reason == error` 仅 Android：controller
+/// 拆掉 video_player 换 IJK 软解前触发；`reason == timeout` 三端通用，
+/// 是 initialize 的 wall-clock 超时排障信号（iOS / Web 上不伴随内核回退）。
 final class FallbackTriggered extends NiumaPlayerEvent {
   const FallbackTriggered(
     this.reason, {
@@ -365,21 +363,3 @@ final class PipRemoteAction extends NiumaPlayerEvent {
   final String action;
 }
 
-/// 投屏开始。
-final class CastStarted extends NiumaPlayerEvent {
-  const CastStarted(this.device);
-  final CastDevice device;
-}
-
-/// 投屏结束。
-final class CastEnded extends NiumaPlayerEvent {
-  const CastEnded(this.reason);
-  final CastEndReason reason;
-}
-
-/// 投屏出错（与 CastEnded 区别：可恢复 / 不可恢复看 reason）。
-final class CastError extends NiumaPlayerEvent {
-  const CastError({required this.code, this.message});
-  final String code;
-  final String? message;
-}
