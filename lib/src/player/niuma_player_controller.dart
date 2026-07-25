@@ -19,6 +19,12 @@ import 'package:niuma_player/src/player/pip_lifecycle_observer.dart';
 /// 进程级「正在播放且要求亮屏的 controller 数」，归并多实例，见 `_syncWakelock`。
 int _wakelockHolderCount = 0;
 
+/// 生命周期取消（load 换代 / dispose）——不是媒体错误：不重试、不触发
+/// IJK 兜底、不包装进 [EngineFallbackFailure]。
+class _LifecycleCanceled extends StateError {
+  _LifecycleCanceled() : super('NiumaPlayerController superseded or disposed');
+}
+
 /// 播放内核的单一公共门面：选 backend（三端主路径官方 video_player，web 走
 /// 自家 WebVideoBackend，Android 失败当次会话回退 IJK 软解）、多线路编排、
 /// PiP。
@@ -233,6 +239,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     }
     try {
       await _initVideoPlayer();
+    } on _LifecycleCanceled {
+      rethrow; // 快滑换源 / 页面销毁的取消，不是媒体失败。
     } catch (vpError) {
       // video_player 失败 → 当次会话内用 IJK 软解兜底重试（不落盘）。
       _emit(FallbackTriggered(
@@ -264,7 +272,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     PlayerBackend Function(NiumaDataSource resolved) create,
   ) async {
     if (_disposed || epoch != _epoch) {
-      throw StateError('NiumaPlayerController superseded or disposed');
+      throw _LifecycleCanceled();
     }
     await _disposeCurrentBackend();
     _resolvedSource = await runSourceMiddlewares(raw, middlewares);
@@ -407,7 +415,7 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // 真实平台播放器；StateError 属 unknown 类，各预设 RetryPolicy 均
       // 不重试，僵尸链就此终止。
       await backend.dispose();
-      throw StateError('NiumaPlayerController has been disposed');
+      throw _LifecycleCanceled();
     }
     await _detachBackend();
     _backend = backend;

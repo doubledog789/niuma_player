@@ -378,6 +378,49 @@ void main() {
       await controller.dispose();
     });
 
+    test('F2. 生命周期取消（dispose/load 换代）不触发 IJK 兜底、不包装组合异常',
+        () async {
+      // 复现线上：快滑 feed 时旧 init 链被代际守卫取消，取消却被 Android
+      // 分支误当 vp 失败 → 试 IJK → 报「两个内核均失败」污染错误上报。
+      final gate = Completer<void>();
+      final factory = FakeBackendFactory(
+        makeVideoPlayer: (_) => FakePlayerBackend(
+          kind: PlayerBackendKind.videoPlayer,
+          initBlock: () async {
+            await gate.future;
+            throw _RetryableError(PlayerErrorCategory.network);
+          },
+        ),
+      );
+      final controller = NiumaPlayerController(
+        NiumaMediaSource.single(ds),
+        retryPolicy: const RetryPolicy.exponential(
+          base: Duration(milliseconds: 10),
+          max: Duration(milliseconds: 10),
+          maxAttempts: 3,
+        ),
+        platform: FakePlatformBridge(),
+        backendFactory: factory,
+      );
+
+      final init = controller.initialize();
+      final failure = expectLater(
+        init,
+        throwsA(isA<StateError>().having(
+          (e) => e.toString(),
+          'message',
+          contains('superseded or disposed'),
+        )),
+      );
+      // 首次 attempt 卡在 gate 上时 dispose——放行后 retry 链发现代际失效。
+      await controller.dispose();
+      gate.complete();
+      await failure;
+
+      // 取消不是媒体失败：绝不能去拉 IJK。
+      expect(factory.nativePlayers, isEmpty);
+    });
+
     test('F. Android vp 与 IJK 兜底双双失败 → initialize() 抛组合异常',
         () async {
       final factory = FakeBackendFactory(
