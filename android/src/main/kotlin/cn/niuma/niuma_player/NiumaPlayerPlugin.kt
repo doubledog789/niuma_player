@@ -121,6 +121,10 @@ class NiumaPlayerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 result.success(hasHardwareHevcDecoder())
                 return
             }
+            "getAndroidSdkInt" -> {
+                result.success(Build.VERSION.SDK_INT)
+                return
+            }
             "getSystemVolume" -> {
                 handleGetSystemVolume(result)
                 return

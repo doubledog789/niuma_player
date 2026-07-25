@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:web/web.dart' as web;
 
 /// 设备媒体能力探测（web 实现）。
@@ -26,5 +27,14 @@ class NiumaCapabilities {
       } catch (_) {}
     }
     return _hevcCache = ok;
+  }
+
+  /// Android API level——web 上无意义，恒 0（与 io 实现保持同一签名）。
+  static Future<int> androidSdkInt() async => 0;
+
+  /// 仅测试用：清空进程内探测缓存。
+  @visibleForTesting
+  static void debugResetCaches() {
+    _hevcCache = null;
   }
 }

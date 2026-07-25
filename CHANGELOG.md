@@ -40,6 +40,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   所有权回退给仍存活的上一个并重建，绑定自然恢复（与 1.x 自研 native 路径
   `PlayerSession.surfaceStack` 同语义）。接入方零改动；texture 路径与 iOS
   不受影响。
+- **Android 9（API 28）上 vp 主路径自动降级 textureView**：该版本 video_player
+  的平台视图走 `setupSurfaceWithCallback`——`surfaceCreated` 里无条件
+  `seekTo(1)`（surface 每次重建都跳回开头，切后台再回来也会）、
+  `surfaceDestroyed` 里无条件 `setVideoSurface(null)`（不判断当前绑的是不是
+  自己）。多 surface 交接必然黑屏，`useAndroidPlatformView` 在 API 28 上因此
+  自动失效。IJK 兜底路径走自家 `PlayerSession.surfaceStack`，不受此限。
 - **倍速状态不再被打回 1.0**：vp / IJK 两后端的 value 映射漏带
   `playbackSpeed`，`setPlaybackSpeed(2.0)` 后下一条底层通知会把公开
   `value.playbackSpeed` 覆盖回 1.0（实际播放仍 2x，UI 倍速指示闪回）。

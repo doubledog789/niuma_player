@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import 'package:niuma_player/src/capabilities/niuma_capabilities.dart';
 import 'package:niuma_player/src/data/default_backend_factory.dart';
 import 'package:niuma_player/src/data/default_platform_bridge.dart';
 import 'package:niuma_player/src/domain/backend_factory.dart';
@@ -271,16 +272,29 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
     await _backend!.initialize().timeout(options.initTimeout);
   }
 
-  PlayerBackend _createVideoPlayer(NiumaDataSource resolved) =>
+  PlayerBackend _createVideoPlayer(
+    NiumaDataSource resolved,
+    bool useAndroidPlatformView,
+  ) =>
       _backendFactory.createVideoPlayer(
         resolved,
-        useAndroidPlatformView: options.useAndroidPlatformView,
+        useAndroidPlatformView: useAndroidPlatformView,
       );
+
+  /// vp 主路径实际是否用 platformView。Android 9（API 28）上 vp 的平台视图
+  /// 走 `setupSurfaceWithCallback`：`surfaceCreated` 里 `seekTo(1)`、
+  /// `surfaceDestroyed` 里无条件 `setVideoSurface(null)`（不判断当前绑的是
+  /// 不是自己）——全屏 ↔ inline 交接必然黑屏 + 跳回开头，故降级 textureView。
+  /// IJK 兜底路径走自家 `PlayerSession.surfaceStack`，不受此限。
+  Future<bool> _vpUsePlatformView() async =>
+      options.useAndroidPlatformView &&
+      await NiumaCapabilities.androidSdkInt() != 28;
 
   /// video_player 主路径初始化：autoFailover 开且多线路时按 priority 升序
   /// 全遍历，否则只试 defaultLine；全失败抛最后一条错误。
   Future<void> _initVideoPlayer() async {
     final epoch = _epoch;
+    final platformView = await _vpUsePlatformView();
     final candidates =
         (options.autoFailoverOnInitialError && source.lines.length > 1)
             ? ([...source.lines]
@@ -293,8 +307,8 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       final line = candidates[i];
       try {
         _activeLineId = line.id;
-        await _withRetry(
-            () => _bringUp(epoch, line.source, _createVideoPlayer));
+        await _withRetry(() => _bringUp(
+            epoch, line.source, (r) => _createVideoPlayer(r, platformView)));
         _emit(const BackendSelected(
           PlayerBackendKind.videoPlayer,
           fromMemory: false,
@@ -550,8 +564,9 @@ class NiumaPlayerController extends ValueNotifier<NiumaPlayerValue> {
       // 三端统一 video_player 主路径；每次重试整链重建（复用同一个失败
       // backend 反复 initialize 是打不活的）。
       final epoch = _epoch;
-      await _withRetry(
-          () => _bringUp(epoch, target.source, _createVideoPlayer));
+      final platformView = await _vpUsePlatformView();
+      await _withRetry(() => _bringUp(
+          epoch, target.source, (r) => _createVideoPlayer(r, platformView)));
     }
     if (_disposed) {
       await _disposeCurrentBackend();
