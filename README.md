@@ -56,7 +56,7 @@ Web 端基于 `package:web`，**wasm-ready**（可随 `flutter build web --wasm`
 
 ```yaml
 dependencies:
-  niuma_player: ^0.4.0   # pub.dev
+  niuma_player: ^0.5.0   # pub.dev
 ```
 
 ```bash
