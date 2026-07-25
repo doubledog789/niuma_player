@@ -31,6 +31,15 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **暂停被误报成 `buffering`**：vp 的 `pause()` 只翻 `isPlaying`、不动
+  `isBuffering`，而 ExoPlayer 暂停只改 `playWhenReady`、不改 `playbackState`
+  （收不到 `bufferingEnd`）——在缓冲窗口内按暂停会永久停在 `buffering`：
+  `effectivelyPlaying` 恒 true 导致播放/暂停按钮不翻转，spinner 也不灭。
+  `VideoPlayerBackend` 现在自己记录播放意图，`derivePhaseFor` 据此推导，
+  不变量是**无播放意图时永不产出 `buffering`**——与 `PlayerPhase.buffering`
+  的既有文档契约（「播放意图为真但解码器拿不到数据」）一致，也与 1.x
+  native 路径的 `PlayerSession.userWantsPlay` 同语义。web 路径按 `<video>`
+  的 `paused` 真值推导，本就不受影响。
 - **Android platformView 退出全屏后画面冻结**：`useAndroidPlatformView: true`
   时 vp 的平台视图构造即 `setVideoSurfaceView(自己)` 抢走 ExoPlayer 的独占
   输出 surface，销毁时只释放自己的 surface 不归还。宿主用共享 controller

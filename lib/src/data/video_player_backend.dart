@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
@@ -94,13 +95,33 @@ class VideoPlayerBackend extends PlayerBackend {
   }
 
   /// 推导 [PlayerPhase]，优先级
-  /// `error → opening → ended → buffering → playing → paused/ready`。
-  PlayerPhase _derivePhase(VideoPlayerValue v) {
+  /// `error → opening → ended → playing → 无意图则 paused/ready →
+  /// buffering → paused/ready`。
+  ///
+  /// playing 必须排在 buffering 前：video_player 的 Android 实现会在正常
+  /// 播放中把 isBuffering 卡在 true，若 buffering 优先，phase 永远出不了
+  /// buffering——皮肤 spinner 不灭、isPlaying 恒 false。
+  ///
+  /// [userWantsPlay] 是必需的：vp 的 `pause()` 只翻 isPlaying、不动
+  /// isBuffering，而 ExoPlayer 暂停只改 playWhenReady、不改 playbackState，
+  /// 收不到 bufferingEnd。因此在缓冲窗口内按暂停会永久卡在 buffering
+  /// （按钮不翻转 + spinner 不灭）。语义对齐 1.x native 路径的
+  /// `PlayerSession.userWantsPlay`：无播放意图时永不产出 buffering。
+  @visibleForTesting
+  static PlayerPhase derivePhaseFor(
+    VideoPlayerValue v, {
+    required bool userWantsPlay,
+  }) {
     if (v.hasError) return PlayerPhase.error;
     if (!v.isInitialized) return PlayerPhase.opening;
     if (v.isCompleted) return PlayerPhase.ended;
-    if (v.isBuffering) return PlayerPhase.buffering;
     if (v.isPlaying) return PlayerPhase.playing;
+    if (!userWantsPlay) {
+      return v.position == Duration.zero
+          ? PlayerPhase.ready
+          : PlayerPhase.paused;
+    }
+    if (v.isBuffering) return PlayerPhase.buffering;
     if (v.position == Duration.zero) return PlayerPhase.ready;
     return PlayerPhase.paused;
   }
@@ -109,7 +130,7 @@ class VideoPlayerBackend extends PlayerBackend {
     if (_disposed) return;
     final v = _inner.value;
     final buffered = v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
-    final phase = _derivePhase(v);
+    final phase = derivePhaseFor(v, userWantsPlay: _userWantsPlay);
     // video_player 只有自由格式 errorDescription，包成 unknown 分类。
     final PlayerError? playerError = v.hasError
         ? PlayerError(
@@ -137,15 +158,21 @@ class VideoPlayerBackend extends PlayerBackend {
   // mutate _inner 前先查 _disposed：dispose 期间 listener 可能同步调进来，
   // 撞 'VideoPlayerController used after disposed'。
 
+  /// 最近一次的播放意图。底层拿不到（vp 不暴露 playWhenReady），必须自己
+  /// 记——见 [derivePhaseFor] 的说明。任何会改变播放状态的路径都要维护它。
+  bool _userWantsPlay = false;
+
   @override
   Future<void> play() async {
     if (_disposed) return;
+    _userWantsPlay = true;
     return _inner.play();
   }
 
   @override
   Future<void> pause() async {
     if (_disposed) return;
+    _userWantsPlay = false;
     return _inner.pause();
   }
 
