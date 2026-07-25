@@ -39,24 +39,31 @@ class VideoPlayerBackend extends PlayerBackend {
   /// `package:video_player` 的 `VideoPlayer` widget。
   VideoPlayerController get innerController => _inner;
 
+  late final VideoViewType _viewType = useAndroidPlatformView && Platform.isAndroid
+      ? VideoViewType.platformView
+      : VideoViewType.textureView;
+
+  /// platformView 路径下底层 ExoPlayer 的输出 surface 是独占资源——同一
+  /// player 同时只能绑一个 SurfaceView，所以同一时刻只允许一份渲染 widget
+  /// 挂载（`NiumaPlayerView` 用 `ExclusiveSurfaceGate` 仲裁）。texture 路径
+  /// 是纯消费者，多份可并存。
+  bool get usesExclusiveSurface => _viewType == VideoViewType.platformView;
+
   VideoPlayerController _buildController() {
     final headers = _dataSource.headers ?? const <String, String>{};
-    final viewType = useAndroidPlatformView && Platform.isAndroid
-        ? VideoViewType.platformView
-        : VideoViewType.textureView;
     switch (_dataSource.type) {
       case NiumaSourceType.network:
         return VideoPlayerController.networkUrl(
           Uri.parse(_dataSource.uri),
           httpHeaders: headers,
-          viewType: viewType,
+          viewType: _viewType,
         );
       case NiumaSourceType.asset:
         return VideoPlayerController.asset(_dataSource.uri,
-            viewType: viewType);
+            viewType: _viewType);
       case NiumaSourceType.file:
         return VideoPlayerController.file(File(_dataSource.uri),
-            viewType: viewType);
+            viewType: _viewType);
     }
   }
 

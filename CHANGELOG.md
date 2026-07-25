@@ -31,6 +31,15 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Android platformView 退出全屏后画面冻结**：`useAndroidPlatformView: true`
+  时 vp 的平台视图构造即 `setVideoSurfaceView(自己)` 抢走 ExoPlayer 的独占
+  输出 surface，销毁时只释放自己的 surface 不归还。宿主用共享 controller
+  实现无缝全屏（inline 那份全屏期间仍挂在树上）时，退全屏后 player 绑在已
+  释放的 surface 上——声音和进度正常，画面停在最后一帧。现在同一 controller
+  下只有最后 mount 的 `NiumaPlayerView` 构造 vp 渲染 widget，它 unmount 时
+  所有权回退给仍存活的上一个并重建，绑定自然恢复（与 1.x 自研 native 路径
+  `PlayerSession.surfaceStack` 同语义）。接入方零改动；texture 路径与 iOS
+  不受影响。
 - **倍速状态不再被打回 1.0**：vp / IJK 两后端的 value 映射漏带
   `playbackSpeed`，`setPlaybackSpeed(2.0)` 后下一条底层通知会把公开
   `value.playbackSpeed` 覆盖回 1.0（实际播放仍 2x，UI 倍速指示闪回）。

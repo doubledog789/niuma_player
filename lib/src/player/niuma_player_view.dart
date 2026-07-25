@@ -10,6 +10,7 @@ import 'package:niuma_player/src/data/video_player_backend.dart';
 import 'package:niuma_player/src/domain/player_backend.dart';
 import 'package:niuma_player/src/domain/player_state.dart';
 import 'package:niuma_player/src/player/niuma_player_controller.dart';
+import 'package:niuma_player/src/player/surface_ownership.dart';
 import 'package:niuma_player/src/player/web_fullscreen_coordination.dart'
     show NiumaFullscreenScope, webFullscreenRouteCountListenable;
 
@@ -70,7 +71,19 @@ class NiumaPlayerView extends StatelessWidget {
         } else if (backend is VideoPlayerBackend) {
           // iOS / Android 主路径：渲染交给 vp 的 VideoPlayer widget
           //（texture / platformView 由 vp 按 viewType 自决）。
-          child = VideoPlayer(backend.innerController);
+          if (backend.usesExclusiveSurface) {
+            // platformView 下 ExoPlayer 输出 surface 独占：全屏那份后 mount
+            // 会抢走绑定，而 vp 的平台视图销毁时只释放自己的 surface、不归还
+            // → inline 那份（全屏期间通常仍挂在树上）退出后永远停在最后一帧。
+            // 这里做与 1.x PlayerSession.surfaceStack 同语义的仲裁。
+            child = ExclusiveSurfaceGate(
+              owner: controller,
+              builder: (_) => VideoPlayer(backend.innerController),
+              placeholder: const ColoredBox(color: Color(0xFF000000)),
+            );
+          } else {
+            child = VideoPlayer(backend.innerController);
+          }
         } else if (backend != null &&
             backend.androidPlatformViewId != null) {
           // Android PlatformView 路径（useAndroidPlatformView=true）。
