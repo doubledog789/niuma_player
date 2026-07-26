@@ -59,6 +59,7 @@ internal class IjkSession(
 
         // Network resilience: transient failures all surface as `what=-10000
         // extra=0`, so let FFmpeg recover on its own before propagating.
+
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1)
         // 绝不能开 reconnect_streamed：它把 HLS 分片的正常 EOF 也当断连，
         // 无限重连同一分片 → buffering/seek 死循环。

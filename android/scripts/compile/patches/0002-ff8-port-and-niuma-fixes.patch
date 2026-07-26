@@ -1,0 +1,370 @@
+diff --git a/ijkmedia/ijkplayer/android/ijkplayer_jni.c b/ijkmedia/ijkplayer/android/ijkplayer_jni.c
+index 40c19d8..f42f4d5 100755
+--- a/ijkmedia/ijkplayer/android/ijkplayer_jni.c
++++ b/ijkmedia/ijkplayer/android/ijkplayer_jni.c
+@@ -1234,6 +1234,15 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
+     IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_IJKPLAYER);
+     //MARK 注册IjkMediaPlayer的native方法
+     (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods) );
++    //MARK 此 fork 把 ijksdl / ijkj4a 编成独立 .so，它们各自的 JNI_OnLoad 不会被
++    // Android runtime 调用（只有 System.loadLibrary 直接加载的库才触发，
++    // DT_NEEDED 被动带入的不触发）。原本由 ijksdl 的 JNI_OnLoad 完成的两件关键
++    // 初始化因此从未执行：① 给 ijksdl 注入 JavaVM（message-loop 线程 attach 用），
++    // ② J4A_LoadAll 加载全部 j4a 类的 field/method ID。缺 ① → 事件发不回 Java
++    // → prepared 超时；缺 ② → native_setup 读 mNativeMediaPlayer 得 NULL jfieldID
++    // → CheckJNI SIGABRT。在此由主 JNI_OnLoad 代为补齐。
++    SDL_JNI_SetJvm(vm);
++    J4A_LoadAll__catchAll(env);
+     //MARK 注册ffmpeg 组件和网络 和 自定义模块
+     ijkmp_global_init();
+     //MARK 注册检测在线直播流回调
+diff --git a/ijkmedia/ijkplayer/android/pipeline/ffpipenode_android_mediacodec_vdec.c b/ijkmedia/ijkplayer/android/pipeline/ffpipenode_android_mediacodec_vdec.c
+index 5f793fe..b7df195 100755
+--- a/ijkmedia/ijkplayer/android/pipeline/ffpipenode_android_mediacodec_vdec.c
++++ b/ijkmedia/ijkplayer/android/pipeline/ffpipenode_android_mediacodec_vdec.c
+@@ -1562,7 +1562,7 @@ drain_output_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *deq
+                 }
+             }
+         }
+-        ret = ffp_queue_picture(ffp, frame, pts, duration, frame->pkt_pos,
++        ret = ffp_queue_picture(ffp, frame, pts, duration, (int64_t)-1,
+                                 is->viddec.pkt_serial);
+         if (ret) {
+             if (frame->opaque)
+@@ -1714,7 +1714,7 @@ static int func_run_sync(IJKFF_Pipenode *node) {
+                     }
+                 }
+             }
+-            ret = ffp_queue_picture(ffp, frame, pts, duration, frame->pkt_pos,
++            ret = ffp_queue_picture(ffp, frame, pts, duration, (int64_t)-1,
+                                     is->viddec.pkt_serial);
+             if (ret) {
+                 if (frame->opaque)
+@@ -1791,43 +1791,43 @@ ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipelin
+                 goto fail;
+             }
+             switch (opaque->codecpar->profile) {
+-                case FF_PROFILE_H264_BASELINE:
++                case AV_PROFILE_H264_BASELINE:
+                     ALOGI("%s: MediaCodec: H264_BASELINE: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_CONSTRAINED_BASELINE:
++                case AV_PROFILE_H264_CONSTRAINED_BASELINE:
+                     ALOGI("%s: MediaCodec: H264_CONSTRAINED_BASELINE: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_MAIN:
++                case AV_PROFILE_H264_MAIN:
+                     ALOGI("%s: MediaCodec: H264_MAIN: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_EXTENDED:
++                case AV_PROFILE_H264_EXTENDED:
+                     ALOGI("%s: MediaCodec: H264_EXTENDED: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_HIGH:
++                case AV_PROFILE_H264_HIGH:
+                     ALOGI("%s: MediaCodec: H264_HIGH: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_HIGH_10:
++                case AV_PROFILE_H264_HIGH_10:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_10_INTRA:
++                case AV_PROFILE_H264_HIGH_10_INTRA:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_422:
++                case AV_PROFILE_H264_HIGH_422:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_422: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_422_INTRA:
++                case AV_PROFILE_H264_HIGH_422_INTRA:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_444:
++                case AV_PROFILE_H264_HIGH_444:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_444: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_444_PREDICTIVE:
++                case AV_PROFILE_H264_HIGH_444_PREDICTIVE:
+                     ALOGW("%s: MediaCodec: H264_HIGH_444_PREDICTIVE: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_444_INTRA:
++                case AV_PROFILE_H264_HIGH_444_INTRA:
+                     ALOGW("%s: MediaCodec: H264_HIGH_444_INTRA: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_CAVLC_444:
++                case AV_PROFILE_H264_CAVLC_444:
+                     ALOGW("%s: MediaCodec: H264_CAVLC_444: disabled\n", __func__);
+                     goto fail;
+                 default:
+@@ -2034,43 +2034,43 @@ ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pip
+                 goto fail;
+             }
+             switch (opaque->codecpar->profile) {
+-                case FF_PROFILE_H264_BASELINE:
++                case AV_PROFILE_H264_BASELINE:
+                     ALOGI("%s: MediaCodec: H264_BASELINE: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_CONSTRAINED_BASELINE:
++                case AV_PROFILE_H264_CONSTRAINED_BASELINE:
+                     ALOGI("%s: MediaCodec: H264_CONSTRAINED_BASELINE: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_MAIN:
++                case AV_PROFILE_H264_MAIN:
+                     ALOGI("%s: MediaCodec: H264_MAIN: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_EXTENDED:
++                case AV_PROFILE_H264_EXTENDED:
+                     ALOGI("%s: MediaCodec: H264_EXTENDED: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_HIGH:
++                case AV_PROFILE_H264_HIGH:
+                     ALOGI("%s: MediaCodec: H264_HIGH: enabled\n", __func__);
+                     break;
+-                case FF_PROFILE_H264_HIGH_10:
++                case AV_PROFILE_H264_HIGH_10:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_10_INTRA:
++                case AV_PROFILE_H264_HIGH_10_INTRA:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_422:
++                case AV_PROFILE_H264_HIGH_422:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_422: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_422_INTRA:
++                case AV_PROFILE_H264_HIGH_422_INTRA:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_444:
++                case AV_PROFILE_H264_HIGH_444:
+                     ALOGW("%s: MediaCodec: H264_HIGH_10_444: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_444_PREDICTIVE:
++                case AV_PROFILE_H264_HIGH_444_PREDICTIVE:
+                     ALOGW("%s: MediaCodec: H264_HIGH_444_PREDICTIVE: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_HIGH_444_INTRA:
++                case AV_PROFILE_H264_HIGH_444_INTRA:
+                     ALOGW("%s: MediaCodec: H264_HIGH_444_INTRA: disabled\n", __func__);
+                     goto fail;
+-                case FF_PROFILE_H264_CAVLC_444:
++                case AV_PROFILE_H264_CAVLC_444:
+                     ALOGW("%s: MediaCodec: H264_CAVLC_444: disabled\n", __func__);
+                     goto fail;
+                 default:
+diff --git a/ijkmedia/ijkplayer/ff_cmdutils.c b/ijkmedia/ijkplayer/ff_cmdutils.c
+index b8483e5..e46da59 100644
+--- a/ijkmedia/ijkplayer/ff_cmdutils.c
++++ b/ijkmedia/ijkplayer/ff_cmdutils.c
+@@ -229,8 +229,12 @@ void *grow_array(void *array, int elem_size, int *size, int new_size)
+ double get_rotation(AVStream *st)
+ {
+     AVDictionaryEntry *rotate_tag = av_dict_get(st->metadata, "rotate", NULL, 0);
+-    uint8_t* displaymatrix = av_stream_get_side_data(st,
+-                                                     AV_PKT_DATA_DISPLAYMATRIX, NULL);
++    /* FFmpeg 8: av_stream_get_side_data 已移除，改查 codecpar 的 coded_side_data */
++    const AVPacketSideData *ijk_sd =
++        av_packet_side_data_get(st->codecpar->coded_side_data,
++                                st->codecpar->nb_coded_side_data,
++                                AV_PKT_DATA_DISPLAYMATRIX);
++    uint8_t* displaymatrix = ijk_sd ? ijk_sd->data : NULL;
+     double theta = 0;
+ 
+     if (rotate_tag && *rotate_tag->value && strcmp(rotate_tag->value, "0")) {
+diff --git a/ijkmedia/ijkplayer/ff_ffinc.h b/ijkmedia/ijkplayer/ff_ffinc.h
+index 63449ec..6b0998e 100644
+--- a/ijkmedia/ijkplayer/ff_ffinc.h
++++ b/ijkmedia/ijkplayer/ff_ffinc.h
+@@ -30,7 +30,7 @@
+ #include "libavutil/avstring.h"
+ #include "libavutil/time.h"
+ #include "libavformat/avformat.h"
+-#include "libavcodec/avfft.h"
++#include "ijk_avfft_shim.h"
+ #include "libswscale/swscale.h"
+ #include "libavutil/application.h"
+ #include "libavutil/base64.h"
+diff --git a/ijkmedia/ijkplayer/ff_ffplay.c b/ijkmedia/ijkplayer/ff_ffplay.c
+index f00f9e7..92bcfc3 100755
+--- a/ijkmedia/ijkplayer/ff_ffplay.c
++++ b/ijkmedia/ijkplayer/ff_ffplay.c
+@@ -55,7 +55,7 @@
+ 
+ #include "libswscale/swscale.h"
+ #include "libavutil/opt.h"
+-#include "libavcodec/avfft.h"
++#include "ijk_avfft_shim.h"
+ #include "libswresample/swresample.h"
+ 
+ #if CONFIG_AVFILTER
+@@ -2235,7 +2235,7 @@ static int audio_thread(void *arg) {
+                 goto the_end;
+ 
+             af->pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
+-            af->pos = frame->pkt_pos;
++            af->pos = (int64_t)-1;
+             af->serial = is->auddec.pkt_serial;
+             af->duration = av_q2d((AVRational) {frame->nb_samples, frame->sample_rate});
+ 
+@@ -2427,7 +2427,7 @@ static int ffplay_video_thread(void *arg) {
+         duration = (frame_rate.num && frame_rate.den ? av_q2d(
+                 (AVRational) {frame_rate.den, frame_rate.num}) : 0);
+         pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
+-        ret = queue_picture(ffp, frame, pts, duration, frame->pkt_pos, is->viddec.pkt_serial);
++        ret = queue_picture(ffp, frame, pts, duration, (int64_t)-1, is->viddec.pkt_serial);
+         av_frame_unref(frame);
+ #if CONFIG_AVFILTER
+         }
+@@ -2992,12 +2992,21 @@ static int stream_component_open(FFPlayer *ffp, int stream_index) {
+         goto fail;
+     avctx->pkt_timebase = ic->streams[stream_index]->time_base;
+     //MARK 查找对应解码器
++    // 原 fork 在这里无条件优先取 *_mediacodec 解码器，**无视 mediacodec 选项**。
++    // niuma 的 IJK 定位就是「兜 MediaCodec 不稳的设备」，显式设了 mediacodec=0，
++    // 却仍会走到硬解 wrapper：H.264 上 avcodec_open2 直接失败（EINVAL），
++    // 表现为有声无画（音频组件开了、视频组件没开）。HEVC 侥幸没事只是因为
++    // hevc_mediacodec 在本构建里没注册、落回了软解。
++    // 这里改成尊重选项：只有显式开了对应开关才走 MediaCodec。
+     if (avctx->codec_id == AV_CODEC_ID_H264) {
+-        codec = avcodec_find_decoder_by_name("h264_mediacodec");
++        if (ffp->mediacodec_avc || ffp->mediacodec_all_videos)
++            codec = avcodec_find_decoder_by_name("h264_mediacodec");
+     } else if (avctx->codec_id == AV_CODEC_ID_HEVC) {
+-        codec = avcodec_find_decoder_by_name("hevc_mediacodec");
++        if (ffp->mediacodec_hevc || ffp->mediacodec_all_videos)
++            codec = avcodec_find_decoder_by_name("hevc_mediacodec");
+     } else if (avctx->codec_id == AV_CODEC_ID_AV1) {
+-        codec = avcodec_find_decoder_by_name("av1_mediacodec");
++        if (ffp->mediacodec_all_videos)
++            codec = avcodec_find_decoder_by_name("av1_mediacodec");
+     }
+ 
+     if (codec == NULL) {
+@@ -3340,7 +3349,7 @@ static int read_thread(void *arg) {
+     if (ffp->genpts)
+         ic->flags |= AVFMT_FLAG_GENPTS;
+ 
+-    av_format_inject_global_side_data(ic);
++    /* FFmpeg 8: 已移除，全局 side data 恒注入 */
+     //
+     //AVDictionary **opts;
+     //int orig_nb_streams;
+@@ -3356,7 +3365,7 @@ static int read_thread(void *arg) {
+             if (av_stristart(is->filename, "data:", NULL) && orig_nb_streams > 0) {
+                 for (i = 0; i < orig_nb_streams; i++) {
+                     if (!ic->streams[i] || !ic->streams[i]->codecpar ||
+-                        ic->streams[i]->codecpar->profile == FF_PROFILE_UNKNOWN) {
++                        ic->streams[i]->codecpar->profile == AV_PROFILE_UNKNOWN) {
+                         break;
+                     }
+                 }
+@@ -4686,9 +4695,17 @@ long ffp_get_current_position_l(FFPlayer *ffp) {
+         return (long) pos;
+     }
+ 
+-    if (pos < 0 || pos < start_diff)
++    if (pos < 0)
+         return 0;
+ 
++    // fMP4 分片的 HLS（EXT-X-MAP）：ic->start_time 取自分片的
++    // baseMediaDecodeTime，是个很大的值，而 master clock 并不含这个偏移，
++    // 于是 pos < start_diff 恒成立 —— 原实现在这里直接返回 0，表现为
++    // 进度条永远不动、seek 之后位置塌回 0（画面其实一直在正常播）。
++    // 这种情况下 start_diff 不适用，直接用时钟值。
++    if (pos < start_diff)
++        return (long) pos;
++
+     int64_t adjust_pos = pos - start_diff;
+     return (long) adjust_pos;
+ }
+@@ -4959,9 +4976,12 @@ void ffp_check_buffering_l(FFPlayer *ffp) {
+ #endif
+         //MARK 发送解码缓存信息
+         ffp_notify_msg3(ffp, FFP_MSG_BUFFERING_UPDATE, (int) buf_time_position, buf_percent);
+-        if (ffp->show_first_frame && buf_percent > 0) {
+-            ffp_seek_to_l(ffp, 0);
+-        }
++        // 原 fork 在这里 ffp_seek_to_l(ffp, 0)，意图是"逼出首帧"。但缓冲期
++        // 输出是暂停的、首帧显示不出来 → show_first_frame 永远清不掉 →
++        // 每轮缓冲检查都重新 seek 回 0 → 分片反复重拉、缓冲永远填不满，
++        // 实测起播要读 23~26 个分片（约 140 秒内容），黑屏 2.4~5.7 秒。
++        // niuma 走 start-on-prepared=0 + Dart 侧立即 play()，不需要这个
++        // hack，移除。
+     }
+ 
+     if (need_start_buffering) {
+diff --git a/ijkmedia/ijkplayer/ff_ffplay_def.h b/ijkmedia/ijkplayer/ff_ffplay_def.h
+index 82de482..e13d609 100755
+--- a/ijkmedia/ijkplayer/ff_ffplay_def.h
++++ b/ijkmedia/ijkplayer/ff_ffplay_def.h
+@@ -49,7 +49,7 @@
+ // FFP_MERGE: #include "libavdevice/avdevice.h"
+ #include "libswscale/swscale.h"
+ #include "libavutil/opt.h"
+-#include "libavcodec/avfft.h"
++#include "ijk_avfft_shim.h"
+ #include "libswresample/swresample.h"
+ 
+ #if CONFIG_AVFILTER
+diff --git a/ijkmedia/ijkplayer/ijk_avfft_shim.h b/ijkmedia/ijkplayer/ijk_avfft_shim.h
+new file mode 100644
+index 0000000..d488676
+--- /dev/null
++++ b/ijkmedia/ijkplayer/ijk_avfft_shim.h
+@@ -0,0 +1,9 @@
++#ifndef IJK_AVFFT_SHIM_H
++#define IJK_AVFFT_SHIM_H
++/* FFmpeg 8.0 移除了 libavcodec/avfft.h（FFT API 迁到 libavutil/tx.h）。
++ * ijkplayer 仅在音频波形可视化（SHOW_MODE_RDFT）中用到 RDFT，niuma 的
++ * 播放路径永远走不到该分支，这里提供最小 shim 让编译通过。 */
++typedef struct RDFTContext RDFTContext;
++typedef float FFTSample;
++#define av_rdft_end(ctx) do { (void)(ctx); } while (0)
++#endif
+diff --git a/ijkmedia/ijkplayer/ijkmeta.c b/ijkmedia/ijkplayer/ijkmeta.c
+index 9ef8db7..4b42b52 100755
+--- a/ijkmedia/ijkplayer/ijkmeta.c
++++ b/ijkmedia/ijkplayer/ijkmeta.c
+@@ -199,7 +199,7 @@ void ijkmeta_set_avformat_context_l(IjkMediaMeta *meta, AVFormatContext *ic) {
+         const char *codec_name = avcodec_get_name(codecpar->codec_id);
+         if (codec_name)
+             ijkmeta_set_string_l(stream_meta, IJKM_KEY_CODEC_NAME, codec_name);
+-        if (codecpar->profile != FF_PROFILE_UNKNOWN) {
++        if (codecpar->profile != AV_PROFILE_UNKNOWN) {
+             const AVCodec *codec = avcodec_find_decoder(codecpar->codec_id);
+             if (codec) {
+                 ijkmeta_set_int64_l(stream_meta, IJKM_KEY_CODEC_PROFILE_ID, codecpar->profile);
+diff --git a/ijkmedia/ijksdl/android/ijksdl_android_jni.c b/ijkmedia/ijksdl/android/ijksdl_android_jni.c
+index c5ac420..841bd35 100644
+--- a/ijkmedia/ijksdl/android/ijksdl_android_jni.c
++++ b/ijkmedia/ijksdl/android/ijksdl_android_jni.c
+@@ -40,6 +40,15 @@ JavaVM *SDL_JNI_GetJvm()
+     return g_jvm;
+ }
+ 
++// 此 fork 把 ijksdl 编成独立 .so，其 JNI_OnLoad 不会被 Android runtime 调用
++// （只有 System.loadLibrary 直接加载的库才触发），导致 g_jvm 始终为 NULL，
++// message-loop 线程 SDL_JNI_SetupThreadEnv 失败、事件发不回 Java。
++// 暴露 setter 让 libijkplayer.so 的主 JNI_OnLoad 代为注入 JavaVM。
++void SDL_JNI_SetJvm(JavaVM *vm)
++{
++    g_jvm = vm;
++}
++
+ static void SDL_JNI_ThreadDestroyed(void* value)
+ {
+     JNIEnv *env = (JNIEnv*) value;
+diff --git a/ijkmedia/ijksdl/android/ijksdl_android_jni.h b/ijkmedia/ijksdl/android/ijksdl_android_jni.h
+index 76477a9..4ea6eef 100644
+--- a/ijkmedia/ijksdl/android/ijksdl_android_jni.h
++++ b/ijkmedia/ijksdl/android/ijksdl_android_jni.h
+@@ -54,6 +54,7 @@
+ #define IJK_API_23_M                        23  // 6.0
+ 
+ JavaVM *SDL_JNI_GetJvm();
++void    SDL_JNI_SetJvm(JavaVM *vm);
+ 
+ jint    SDL_JNI_SetupThreadEnv(JNIEnv **p_env);
+ void    SDL_JNI_DetachThreadEnv();

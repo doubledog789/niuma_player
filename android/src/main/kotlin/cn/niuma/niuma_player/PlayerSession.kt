@@ -88,6 +88,7 @@ internal abstract class PlayerSession(
     // ── Snapshot fields. Touched only on the main looper. ────────────────
     private var phase: String = PHASE_IDLE
     private var positionMs: Long = 0L
+
     private var durationMs: Long = 0L
     private var bufferedMs: Long = 0L
     private var width: Int = 0
@@ -104,7 +105,20 @@ internal abstract class PlayerSession(
             if (phase != PHASE_IDLE && phase != PHASE_OPENING && phase != PHASE_ERROR) {
                 if (System.currentTimeMillis() >= suppressHeartbeatUntilMs) {
                     try {
+                        val prev = positionMs
                         positionMs = underlyingCurrentPosition()
+                        // ── buffering 的「出口」兜底 ────────────────────
+                        // fMP4 分片的 HLS 上，seek 后 IJK 只发 BUFFERING_START
+                        // 不发 BUFFERING_END，phase 会永远卡在 buffering——
+                        // 而画面其实在正常播（实测截图逐帧在变）。
+                        // VIDEO_RENDERING_START 只在首帧发一次，救不了后续。
+                        // 位置在推进 = 帧在流，这是比任何事件都硬的证据，
+                        // 据此自愈；真卡顿时位置不动，仍正确停在 buffering。
+                        if (phase == PHASE_BUFFERING && userWantsPlay &&
+                            positionMs > prev
+                        ) {
+                            phase = PHASE_PLAYING
+                        }
                         emitState()
                     } catch (_: Throwable) {
                         // swallow — player may be transitioning / released

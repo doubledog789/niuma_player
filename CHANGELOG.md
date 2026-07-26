@@ -9,6 +9,26 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Android IJK 软解兜底重建：改用自编 FFmpeg 8.1，修好 fMP4 分片 HLS 的三处硬伤。**
+  产物从 GSY 官方（FFmpeg 4.x）换回自编 `ijkplayer-0.8.8-ff8.1-20260727`
+  （arm64-v8a + armeabi-v7a，minSdk 保持 21）。fork 自带的私货与旧假设逐条修掉：
+  - **fMP4 位置恒 0 / seek 后永久卡 buffering**：`ffp_get_current_position_l()`
+    对 `ic->start_time` 的假设不适用于 fMP4（`start_time` 取自分片的
+    `baseMediaDecodeTime`，是个很大的值，而 master clock 不含此偏移），
+    `pos < start_diff` 恒成立直接返回 0。画面其实一直在正常播，坏的只是位置上报。
+  - **起播黑屏 2.4~5.7 秒**：fork 在 `ffp_check_buffering_l()` 里为「逼出首帧」
+    做 `seek_to(0)`，而 `show_first_frame` 只有首帧显示后才清零、缓冲期间又
+    显示不出来 → 每轮缓冲检查都 seek 回 0 → 分片反复重拉。实测起播要读
+    23~26 个分片（约 140 秒内容）；移除后降到 1~2 片。
+  - **H.264 有声无画**：fork 在 `stream_component_open()` 里无条件优先取
+    `*_mediacodec` 解码器，**无视 `mediacodec` 选项**。niuma 显式设了
+    `mediacodec=0` 仍会走硬解 wrapper，H.264 上 `avcodec_open2` 失败
+    （EINVAL）导致视频组件根本没打开。改为尊重选项。
+  - `PlayerSession` 心跳补一道 buffering 出口兜底：位置在推进即视为帧在流，
+    snap 回 playing——不再依赖 `BUFFERING_END` 事件（fMP4 上它不发）。
+  - 编译链、补丁（`patches/0001~0003`）、`VERSIONS.lock`、
+    `module-niuma-ff8-slim.sh` 全部回归本仓；踩坑记录见
+    `doc/ijk-fmp4-hls.md`。
 - **播完后拖回进度可能永远转圈**：video_player 在 completed 事件里调的是
   自己的 `pause()`，绕过 `VideoPlayerBackend.pause()`，播放意图停在 true；
   而拖动进度会把 `isCompleted` 翻回 false，底层重新缓冲就被推导成
