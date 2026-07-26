@@ -86,7 +86,7 @@ class _StandardPlayerPageState extends State<StandardPlayerPage> {
     super.initState();
     _c = NiumaPlayerController.dataSource(
       NiumaDataSource.network(
-        'https://artplayer.org/assets/sample/bbb-video.mp4',
+        'http://api.remnthdf.com/xbapi/m3u8/p/8ab6405c7201e17df84943b744c62bec.m3u8',
       ),
       options: const NiumaPlayerOptions(useAndroidPlatformView: true),
     );
@@ -141,12 +141,21 @@ class EngineSwitchPage extends StatefulWidget {
 }
 
 class _EngineSwitchPageState extends State<EngineSwitchPage> {
-  // TODO: 换成你自己的测试流地址（mp4 / m3u8 均可）。
-  static const String _url =
-      'https://artplayer.org/assets/sample/bbb-video.mp4';
+  // TODO: 换成你自己的测试流地址（mp4 / m3u8 均可）。页面上的输入框可以
+  // 运行时替换——签名过期的源不用改代码重编。
+  static const String _defaultUrl =
+      'http://api.remnthdf.com/xbapi/m3u8/p/c19b4137fb220f5aefa601b5420448cc.m3u8';
+
+  late final TextEditingController _urlCtrl =
+      TextEditingController(text: _defaultUrl);
+  String _url = _defaultUrl;
 
   /// false = ExoPlayer（默认硬解）；true = 强制 IJK 软解。
   bool _useIjk = false;
+
+  /// PlatformView（SurfaceView 直出）/ Texture（走 Flutter 纹理）。
+  /// 排查「解码不出帧」还是「出了帧送不到屏幕」时，两条路要分别试一次。
+  bool _usePlatformView = true;
 
   NiumaPlayerController? _c;
 
@@ -169,7 +178,7 @@ class _EngineSwitchPageState extends State<EngineSwitchPage> {
       //   headers: const {'referer': 'https://your.domain'}。
       NiumaDataSource.network(_url),
       options: NiumaPlayerOptions(
-        useAndroidPlatformView: true,
+        useAndroidPlatformView: _usePlatformView,
         forceIjkOnAndroid: _useIjk,
       ),
     );
@@ -190,6 +199,7 @@ class _EngineSwitchPageState extends State<EngineSwitchPage> {
 
   @override
   void dispose() {
+    _urlCtrl.dispose();
     _c?.dispose();
     super.dispose();
   }
@@ -203,7 +213,34 @@ class _EngineSwitchPageState extends State<EngineSwitchPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _urlCtrl,
+                    maxLines: 1,
+                    style: const TextStyle(fontSize: 12),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                      labelText: '测试流 URL',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () {
+                    setState(() => _url = _urlCtrl.text.trim());
+                    _rebuild();
+                  },
+                  child: const Text('加载'),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
             child: SegmentedButton<bool>(
               segments: const [
                 ButtonSegment(value: false, label: Text('ExoPlayer 硬解')),
@@ -212,6 +249,20 @@ class _EngineSwitchPageState extends State<EngineSwitchPage> {
               selected: {_useIjk},
               onSelectionChanged: (s) {
                 setState(() => _useIjk = s.first);
+                _rebuild();
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('PlatformView')),
+                ButtonSegment(value: false, label: Text('Texture')),
+              ],
+              selected: {_usePlatformView},
+              onSelectionChanged: (s) {
+                setState(() => _usePlatformView = s.first);
                 _rebuild();
               },
             ),
