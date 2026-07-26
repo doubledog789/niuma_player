@@ -126,10 +126,21 @@ class VideoPlayerBackend extends PlayerBackend {
     return PlayerPhase.paused;
   }
 
+  /// 播放意图的推进：播完即作废。
+  ///
+  /// vp 收到 completed 事件时调的是**自己**的 `pause()`（绕过本类的
+  /// [pause]），意图随之失效。不清掉的话，用户把进度拖回中间时
+  /// `_updatePosition` 会把 `isCompleted` 翻回 false，而意图仍是「播」，
+  /// 底层重新缓冲就会被推导成永远转圈的 buffering。
+  @visibleForTesting
+  static bool nextUserWantsPlay(bool current, VideoPlayerValue v) =>
+      current && !v.isCompleted;
+
   void _onInnerChanged() {
     if (_disposed) return;
     final v = _inner.value;
     final buffered = v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
+    _userWantsPlay = nextUserWantsPlay(_userWantsPlay, v);
     final phase = derivePhaseFor(v, userWantsPlay: _userWantsPlay);
     // video_player 只有自由格式 errorDescription，包成 unknown 分类。
     final PlayerError? playerError = v.hasError

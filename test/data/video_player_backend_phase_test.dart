@@ -107,6 +107,36 @@ void main() {
       expect(_phase(_v(), userWantsPlay: false), PlayerPhase.paused);
     });
 
+    test('播完即作废播放意图——vp 内部 pause() 绕过了本类的 pause()', () {
+      // 播完 → 拖进度回中间：_updatePosition 会把 isCompleted 翻回 false，
+      // 若意图还停在 true，就会推导成永远转圈的 buffering。
+      expect(
+        VideoPlayerBackend.nextUserWantsPlay(true, _v(isCompleted: true)),
+        isFalse,
+      );
+      expect(
+        VideoPlayerBackend.nextUserWantsPlay(true, _v()),
+        isTrue,
+        reason: '没播完不能动意图',
+      );
+      expect(
+        VideoPlayerBackend.nextUserWantsPlay(false, _v()),
+        isFalse,
+      );
+    });
+
+    test('播完后拖回中间 → paused，不是 buffering', () {
+      final ended = _v(isCompleted: true, position: const Duration(seconds: 10));
+      final intent = VideoPlayerBackend.nextUserWantsPlay(true, ended);
+      // seek 回中间：isCompleted 变回 false，底层正在重新缓冲。
+      final afterSeek =
+          _v(isBuffering: true, position: const Duration(seconds: 4));
+      expect(
+        _phase(afterSeek, userWantsPlay: intent),
+        PlayerPhase.paused,
+      );
+    });
+
     test('不变量：无播放意图时永不产出 buffering', () {
       for (final playing in <bool>[true, false]) {
         for (final buffering in <bool>[true, false]) {

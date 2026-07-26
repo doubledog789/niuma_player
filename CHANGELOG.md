@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **播完后拖回进度可能永远转圈**：video_player 在 completed 事件里调的是
+  自己的 `pause()`，绕过 `VideoPlayerBackend.pause()`，播放意图停在 true；
+  而拖动进度会把 `isCompleted` 翻回 false，底层重新缓冲就被推导成
+  `buffering`——spinner 不灭、按钮显示正在播、实际没播。现在观察到
+  completed 即作废播放意图。触发要求 seek 目标处发生重缓冲，真机上表现为
+  间歇（HLS / 长视频 / 弱网更易命中）。
+
 ## [0.5.0] - 2026-07-25
 
 ### Changed
