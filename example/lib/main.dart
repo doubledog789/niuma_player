@@ -86,7 +86,7 @@ class _StandardPlayerPageState extends State<StandardPlayerPage> {
     super.initState();
     _c = NiumaPlayerController.dataSource(
       NiumaDataSource.network(
-        'http://api.remnthdf.com/xbapi/m3u8/p/8ab6405c7201e17df84943b744c62bec.m3u8',
+        'https://artplayer.org/assets/sample/bbb-video.mp4',
       ),
       options: const NiumaPlayerOptions(useAndroidPlatformView: true),
     );
@@ -144,7 +144,7 @@ class _EngineSwitchPageState extends State<EngineSwitchPage> {
   // TODO: 换成你自己的测试流地址（mp4 / m3u8 均可）。页面上的输入框可以
   // 运行时替换——签名过期的源不用改代码重编。
   static const String _defaultUrl =
-      'http://api.remnthdf.com/xbapi/m3u8/p/c19b4137fb220f5aefa601b5420448cc.m3u8';
+      'https://artplayer.org/assets/sample/bbb-video.mp4';
 
   late final TextEditingController _urlCtrl =
       TextEditingController(text: _defaultUrl);

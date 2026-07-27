@@ -64,6 +64,6 @@ android {
         // - gsyvideoplayer-java：官方 ijkplayer-java（保留 tv.danmaku.ijk
         //   包名，API 与 IjkSession 完全兼容），依赖仅 androidx 基础件
         // - ex_so：含 hevc 的扩展版 so（标准版无 hevc）
-        implementation("tv.danmaku.ijk:ijkplayer:0.8.8-ff8.1-20260727@aar")
+        implementation("tv.danmaku.ijk:ijkplayer:0.8.8-ff8.1-static-20260727@aar")
     }
 }

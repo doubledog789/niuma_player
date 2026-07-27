@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-07-27
+
+### Changed
+
+- **IJK 产物改用 `c++_static` 链接**：不再随包分发 `libc++_shared.so`。
+  实测五个 ijk `.so` 里只有 `libijksoundtouch` 真用 C++ 运行时（0.1 → 0.4 MB），
+  其余体积不变，不存在「每个 so 各带一份 libc++」的膨胀。
+  装机体积 arm64-v8a 9.9 → **8.5 MB**、armeabi-v7a 7.5 → **6.4 MB**，
+  aar 7.7 → 6.9 MB。相对 GSY 官方产物的净增从 +2.7 MB 压到 +1.3 MB。
+
+### Fixed
+
+- example 的默认测试流误提交成了内部签名地址（0.5.1 随包发出），
+  改回公开示例源。
+
 ## [0.5.1] - 2026-07-27
 
 ### Fixed
